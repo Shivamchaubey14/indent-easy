@@ -1,0 +1,444 @@
+{% load custom_filters %}
+<div class="balance-details-modal">
+    <!-- Current Ledger Info -->
+    <div class="current-ledger-section">
+        <div class="ledger-header">
+            <h4>
+                <i class="fas fa-calculator"></i>
+                Current Balance Details
+            </h4>
+            <span class="status-badge {% if ledger.closing_balance > 0 %}pending-send{% elif ledger.closing_balance < 0 %}pending-deduct{% else %}reconciled{% endif %}">
+                {{ ledger.get_balance_status }}
+            </span>
+        </div>
+        
+        <div class="ledger-grid">
+            <div class="ledger-item">
+                <div class="ledger-label">MPP</div>
+                <div class="ledger-value">
+                    <strong>{{ ledger.mpp.name_with_code }}</strong>
+                    <div class="text-muted small">{{ ledger.mpp.mpp_transaction_code|default:"No Code" }}</div>
+                </div>
+            </div>
+            
+            <div class="ledger-item">
+                <div class="ledger-label">Product</div>
+                <div class="ledger-value">
+                    <strong>{{ ledger.product.name }}</strong>
+                    <div class="text-muted small">{{ ledger.product.uom|default:"Unit" }}</div>
+                </div>
+            </div>
+            
+            <div class="ledger-item">
+                <div class="ledger-label">Cycle</div>
+                <div class="ledger-value">
+                    <strong>{{ ledger.cycle.monthly_cycle.month }} {{ ledger.cycle.monthly_cycle.year }}</strong>
+                    <div class="text-muted small">{{ ledger.cycle.name }}</div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Balance Breakdown -->
+        <div class="balance-breakdown">
+            <div class="balance-row">
+                <div class="balance-label">
+                    <i class="fas fa-door-open"></i>
+                    Opening Balance
+                </div>
+                <div class="balance-value {% if ledger.opening_balance > 0 %}positive{% elif ledger.opening_balance < 0 %}negative{% endif %}">
+                    {{ ledger.opening_balance }}
+                </div>
+            </div>
+            
+            <div class="balance-row">
+                <div class="balance-label">
+                    <i class="fas fa-plus-circle"></i>
+                    Advance Sale (Current)
+                </div>
+                <div class="balance-value">
+                    {{ ledger.current_advance_sale }}
+                </div>
+            </div>
+            
+            <div class="balance-row">
+                <div class="balance-label">
+                    <i class="fas fa-minus-circle"></i>
+                    SAP Entry (Current)
+                </div>
+                <div class="balance-value">
+                    {{ ledger.current_sap_entry }}
+                </div>
+            </div>
+            
+            <div class="balance-row">
+                <div class="balance-label">
+                    <i class="fas fa-exchange-alt"></i>
+                    Current Difference
+                </div>
+                <div class="balance-value {% if ledger.current_difference > 0 %}positive{% elif ledger.current_difference < 0 %}negative{% endif %}">
+                    {{ ledger.current_difference|prefix_sign }}
+                </div>
+            </div>
+            
+            <div class="balance-row total-row">
+                <div class="balance-label">
+                    <i class="fas fa-door-closed"></i>
+                    <strong>Closing Balance</strong>
+                </div>
+                <div class="balance-value {% if ledger.closing_balance > 0 %}positive{% elif ledger.closing_balance < 0 %}negative{% endif %}">
+                    <strong>{{ ledger.closing_balance|prefix_sign }}</strong>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Ledger Timeline -->
+    {% if ledger_history|length > 1 %}
+    <div class="timeline-section">
+        <h5>
+            <i class="fas fa-history"></i>
+            Ledger Timeline ({{ ledger.cycle.monthly_cycle.month }} {{ ledger.cycle.monthly_cycle.year }})
+        </h5>
+        
+        <div class="timeline">
+            {% for history in ledger_history %}
+            <div class="timeline-item {% if history.is_current %}current{% endif %}">
+                <div class="timeline-header">
+                    <div class="cycle-name">{{ history.cycle }}</div>
+                    <div class="cycle-number">Cycle {{ history.cycle_number }}</div>
+                </div>
+                
+                <div class="timeline-content">
+                    <div class="timeline-row">
+                        <span>Opening:</span>
+                        <span class="{% if history.opening > 0 %}positive{% elif history.opening < 0 %}negative{% endif %}">
+                            {{ history.opening|prefix_sign }}
+                        </span>
+                    </div>
+                    
+                    <div class="timeline-row">
+                        <span>Advance:</span>
+                        <span>{{ history.advance }}</span>
+                    </div>
+                    
+                    <div class="timeline-row">
+                        <span>SAP:</span>
+                        <span>{{ history.sap }}</span>
+                    </div>
+                    
+                    <div class="timeline-row">
+                        <span>Diff:</span>
+                        <span class="{% if history.difference > 0 %}positive{% elif history.difference < 0 %}negative{% endif %}">
+                            {{ history.difference|prefix_sign }}
+                        </span>
+                    </div>
+                    
+                    <div class="timeline-row total">
+                        <span>Closing:</span>
+                        <span class="{% if history.closing > 0 %}positive{% elif history.closing < 0 %}negative{% endif %}">
+                            <strong>{{ history.closing|prefix_sign }}</strong>
+                        </span>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+    
+    <!-- Previous/Next Cycle Navigation -->
+    <div class="cycle-navigation">
+        {% if previous_ledger %}
+        <a href="#" class="nav-btn prev-btn" data-entry-id="{{ previous_ledger.id }}">
+            <i class="fas fa-arrow-left"></i>
+            Previous Cycle ({{ previous_ledger.cycle.name }})
+        </a>
+        {% endif %}
+        
+        {% if next_ledger %}
+        <a href="#" class="nav-btn next-btn" data-entry-id="{{ next_ledger.id }}">
+            Next Cycle ({{ next_ledger.cycle.name }})
+            <i class="fas fa-arrow-right"></i>
+        </a>
+        {% endif %}
+    </div>
+    
+    <!-- Reconciliation Record Info -->
+    {% if reconciliation_record %}
+    <div class="reconciliation-section">
+        <h6>
+            <i class="fas fa-file-invoice"></i>
+            Reconciliation Details
+        </h6>
+        
+        <div class="reconciliation-info">
+            <div class="info-row">
+                <span>Uploaded:</span>
+                <span>{{ reconciliation_record.reconciliation_sheet.upload_date|date:"d M Y, H:i" }}</span>
+            </div>
+            
+            {% if reconciliation_record.is_acknowledged %}
+            <div class="info-row">
+                <span>Acknowledged:</span>
+                <span>{{ reconciliation_record.acknowledged_at|date:"d M Y, H:i" }} by {{ reconciliation_record.acknowledged_by.get_full_name }}</span>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+<style>
+    .balance-details-modal {
+        max-height: 70vh;
+        overflow-y: auto;
+        padding-right: 10px;
+    }
+    
+    .balance-details-modal::-webkit-scrollbar {
+        width: 8px;
+    }
+    
+    .balance-details-modal::-webkit-scrollbar-track {
+        background: #f1f1f1;
+        border-radius: 4px;
+    }
+    
+    .balance-details-modal::-webkit-scrollbar-thumb {
+        background: #888;
+        border-radius: 4px;
+    }
+    
+    .balance-details-modal::-webkit-scrollbar-thumb:hover {
+        background: #555;
+    }
+    
+    .ledger-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 1.5rem;
+        padding-bottom: 1rem;
+        border-bottom: 2px solid #e9ecef;
+    }
+    
+    .ledger-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 1rem;
+        margin-bottom: 1.5rem;
+    }
+    
+    .ledger-item {
+        background: rgba(255, 255, 255, 0.5);
+        padding: 1rem;
+        border-radius: 8px;
+        border: 1px solid #dee2e6;
+    }
+    
+    .ledger-label {
+        font-size: 0.85rem;
+        color: #6c757d;
+        margin-bottom: 0.25rem;
+    }
+    
+    .ledger-value {
+        font-size: 1rem;
+        color: #313647;
+    }
+    
+    .balance-breakdown {
+        background: white;
+        border-radius: 10px;
+        padding: 1rem;
+        margin: 1.5rem 0;
+        border: 1px solid #dee2e6;
+    }
+    
+    .balance-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 0.75rem 0;
+        border-bottom: 1px solid #f8f9fa;
+    }
+    
+    .balance-row:last-child {
+        border-bottom: none;
+    }
+    
+    .balance-row.total-row {
+        border-top: 2px solid #dee2e6;
+        margin-top: 0.5rem;
+        padding-top: 1rem;
+        font-size: 1.1rem;
+    }
+    
+    .balance-label {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        color: #495057;
+    }
+    
+    .balance-value {
+        font-weight: 600;
+        font-size: 1.1rem;
+    }
+    
+    .balance-value.positive {
+        color: #28a745;
+    }
+    
+    .balance-value.negative {
+        color: #dc3545;
+    }
+    
+    .timeline-section {
+        margin-top: 2rem;
+        padding-top: 1.5rem;
+        border-top: 2px solid #e9ecef;
+    }
+    
+    .timeline {
+        display: flex;
+        overflow-x: auto;
+        gap: 1rem;
+        padding: 1rem 0;
+        margin-top: 1rem;
+    }
+    
+    .timeline-item {
+        min-width: 220px;
+        background: white;
+        border-radius: 10px;
+        padding: 1rem;
+        border: 2px solid #dee2e6;
+        flex-shrink: 0;
+    }
+    
+    .timeline-item.current {
+        border-color: #A3B087;
+        background: rgba(163, 176, 135, 0.05);
+    }
+    
+    .timeline-header {
+        text-align: center;
+        margin-bottom: 1rem;
+        padding-bottom: 0.5rem;
+        border-bottom: 1px solid #dee2e6;
+    }
+    
+    .cycle-name {
+        font-weight: 600;
+        color: #313647;
+    }
+    
+    .cycle-number {
+        font-size: 0.85rem;
+        color: #6c757d;
+    }
+    
+    .timeline-content {
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+    }
+    
+    .timeline-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        font-size: 0.9rem;
+    }
+    
+    .timeline-row.total {
+        border-top: 1px solid #dee2e6;
+        padding-top: 0.5rem;
+        margin-top: 0.5rem;
+        font-weight: 600;
+    }
+    
+    .positive {
+        color: #28a745;
+    }
+    
+    .negative {
+        color: #dc3545;
+    }
+    
+    .cycle-navigation {
+        display: flex;
+        justify-content: space-between;
+        margin-top: 2rem;
+        padding-top: 1rem;
+        border-top: 2px solid #e9ecef;
+    }
+    
+    .nav-btn {
+        padding: 0.5rem 1rem;
+        background: #f8f9fa;
+        border: 1px solid #dee2e6;
+        border-radius: 6px;
+        color: #313647;
+        text-decoration: none;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        transition: all 0.3s ease;
+    }
+    
+    .nav-btn:hover {
+        background: #e9ecef;
+        text-decoration: none;
+        color: #313647;
+    }
+    
+    .reconciliation-section {
+        margin-top: 2rem;
+        padding: 1rem;
+        background: rgba(248, 249, 250, 0.8);
+        border-radius: 8px;
+        border: 1px solid #dee2e6;
+    }
+    
+    .reconciliation-info {
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+        margin-top: 0.5rem;
+    }
+    
+    .info-row {
+        display: flex;
+        justify-content: space-between;
+        font-size: 0.9rem;
+    }
+    
+    .info-row span:first-child {
+        color: #6c757d;
+    }
+    
+    .info-row span:last-child {
+        color: #313647;
+        font-weight: 500;
+    }
+</style>
+
+<script>
+$(document).ready(function() {
+    // Navigation between cycles
+    $('.nav-btn').click(function(e) {
+        e.preventDefault();
+        const entryId = $(this).data('entry-id');
+        
+        // Close current modal
+        $('#balanceDetailsModal').modal('hide');
+        
+        // Open new modal with the clicked entry
+        setTimeout(() => {
+            $('.view-details[data-entry-id="' + entryId + '"]').click();
+        }, 500);
+    });
+});
+</script>

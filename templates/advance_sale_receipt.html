@@ -1,0 +1,417 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Advance Sale Dispatch Receipt</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Roboto+Condensed:wght@400&display=swap');
+
+        /* PRINT MARGINS TO PREVENT CROPPING */
+        @page {
+            size: A4;
+            margin: 10mm 8mm 10mm 8mm; /* Reduced margins to save space */
+        }
+        
+        body {
+            font-family: Arial, sans-serif;
+            font-size: 10px; /* Reduced base font size */
+            margin: 0;
+            padding: 0 5px; /* Reduced padding */
+            color: #000;
+            background-color: #fff;
+            box-sizing: border-box;
+            height: 100%;
+            width: 100%;
+        }
+        .page {
+            width: 100%;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 0;
+            height: 100%;
+            position: relative;
+        }
+        .header {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding-bottom: 5px; /* Reduced padding */
+            border-bottom: 1px solid black; /* Thinner border */
+            margin-bottom: 5px; /* Reduced margin */
+        }
+        .logo {
+            width: 50px; /* Keep logo size reasonable */
+            height: 50px;
+            object-fit: contain;
+            margin-right: 15px; /* Reduced margin */
+        }
+        .header-text {
+            text-align: center;
+        }
+        .header-text h1 {
+            font-family: 'Roboto Condensed', sans-serif;
+            font-size: 14px; /* Reduced from 18px */
+            margin: 0;
+            text-transform: uppercase;
+            line-height: 1.1; /* Tighter line height */
+        }
+        .header-text h3 {
+            font-size: 10px; /* Reduced from 12px */
+            margin: 2px 0; /* Reduced margin */
+            line-height: 1.1;
+        }
+        .header-text h5 {
+            margin: 2px 0; /* Reduced margin */
+            font-size: 8px; /* Reduced from 10px */
+            line-height: 1.1;
+        }
+        .document-title {
+            font-size: 14px; /* Reduced from 16px */
+            font-weight: bold;
+            text-align: center;
+            margin: 8px 0; /* Reduced margin */
+            line-height: 1.1;
+            padding: 0 8px; /* Reduced padding */
+        }
+        .details {
+            margin-top: 5px; /* Reduced margin */
+            font-size: 9px; /* Reduced font size */
+            padding: 0 8px; /* Reduced padding */
+        }
+        .details-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 0 auto;
+        }
+        .details-table td {
+            padding: 4px 3px; /* Reduced padding */
+            border: none;
+            word-wrap: break-word;
+            max-width: 50%;
+            vertical-align: top;
+            line-height: 1.1; /* Tighter line height */
+        }
+        .details-table td:first-child {
+            padding-left: 8px; /* Reduced padding */
+        }
+        .details-table td:last-child {
+            text-align: right;
+            padding-right: 8px; /* Reduced padding */
+        }
+        /* Specific style for Unique Code cell */
+        .unique-code-cell {
+            padding-top: 8px !important; /* Reduced padding */
+        }
+        .items-table-container {
+            margin: 5px auto; /* Reduced margin */
+            padding: 0 10px; /* Reduced padding */
+        }
+        .items-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 8px; /* Base font size for table */
+            border: 1px solid black;
+            margin-bottom: 5px; /* Reduced margin */
+        }
+        .items-table th {
+            border: 1px solid black;
+            padding: 3px; /* Reduced padding */
+            text-align: center;
+            background-color: #f2f2f2;
+            font-size: 9px; /* Slightly larger for headers */
+            line-height: 1.1;
+            font-weight: bold;
+        }
+        .items-table td {
+            padding: 3px; /* Reduced padding */
+            text-align: center;
+            border-left: 1px solid black;
+            border-right: 1px solid black;
+            line-height: 1.1;
+        }
+        .half-page {
+            min-height: 45%;
+            padding: 5px 0; /* Reduced padding */
+            box-sizing: border-box;
+            page-break-inside: avoid; /* Prevent splitting across pages */
+        }
+        .section-title {
+            font-size: 11px; /* Reduced from 14px */
+            font-weight: bold;
+            margin: 5px 0; /* Reduced margin */
+            text-align: center;
+            text-decoration: underline;
+            line-height: 1.1;
+            padding: 0 8px; /* Reduced padding */
+        }
+        .divider {
+            text-align: center;
+            margin: 8px 10px; /* Reduced margin */
+            border-top: 1px dashed #000; /* Thinner border */
+            position: relative;
+            padding: 5px 0; /* Reduced padding */
+        }
+        .divider-text {
+            background: white;
+            padding: 0 5px; /* Reduced padding */
+            position: relative;
+            top: -8px; /* Adjusted */
+            font-size: 8px; /* Reduced font */
+        }
+        .footer {
+            margin-top: 5px; /* Reduced margin */
+            text-align: center;
+            font-size: 9px; /* Reduced font */
+            width: 100%;
+            padding: 0 10px; /* Reduced padding */
+        }
+        .signature {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 15px; /* Reduced margin */
+            margin-bottom: 10px; /* Reduced margin */
+            width: 100%;
+            padding: 0 10px; /* Reduced padding */
+        }
+        .signature-container {
+            width: 45%;
+            text-align: center;
+            padding: 3px; /* Reduced padding */
+        }
+        .signature-preview {
+            width: 80px; /* Reduced size */
+            height: 30px; /* Reduced size */
+            object-fit: contain;
+            margin: 3px auto; /* Reduced margin */
+            border-bottom: 1px solid #000;
+            display: block;
+        }
+        .signature-label {
+            margin-top: 3px; /* Reduced margin */
+            font-weight: bold;
+            font-size: 9px; /* Reduced font */
+        }
+        .blank-line {
+            border-bottom: 1px solid black;
+            display: inline-block;
+            min-width: 80px; /* Reduced width */
+            margin-top: 3px; /* Reduced margin */
+        }
+        tr.compact-row {
+            height: 12px; /* Reduced height */
+        }
+
+        /* Dynamic font sizing based on item count */
+        {% if items|length > 20 %}
+        body { font-size: 9px; }
+        .header-text h1 { font-size: 12px; }
+        .header-text h3 { font-size: 9px; }
+        .header-text h5 { font-size: 7px; }
+        .document-title { font-size: 12px; }
+        .details { font-size: 8px; }
+        .items-table { font-size: 7px; }
+        .items-table th { font-size: 8px; padding: 2px; }
+        .items-table td { padding: 2px; }
+        .section-title { font-size: 10px; }
+        .signature-label { font-size: 8px; }
+        {% endif %}
+        
+        {% if items|length > 30 %}
+        body { font-size: 8px; }
+        .header-text h1 { font-size: 11px; }
+        .header-text h3 { font-size: 8px; }
+        .header-text h5 { font-size: 6px; }
+        .document-title { font-size: 11px; }
+        .details { font-size: 7px; }
+        .items-table { font-size: 6px; }
+        .items-table th { font-size: 7px; padding: 1px; }
+        .items-table td { padding: 1px; }
+        .section-title { font-size: 9px; }
+        .signature-label { font-size: 7px; }
+        .logo { width: 40px; height: 40px; margin-right: 10px; }
+        {% endif %}
+
+        /* PRINT-SPECIFIC ADJUSTMENTS */
+        @media print {
+            body {
+                padding: 0;
+                font-size: 9px; /* Slightly larger for print */
+            }
+            .page {
+                padding: 0 3mm; /* Reduced padding */
+            }
+            .logo {
+                margin-left: 0;
+            }
+            .details-table td:last-child {
+                padding-right: 3mm; /* Reduced padding */
+            }
+            .unique-code-cell {
+                padding-top: 8px !important; /* Consistent with screen */
+            }
+            
+            /* Force page breaks for large content */
+            .half-page {
+                page-break-inside: avoid;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="page">
+        <!-- First Half - FOR SAHAYAK USE -->
+        <div class="half-page">
+            <!-- Header in SAHAYAK section -->
+            <div class="header">
+                {% if logo_url %}
+                    <img src="{{ logo_url }}" alt="Logo" class="logo">
+                {% else %}
+                    <div class="logo-fallback" style="width: 50px; height: 50px; border: 1px solid #ccc; background-color: #f9f9f9; display: flex; align-items: center; justify-content: center; font-size: 8px; text-align: center; padding: 3px; margin-right: 15px;">
+                        Company<br>Logo
+                    </div>
+                {% endif %}
+                <div class="header-text">
+                    <h1>SHWETDHARA MILK PRODUCER COMPANY LIMITED</h1>
+                    <h3>CIN: U01100UP2016PTC082671</h3>
+                    <h5>GORAKHNATH COMPLEX, FIRST FLOOR LEFT SIDE, PRAYAGRAJ ROAD, NEAR AWADH UNIVERSITY AYODHYA, AYODHYA, 224001</h5>
+                </div>
+            </div>
+            <p class="document-title">ADVANCE SALE DISPATCH RECEIPT</p>
+            
+            <div class="section-title">FOR SAHAYAK USE</div>
+            <div class="details">
+                <table class="details-table">
+                    <tr>
+                        <td><strong>BMC/MCC:</strong> {{ bmc_or_mcc }}</td>
+                        <td><strong>Dispatch Date:</strong> {{ dispatch_date }}</td>
+                    </tr>
+                    <tr>
+                        <td><strong>MPP With Code:</strong> {{ mpp_with_code }}</td>
+                        <td><strong>Location:</strong> {{ location }}</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Dispatched By:</strong> {{ dispatched_by }}</td>
+                        <td class="unique-code-cell"><strong>Unique Code:</strong> <span class="blank-line"></span></td>
+                    </tr>
+                </table>
+            </div>
+
+            <div class="items-table-container">
+                <table class="items-table">
+                    <thead>
+                        <tr class="compact-row">
+                            <th>S.No.</th>
+                            <!-- <th>UOM</th> -->
+                            <th>Stock Item</th>
+                            <th>Quantity</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for item in items %}
+                        <tr class="compact-row">
+                            <td>{{ forloop.counter }}</td>
+                            <!-- <td>{{ item.uom }}</td> -->
+                            <td>{{ item.stockItem }}</td>
+                            <td>{{ item.quantity }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="footer">
+                <div class="signature">
+                    <div class="signature-container">
+                        {% if signature_url %}
+                            <img src="{{ signature_url }}" alt="Signature" class="signature-preview" style="width: 80px; height: 30px; object-fit: contain;">
+                        {% else %}
+                            <div class="signature-preview"></div>
+                        {% endif %}
+                        <div class="signature-label">Signature</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Divider Line with increased spacing -->
+        <div class="divider">
+            <span class="divider-text">✂️✂️✂️✂️ Tear Here ✂️✂️✂️✂️</span>
+        </div>
+
+        <!-- Second Half - FOR STORE USE -->
+        <div class="half-page">
+            <!-- Header in STORE section -->
+            <div class="header">
+                {% if logo_url %}
+                    <img src="{{ logo_url }}" alt="Logo" class="logo">
+                {% else %}
+                    <div class="logo-fallback" style="width: 50px; height: 50px; border: 1px solid #ccc; background-color: #f9f9f9; display: flex; align-items: center; justify-content: center; font-size: 8px; text-align: center; padding: 3px; margin-right: 15px;">
+                        Company<br>Logo
+                    </div>
+                {% endif %}
+                <div class="header-text">
+                    <h1>SHWETDHARA MILK PRODUCER COMPANY LIMITED</h1>
+                    <h3>CIN: U01100UP2016PTC082671</h3>
+                    <h5>GORAKHNATH COMPLEX, FIRST FLOOR LEFT SIDE, PRAYAGRAJ ROAD, NEAR AWADH UNIVERSITY AYODHYA, AYODHYA, 224001</h5>
+                </div>
+            </div>
+            <p class="document-title">ADVANCE SALE DISPATCH RECEIPT</p>
+            
+            <div class="section-title">FOR STORE USE</div>
+            <div class="details">
+                <table class="details-table">
+                    <tr>
+                        <td><strong>BMC/MCC:</strong> {{ bmc_or_mcc }}</td>
+                        <td><strong>Dispatch Date:</strong> {{ dispatch_date }}</td>
+                    </tr>
+                    <tr>
+                        <td><strong>MPP With Code:</strong> {{ mpp_with_code }} {{mpp_transaction_code}}</td>
+                        <td><strong>Location:</strong> {{ location }}</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Dispatched By:</strong> {{ dispatched_by }}</td>
+                        <td class="unique-code-cell"><strong>Unique Code:</strong> <span class="blank-line"></span></td>
+                    </tr>
+                </table>
+            </div>
+
+            <div class="items-table-container">
+                <table class="items-table">
+                    <thead>
+                        <tr class="compact-row">
+                            <th>S.No.</th>
+                            <th>UOM</th>
+                            <th>Stock Item</th>
+                            <th>Quantity</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for item in items %}
+                        <tr class="compact-row">
+                            <td>{{ forloop.counter }}</td>
+                            <td>{{ item.uom }}</td>
+                            <td>{{ item.stockItem }}</td>
+                            <td>{{ item.quantity }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="footer">
+                <div class="signature">
+                    <div class="signature-container">
+                        <div class="signature-preview"></div>
+                        <div class="signature-label">Received by Store</div>
+                    </div>
+                    <div class="signature-container">
+                        <div class="signature-preview"></div>
+                        <div class="signature-label">Sahayak Signature</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

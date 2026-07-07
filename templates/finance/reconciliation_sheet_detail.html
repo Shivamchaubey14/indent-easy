@@ -1,0 +1,1603 @@
+{% extends "base.html" %}
+{% load static %}
+{% load custom_filters %}
+
+{% block title %}Reconciliation Sheet Details{% endblock %}
+
+{% block content %}
+<div class="layout-container">
+  <!-- Sidebar -->
+  <aside class="sidebar">
+    <div class="sidebar-content">
+      <!-- User Welcome Section -->
+      <div class="user-welcome">
+        <div class="welcome-header">
+          <h1 class="welcome-title">
+            Hello!
+            <span class="wave-emoji">👋</span>
+          </h1>
+          <p class="user-name">{{ request.user.first_name }} {{ request.user.last_name }}</p>
+          <div class="user-details">
+            <span class="detail-badge">
+              <i class="fas fa-id-badge"></i>
+              {{ request.user.employee_code }}
+            </span>
+            <span class="detail-badge">
+              <i class="fas fa-building"></i>
+              {{ request.user.department }}
+            </span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Stats Section -->
+      <div class="stats-section">
+        <div class="stat-card">
+          <div class="stat-icon inventory-icon">
+            <i class="fas fa-file-excel"></i>
+          </div>
+          <div class="stat-info">
+            <span class="stat-value">{{ sheet.total_records|default:"0" }}</span>
+            <span class="stat-label">Total Records</span>
+          </div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon success-icon">
+            <i class="fas fa-check-circle"></i>
+          </div>
+          <div class="stat-info">
+            <span class="stat-value">{{ sheet.perfect_match_count|default:"0" }}</span>
+            <span class="stat-label">Perfect Matches</span>
+          </div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon over-icon">
+            <i class="fas fa-arrow-up"></i>
+          </div>
+          <div class="stat-info">
+            <span class="stat-value">{{ sheet.over_recorded_count|default:"0" }}</span>
+            <span class="stat-label">Over Recorded</span>
+          </div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon under-icon">
+            <i class="fas fa-arrow-down"></i>
+          </div>
+          <div class="stat-info">
+            <span class="stat-value">{{ sheet.under_recorded_count|default:"0" }}</span>
+            <span class="stat-label">Under Recorded</span>
+          </div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon not-icon">
+            <i class="fas fa-ban"></i>
+          </div>
+          <div class="stat-info">
+            <span class="stat-value">{{ sheet.not_recorded_count|default:"0" }}</span>
+            <span class="stat-label">Not Recorded</span>
+          </div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon error-icon">
+            <i class="fas fa-exclamation-circle"></i>
+          </div>
+          <div class="stat-info">
+            <span class="stat-value">{{ sheet.error_count|default:"0" }}</span>
+            <span class="stat-label">Errors</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Quick Actions -->
+      <div class="quick-actions">
+        <h3 class="section-title">Quick Actions</h3>
+        <a href="{% url 'post_final_reconciliation' %}" class="action-btn" style="text-decoration: none;">
+          <i class="fas fa-upload"></i>
+          <span>Upload New Sheet</span>
+        </a>
+        <a href="{% url 'view_reconciliation_sheets' %}" class="action-btn" style="text-decoration: none;">
+          <i class="fas fa-history"></i>
+          <span>View All Sheets</span>
+        </a>
+        <a href="{% url 'download_reconciliation_template' %}" class="action-btn" style="text-decoration: none;">
+          <i class="fas fa-download"></i>
+          <span>Download Template</span>
+        </a>
+        <a href="{% url 'monthly_cycle_management' %}" class="action-btn" style="text-decoration: none;">
+          <i class="fas fa-calendar"></i>
+          <span>Manage Cycles</span>
+        </a>
+      </div>
+
+      <!-- Color Legend -->
+      <div class="color-legend">
+        <h3 class="legend-title">
+          <i class="fas fa-palette"></i>
+          Status Legend
+        </h3>
+        <div class="legend-items">
+          <div class="legend-item">
+            <div class="color-box perfect-color"></div>
+            <span class="legend-text">Perfect Match</span>
+          </div>
+          <div class="legend-item">
+            <div class="color-box over-color"></div>
+            <span class="legend-text">Over Recorded</span>
+          </div>
+          <div class="legend-item">
+            <div class="color-box under-color"></div>
+            <span class="legend-text">Under Recorded</span>
+          </div>
+          <div class="legend-item">
+            <div class="color-box not-color"></div>
+            <span class="legend-text">Not Recorded</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- Main Content -->
+  <main class="main-content">
+    <!-- Page Header -->
+    <div class="page-header">
+      <div class="header-content">
+        <div class="header-text">
+          <h1 class="page-title">
+            <i class="fas fa-file-excel"></i>
+            Reconciliation Sheet Details
+          </h1>
+          <p class="page-subtitle">{{ sheet.file_name }}</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Sheet Details Card -->
+    <div class="sheet-details-card">
+      <div class="card-header">
+        <h3 class="section-title">
+          <i class="fas fa-info-circle"></i>
+          Sheet Information
+        </h3>
+      </div>
+      <div class="card-body">
+        <div class="details-grid">
+          <div class="detail-item">
+            <span class="detail-label">File Name:</span>
+            <span class="detail-value">{{ sheet.file_name }}</span>
+          </div>
+          <div class="detail-item">
+            <span class="detail-label">Uploaded By:</span>
+            <span class="detail-value">{{ sheet.uploaded_by.get_full_name|default:sheet.uploaded_by.username }}</span>
+          </div>
+          <div class="detail-item">
+            <span class="detail-label">Upload Date:</span>
+            <span class="detail-value">{{ sheet.upload_date|date:"d M Y, H:i" }}</span>
+          </div>
+          <div class="detail-item">
+            <span class="detail-label">Status:</span>
+            <span class="detail-value">
+              <span class="status-badge {% if sheet.status == 'PROCESSED' %}processed{% elif sheet.status == 'FAILED' %}failed{% else %}pending{% endif %}">
+                <i class="fas {% if sheet.status == 'PROCESSED' %}fa-check-circle{% elif sheet.status == 'FAILED' %}fa-times-circle{% else %}fa-clock{% endif %}"></i>
+                {{ sheet.get_status_display }}
+              </span>
+            </span>
+          </div>
+          <div class="detail-item">
+            <span class="detail-label">Month:</span>
+            <span class="detail-value">{{ sheet.monthly_cycle.month|default:"-" }} {{ sheet.monthly_cycle.year|default:"" }}</span>
+          </div>
+          <div class="detail-item">
+            <span class="detail-label">Cycle:</span>
+            <span class="detail-value">{{ sheet.cycle.name|default:"-" }}</span>
+          </div>
+          <div class="detail-item">
+            <span class="detail-label">Processed At:</span>
+            <span class="detail-value">{{ sheet.processed_at|date:"d M Y, H:i"|default:"-" }}</span>
+          </div>
+          <div class="detail-item">
+            <span class="detail-label">Original File:</span>
+            <span class="detail-value">
+              {% if sheet.excel_file %}
+                <a href="{{ sheet.excel_file.url }}" class="file-link" target="_blank">
+                  <i class="fas fa-download"></i> Download
+                </a>
+              {% else %}
+                -
+              {% endif %}
+            </span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Statistics Cards -->
+    <div class="statistics-section">
+      <div class="stats-grid">
+        <div class="stat-box total">
+          <div class="stat-icon">
+            <i class="fas fa-database"></i>
+          </div>
+          <div class="stat-content">
+            <span class="stat-label">Total Records</span>
+            <span class="stat-number">{{ sheet.total_records|default:"0" }}</span>
+          </div>
+        </div>
+        <div class="stat-box perfect">
+          <div class="stat-icon">
+            <i class="fas fa-check-circle"></i>
+          </div>
+          <div class="stat-content">
+            <span class="stat-label">Perfect Match</span>
+            <span class="stat-number">{{ sheet.perfect_match_count|default:"0" }}</span>
+          </div>
+        </div>
+        <div class="stat-box over">
+          <div class="stat-icon">
+            <i class="fas fa-arrow-up"></i>
+          </div>
+          <div class="stat-content">
+            <span class="stat-label">Over Recorded</span>
+            <span class="stat-number">{{ sheet.over_recorded_count|default:"0" }}</span>
+          </div>
+        </div>
+        <div class="stat-box under">
+          <div class="stat-icon">
+            <i class="fas fa-arrow-down"></i>
+          </div>
+          <div class="stat-content">
+            <span class="stat-label">Under Recorded</span>
+            <span class="stat-number">{{ sheet.under_recorded_count|default:"0" }}</span>
+          </div>
+        </div>
+        <div class="stat-box not">
+          <div class="stat-icon">
+            <i class="fas fa-ban"></i>
+          </div>
+          <div class="stat-content">
+            <span class="stat-label">Not Recorded</span>
+            <span class="stat-number">{{ sheet.not_recorded_count|default:"0" }}</span>
+          </div>
+        </div>
+        <div class="stat-box error">
+          <div class="stat-icon">
+            <i class="fas fa-exclamation-triangle"></i>
+          </div>
+          <div class="stat-content">
+            <span class="stat-label">Errors</span>
+            <span class="stat-number">{{ sheet.error_count|default:"0" }}</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Records Table -->
+    <div class="table-wrapper">
+      <div class="table-header-actions">
+        <div class="table-title">
+          <i class="fas fa-list"></i>
+          <h3>Reconciliation Records</h3>
+        </div>
+        <div class="table-filters">
+          <button class="filter-btn active" data-filter="all">
+            <i class="fas fa-list"></i> All
+          </button>
+          <button class="filter-btn" data-filter="PERFECT_MATCH">
+            <i class="fas fa-check-circle"></i> Perfect Match
+          </button>
+          <button class="filter-btn" data-filter="OVER_RECORDED">
+            <i class="fas fa-arrow-up"></i> Over Recorded
+          </button>
+          <button class="filter-btn" data-filter="UNDER_RECORDED">
+            <i class="fas fa-arrow-down"></i> Under Recorded
+          </button>
+          <button class="filter-btn" data-filter="NOT_RECORDED">
+            <i class="fas fa-ban"></i> Not Recorded
+          </button>
+        </div>
+      </div>
+
+      <div class="table-container">
+        <table class="modern-table" id="recordsTable">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Location</th>
+              <th>MPP Code</th>
+              <th>MPP Name</th>
+              <th>Product</th>
+              <th>Advance Qty</th>
+              <th>SAP Qty</th>
+              <th>Difference</th>
+              <th>Status</th>
+              <th>Match Quality</th>
+              <th>To Send</th>
+              <th>To Deduct</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="recordsTableBody">
+            {% for record in records %}
+              <tr class="table-row" data-status="{{ record.status }}">
+                <td>{{ forloop.counter }}</td>
+                <td>
+                  <div class="location-cell">
+                    <i class="fas fa-map-marker-alt"></i>
+                    <span>{{ record.location|default:"-" }}</span>
+                  </div>
+                </td>
+                <td>
+                  <span class="mpp-code">{{ record.mpp_code|default:"-" }}</span>
+                </td>
+                <td>
+                  <div class="mpp-name-cell">
+                    <span>{{ record.mpp_name|default:"-" }}</span>
+                    {% if record.mpp %}
+                      <small class="text-muted">({{ record.mpp.name_with_code }})</small>
+                    {% endif %}
+                  </div>
+                </td>
+                <td>
+                  <div class="product-cell">
+                    <span class="product-name">{{ record.product_name|default:"-" }}</span>
+                    {% if record.is_service %}
+                      <span class="service-badge">Service</span>
+                    {% endif %}
+                  </div>
+                </td>
+                <td class="text-right">{{ record.advance_sale_qty|floatformat:0 }}</td>
+                <td class="text-right">{{ record.sap_entry_qty|floatformat:0 }}</td>
+                <td class="text-right">
+                  <span class="difference {% if record.quantity_difference > 0 %}positive{% elif record.quantity_difference < 0 %}negative{% endif %}">
+                    {{ record.quantity_difference|floatformat:0 }}
+                  </span>
+                </td>
+                <td>
+                  <span class="status-badge {% if record.status == 'PERFECT_MATCH' %}perfect{% elif record.status == 'OVER_RECORDED' %}over{% elif record.status == 'UNDER_RECORDED' %}under{% else %}not-recorded{% endif %}">
+                    <i class="fas {% if record.status == 'PERFECT_MATCH' %}fa-check-circle{% elif record.status == 'OVER_RECORDED' %}fa-arrow-up{% elif record.status == 'UNDER_RECORDED' %}fa-arrow-down{% else %}fa-ban{% endif %}"></i>
+                    {{ record.get_status_display }}
+                  </span>
+                </td>
+                <td>
+                  <span class="match-quality">{{ record.match_quality|default:"-" }}</span>
+                </td>
+                <td class="text-right">
+                  {% if record.to_be_sent_to_mpp > 0 %}
+                    <span class="send-badge">{{ record.to_be_sent_to_mpp|floatformat:0 }}</span>
+                  {% else %}
+                    -
+                  {% endif %}
+                </td>
+                <td class="text-right">
+                  {% if record.to_be_deducted > 0 %}
+                    <span class="deduct-badge">{{ record.to_be_deducted|floatformat:0 }}</span>
+                  {% else %}
+                    -
+                  {% endif %}
+                </td>
+                <td>
+                  <div class="actions-cell">
+                    <button class="action-btn-small view-btn" data-record-id="{{ record.id }}" data-bs-toggle="tooltip" title="View Details">
+                      <i class="fas fa-eye"></i>
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            {% empty %}
+              <tr>
+                <td colspan="13" class="empty-state">
+                  <div class="empty-state-content">
+                    <i class="fas fa-inbox"></i>
+                    <h3>No Records Found</h3>
+                    <p>This reconciliation sheet has no records.</p>
+                  </div>
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Action Buttons -->
+    <div class="action-bar">
+      <a href="{% url 'view_reconciliation_sheets' %}" class="btn-secondary">
+        <i class="fas fa-arrow-left"></i>
+        Back to List
+      </a>
+      <div class="action-group">
+        <!-- Removed the download report button that was causing the error -->
+        {% if sheet.excel_file %}
+          <a href="{{ sheet.excel_file.url }}" class="btn-success" target="_blank">
+            <i class="fas fa-file-excel"></i>
+            Download Original File
+          </a>
+        {% endif %}
+      </div>
+    </div>
+  </main>
+</div>
+
+<!-- Record Details Modal -->
+<div class="modal fade" id="recordDetailsModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-centered">
+    <div class="modal-content modern-modal">
+      <div class="modal-header">
+        <h5 class="modal-title">
+          <i class="fas fa-info-circle"></i>
+          Record Details
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body" id="recordDetailsContent">
+        <!-- Record details will be loaded here -->
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn-secondary" data-bs-dismiss="modal">
+          Close
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
+<style>
+:root {
+  --primary-dark: #313647;
+  --primary-light: #435663;
+  --accent-green: #A3B087;
+  --accent-red: #EA5B6F;
+  --accent-yellow: #FFF8D4;
+  --text-dark: #2c3e50;
+  --text-light: #7f8c8d;
+  --bg-light: #f8f9fa;
+  --border-color: #e9ecef;
+  --success: #28a745;
+  --warning: #ffc107;
+  --danger: #dc3545;
+  --info: #17a2b8;
+  --perfect: #28a745;
+  --over: #ffc107;
+  --under: #17a2b8;
+  --not-recorded: #6c757d;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: 'Lexend', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  color: var(--text-dark);
+  background: white;
+}
+
+/* Layout */
+.layout-container {
+  display: flex;
+  min-height: calc(100vh - 90px);
+  background: white;
+  align-items: stretch;
+}
+
+/* Sidebar */
+.sidebar {
+  width: 320px;
+  background: var(--primary-dark);
+  color: white;
+  padding: 2rem 1.5rem;
+  box-shadow: 2px 0 20px rgba(0, 0, 0, 0.1);
+  border-radius: 0 20px 20px 0;
+  position: sticky;
+  top: 90px;
+  height: auto;
+  min-height: calc(100vh - 90px);
+  overflow-y: auto;
+  flex-shrink: 0;
+  margin-top: 40px;
+  margin-left: 10px;
+}
+
+.sidebar-content {
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+  height: 100%;
+}
+
+.user-welcome {
+  text-align: center;
+  padding-bottom: 1.5rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.welcome-title {
+  font-size: 1.5rem;
+  font-weight: 600;
+  margin-bottom: 0.5rem;
+  color: var(--accent-green);
+}
+
+.wave-emoji {
+  display: inline-block;
+  animation: wave 1.5s ease-in-out infinite;
+}
+
+@keyframes wave {
+  0%, 100% { transform: rotate(0deg); }
+  25% { transform: rotate(15deg); }
+  75% { transform: rotate(-10deg); }
+}
+
+.user-name {
+  font-size: 1.1rem;
+  color: var(--accent-yellow);
+  font-weight: 500;
+  margin-bottom: 1rem;
+}
+
+.user-details {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.detail-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.4rem 0.8rem;
+  background: rgba(163, 176, 135, 0.1);
+  border-radius: 20px;
+  font-size: 0.85rem;
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.detail-badge i {
+  color: var(--accent-green);
+}
+
+/* Stats Section */
+.stats-section {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+  padding-bottom: 1.5rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.stat-card {
+  background: rgba(163, 176, 135, 0.1);
+  padding: 1rem;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  border: 1px solid rgba(163, 176, 135, 0.2);
+}
+
+.stat-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.5rem;
+}
+
+.inventory-icon {
+  background: rgba(163, 176, 135, 0.2);
+  color: var(--accent-green);
+}
+
+.success-icon {
+  background: rgba(40, 167, 69, 0.2);
+  color: var(--perfect);
+}
+
+.over-icon {
+  background: rgba(255, 193, 7, 0.2);
+  color: var(--over);
+}
+
+.under-icon {
+  background: rgba(23, 162, 184, 0.2);
+  color: var(--under);
+}
+
+.not-icon {
+  background: rgba(108, 117, 125, 0.2);
+  color: var(--not-recorded);
+}
+
+.error-icon {
+  background: rgba(220, 53, 69, 0.2);
+  color: var(--danger);
+}
+
+.stat-info {
+  display: flex;
+  flex-direction: column;
+}
+
+.stat-value {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: white;
+}
+
+.stat-label {
+  font-size: 0.75rem;
+  color: rgba(255, 255, 255, 0.7);
+}
+
+/* Quick Actions */
+.quick-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.section-title {
+  font-size: 1.1rem;
+  color: var(--accent-yellow);
+  margin-bottom: 0.5rem;
+  font-weight: 500;
+}
+
+.action-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.875rem 1rem;
+  background: rgba(163, 176, 135, 0.1);
+  color: var(--accent-yellow);
+  text-decoration: none;
+  border-radius: 10px;
+  transition: all 0.3s ease;
+  border: 1px solid rgba(163, 176, 135, 0.2);
+  position: relative;
+}
+
+.action-btn:hover {
+  background: rgba(163, 176, 135, 0.2);
+  color: white;
+  transform: translateX(5px);
+}
+
+.action-btn i {
+  color: var(--accent-green);
+  font-size: 1.1rem;
+}
+
+.action-btn span {
+  flex: 1;
+}
+
+/* Color Legend */
+.color-legend {
+  background: rgba(163, 176, 135, 0.1);
+  padding: 1rem;
+  border-radius: 10px;
+  border: 1px solid rgba(163, 176, 135, 0.2);
+  margin-top: auto;
+}
+
+.legend-title {
+  color: var(--accent-yellow);
+  font-size: 0.9rem;
+  margin-bottom: 0.75rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.legend-items {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.color-box {
+  width: 16px;
+  height: 16px;
+  border-radius: 3px;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+}
+
+.perfect-color {
+  background-color: var(--perfect);
+}
+
+.over-color {
+  background-color: var(--over);
+}
+
+.under-color {
+  background-color: var(--under);
+}
+
+.not-color {
+  background-color: var(--not-recorded);
+}
+
+.legend-text {
+  font-size: 0.8rem;
+  color: rgba(255, 255, 255, 0.9);
+}
+
+/* Main Content */
+.main-content {
+  flex: 1;
+  background: #ffffff;
+  padding: 2rem;
+  overflow-y: auto;
+  min-height: calc(100vh - 90px);
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+}
+
+/* Page Header */
+.page-header {
+  background: linear-gradient(135deg, var(--accent-green) 0%, #8a9975 100%);
+  border-radius: 20px;
+  padding: 1.5rem 2rem;
+  box-shadow: 0 8px 32px rgba(163, 176, 135, 0.2);
+  border: 2px solid black;
+}
+
+.header-content {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.header-text {
+  text-align: center;
+}
+
+.page-title {
+  font-size: 2rem;
+  font-weight: 700;
+  color: #313647;
+  margin-bottom: 0.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+}
+
+.page-title i {
+  font-size: 1.75rem;
+}
+
+.page-subtitle {
+  font-size: 1rem;
+  color: #313647;
+  font-weight: 400;
+  word-break: break-all;
+}
+
+/* Sheet Details Card */
+.sheet-details-card {
+  background: linear-gradient(135deg, var(--accent-green) 0%, #8a9975 100%);
+  border-radius: 16px;
+  border: 2px solid black;
+  box-shadow: 0 8px 32px rgba(163, 176, 135, 0.2);
+  overflow: hidden;
+}
+
+.sheet-details-card .card-header {
+  background: rgba(255, 255, 255, 0.95);
+  padding: 1.5rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+  backdrop-filter: blur(10px);
+}
+
+.sheet-details-card .card-header .section-title {
+  color: var(--primary-dark);
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  font-size: 1.3rem;
+  font-weight: 700;
+}
+
+.sheet-details-card .card-body {
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(10px);
+  padding: 2rem;
+}
+
+.details-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 1.5rem;
+}
+
+.detail-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.detail-label {
+  font-size: 0.85rem;
+  color: var(--text-light);
+  font-weight: 500;
+}
+
+.detail-value {
+  font-size: 1rem;
+  color: var(--text-dark);
+  font-weight: 600;
+}
+
+.status-badge.processed {
+  background: rgba(40, 167, 69, 0.1);
+  color: var(--success);
+  padding: 0.25rem 0.75rem;
+  border-radius: 20px;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.status-badge.failed {
+  background: rgba(220, 53, 69, 0.1);
+  color: var(--danger);
+  padding: 0.25rem 0.75rem;
+  border-radius: 20px;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.status-badge.pending {
+  background: rgba(255, 193, 7, 0.1);
+  color: var(--warning);
+  padding: 0.25rem 0.75rem;
+  border-radius: 20px;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.file-link {
+  color: var(--primary-dark);
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.file-link:hover {
+  text-decoration: underline;
+}
+
+/* Statistics Section */
+.statistics-section {
+  margin: 1rem 0;
+}
+
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 1rem;
+}
+
+.stat-box {
+  background: linear-gradient(135deg, #ffffff 0%, #ffffff 100%);
+  border: 2px solid black;
+  border-radius: 12px;
+  padding: 1.5rem;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  box-shadow: 0 4px 12px rgba(163, 176, 135, 0.2);
+}
+
+.stat-box.total {
+  border-left: 4px solid var(--primary-dark);
+}
+
+.stat-box.perfect {
+  border-left: 4px solid var(--perfect);
+}
+
+.stat-box.over {
+  border-left: 4px solid var(--over);
+}
+
+.stat-box.under {
+  border-left: 4px solid var(--under);
+}
+
+.stat-box.not {
+  border-left: 4px solid var(--not-recorded);
+}
+
+.stat-box.error {
+  border-left: 4px solid var(--danger);
+}
+
+.stat-box .stat-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.2rem;
+}
+
+.stat-box.total .stat-icon {
+  background: rgba(49, 54, 71, 0.1);
+  color: var(--primary-dark);
+}
+
+.stat-box.perfect .stat-icon {
+  background: rgba(40, 167, 69, 0.1);
+  color: var(--perfect);
+}
+
+.stat-box.over .stat-icon {
+  background: rgba(255, 193, 7, 0.1);
+  color: var(--over);
+}
+
+.stat-box.under .stat-icon {
+  background: rgba(23, 162, 184, 0.1);
+  color: var(--under);
+}
+
+.stat-box.not .stat-icon {
+  background: rgba(108, 117, 125, 0.1);
+  color: var(--not-recorded);
+}
+
+.stat-box.error .stat-icon {
+  background: rgba(220, 53, 69, 0.1);
+  color: var(--danger);
+}
+
+.stat-content {
+  display: flex;
+  flex-direction: column;
+}
+
+.stat-content .stat-label {
+  font-size: 0.8rem;
+  color: var(--text-light);
+  font-weight: 500;
+}
+
+.stat-content .stat-number {
+  font-size: 1.8rem;
+  font-weight: 700;
+  color: var(--text-dark);
+}
+
+/* Table Wrapper */
+.table-wrapper {
+  background: linear-gradient(135deg, var(--accent-green) 0%, #8a9975 100%);
+  border-radius: 16px;
+  border: 2px solid black;
+  box-shadow: 0 8px 32px rgba(163, 176, 135, 0.2);
+  overflow: hidden;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 500px;
+}
+
+.table-header-actions {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1.5rem;
+  background: rgba(255, 255, 255, 0.95);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+  backdrop-filter: blur(10px);
+}
+
+.table-title {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: var(--primary-dark);
+  font-weight: 500;
+}
+
+.table-title i {
+  color: var(--accent-green);
+  font-size: 1.2rem;
+}
+
+.table-title h3 {
+  margin: 0;
+  font-size: 1.1rem;
+  font-weight: 600;
+}
+
+.table-filters {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.filter-btn {
+  padding: 0.5rem 1rem;
+  border: 2px solid transparent;
+  background: rgba(255, 255, 255, 0.8);
+  color: var(--text-dark);
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  font-weight: 500;
+  transition: all 0.3s ease;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  backdrop-filter: blur(5px);
+}
+
+.filter-btn:hover {
+  background: rgba(255, 255, 255, 1);
+  transform: translateY(-2px);
+}
+
+.filter-btn.active {
+  background: var(--primary-dark);
+  color: white;
+  border-color: var(--primary-dark);
+}
+
+/* Table Container */
+.table-container {
+  overflow-x: auto;
+  flex: 1;
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(10px);
+  border-radius: 0 0 16px 16px;
+}
+
+.table-container::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.table-container::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 4px;
+}
+
+.table-container::-webkit-scrollbar-thumb {
+  background: rgba(138, 153, 117, 0.6);
+  border-radius: 4px;
+}
+
+.table-container::-webkit-scrollbar-thumb:hover {
+  background: rgba(138, 153, 117, 0.8);
+}
+
+.modern-table {
+  width: 100%;
+  border-collapse: collapse;
+  background: transparent;
+}
+
+.modern-table thead {
+  background: var(--primary-dark);
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.modern-table th {
+  color: #313647;
+  padding: 1rem;
+  font-weight: 600;
+  text-align: left;
+  font-size: 0.9rem;
+  white-space: nowrap;
+  border-bottom: 2px solid #8a9975;
+}
+
+.modern-table td {
+  padding: 1rem;
+  border-bottom: 1px solid rgba(138, 153, 117, 0.2);
+  vertical-align: middle;
+  font-size: 0.9rem;
+  background: rgba(255, 255, 255, 0.8);
+}
+
+.modern-table tbody tr {
+  transition: all 0.3s ease;
+  background: rgba(255, 255, 255, 0.8);
+}
+
+.modern-table tbody tr:hover {
+  background: rgba(255, 255, 255, 0.95);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(138, 153, 117, 0.2);
+}
+
+/* Table Cell Styles */
+.location-cell {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.location-cell i {
+  color: var(--accent-green);
+}
+
+.mpp-code {
+  font-family: monospace;
+  font-weight: 600;
+  color: var(--primary-dark);
+}
+
+.mpp-name-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.mpp-name-cell small {
+  font-size: 0.75rem;
+  color: var(--text-light);
+}
+
+.product-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.product-name {
+  font-weight: 600;
+  color: var(--text-dark);
+}
+
+.service-badge {
+  display: inline-block;
+  padding: 0.2rem 0.5rem;
+  background: var(--info);
+  color: white;
+  border-radius: 4px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  width: fit-content;
+}
+
+.text-right {
+  text-align: right;
+}
+
+.difference {
+  font-weight: 600;
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+}
+
+.difference.positive {
+  background: rgba(40, 167, 69, 0.1);
+  color: var(--success);
+}
+
+.difference.negative {
+  background: rgba(220, 53, 69, 0.1);
+  color: var(--danger);
+}
+
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  border-radius: 8px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.status-badge.perfect {
+  background: rgba(40, 167, 69, 0.1);
+  color: var(--success);
+}
+
+.status-badge.over {
+  background: rgba(255, 193, 7, 0.1);
+  color: var(--over);
+}
+
+.status-badge.under {
+  background: rgba(23, 162, 184, 0.1);
+  color: var(--under);
+}
+
+.status-badge.not-recorded {
+  background: rgba(108, 117, 125, 0.1);
+  color: var(--not-recorded);
+}
+
+.match-quality {
+  font-size: 0.85rem;
+  color: var(--text-light);
+}
+
+.send-badge {
+  display: inline-block;
+  padding: 0.25rem 0.5rem;
+  background: rgba(40, 167, 69, 0.1);
+  color: var(--success);
+  border-radius: 4px;
+  font-weight: 600;
+}
+
+.deduct-badge {
+  display: inline-block;
+  padding: 0.25rem 0.5rem;
+  background: rgba(220, 53, 69, 0.1);
+  color: var(--danger);
+  border-radius: 4px;
+  font-weight: 600;
+}
+
+/* Actions Cell */
+.actions-cell {
+  min-width: 80px;
+}
+
+.action-btn-small {
+  width: 36px;
+  height: 36px;
+  border: none;
+  border-radius: 8px;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  color: var(--text-light);
+}
+
+.action-btn-small:hover {
+  background: var(--accent-green);
+  color: white;
+  transform: translateY(-2px);
+}
+
+/* Empty State */
+.empty-state {
+  text-align: center;
+  padding: 4rem 2rem;
+}
+
+.empty-state-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+}
+
+.empty-state-content i {
+  font-size: 4rem;
+  color: var(--text-light);
+  opacity: 0.5;
+}
+
+.empty-state-content h3 {
+  color: var(--text-dark);
+  font-weight: 600;
+}
+
+.empty-state-content p {
+  color: var(--text-light);
+}
+
+/* Action Bar */
+.action-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 1rem;
+}
+
+.btn-primary, .btn-secondary, .btn-success {
+  padding: 0.75rem 1.5rem;
+  border: none;
+  border-radius: 8px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  text-decoration: none;
+}
+
+.btn-primary {
+  background: var(--primary-dark);
+  color: white;
+}
+
+.btn-primary:hover {
+  background: var(--primary-light);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(49, 54, 71, 0.3);
+  color: white;
+}
+
+.btn-secondary {
+  background: #31694E;
+  color: white;
+}
+
+.btn-secondary:hover {
+  background: #2a5d44;
+  transform: translateY(-2px);
+  color: white;
+}
+
+.btn-success {
+  background: var(--success);
+  color: white;
+}
+
+.btn-success:hover {
+  background: #218838;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(40, 167, 69, 0.3);
+  color: white;
+}
+
+.action-group {
+  display: flex;
+  gap: 1rem;
+}
+
+/* Modal Styles */
+.modern-modal {
+  border: none;
+  border-radius: 16px;
+  overflow: hidden;
+  background-color: var(--accent-green);
+}
+
+.modern-modal .modal-header {
+  background: linear-gradient(135deg, var(--primary-dark) 0%, var(--primary-light) 100%);
+  color: white;
+  padding: 1.5rem;
+  border: none;
+}
+
+.modal-backdrop {
+  background-color: transparent !important;
+}
+
+.modern-modal .modal-title {
+  font-size: 1.25rem;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.modern-modal .modal-body {
+  padding: 2rem;
+  background: white;
+}
+
+.modern-modal .modal-footer {
+  padding: 1.5rem;
+  background: var(--bg-light);
+  border: none;
+  background-color: var(--accent-green);
+}
+
+/* Responsive Design */
+@media (max-width: 1200px) {
+  .layout-container {
+    flex-direction: column;
+  }
+  
+  .sidebar {
+    width: 100%;
+    margin: 0;
+    border-radius: 0;
+    position: relative;
+    top: 0;
+    min-height: auto;
+  }
+
+  .stats-section {
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  }
+}
+
+@media (max-width: 768px) {
+  .main-content {
+    padding: 1rem;
+  }
+
+  .page-header {
+    padding: 1.5rem;
+    border: 2px solid black;
+  }
+
+  .page-title {
+    font-size: 1.5rem;
+  }
+
+  .details-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .stats-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .table-filters {
+    flex-wrap: wrap;
+  }
+
+  .filter-btn {
+    font-size: 0.8rem;
+    padding: 0.4rem 0.8rem;
+  }
+
+  .modern-table {
+    font-size: 0.8rem;
+  }
+
+  .modern-table th,
+  .modern-table td {
+    padding: 0.5rem;
+  }
+
+  .action-bar {
+    flex-direction: column;
+    gap: 1rem;
+  }
+
+  .action-group {
+    width: 100%;
+    flex-direction: column;
+  }
+
+  .btn-primary, .btn-secondary, .btn-success {
+    width: 100%;
+    justify-content: center;
+  }
+}
+
+@media (max-width: 480px) {
+  .stats-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Loading States */
+.spinner-border {
+  width: 1rem;
+  height: 1rem;
+  border-width: 2px;
+}
+
+/* Tooltips */
+.tooltip {
+  font-size: 0.85rem;
+}
+</style>
+
+<script>
+$(document).ready(function () {
+  // Initialize tooltips
+  $('[data-bs-toggle="tooltip"]').tooltip();
+
+  // Filter buttons
+  $(".filter-btn").click(function () {
+    $(".filter-btn").removeClass("active");
+    $(this).addClass("active");
+
+    const filter = $(this).data("filter");
+    const rows = $("#recordsTable tbody tr");
+
+    if (filter === "all") {
+      rows.show();
+    } else {
+      rows.hide();
+      rows.each(function () {
+        const status = $(this).data("status");
+        if (status === filter) {
+          $(this).show();
+        }
+      });
+    }
+  });
+
+  // View record details
+  $(".view-btn").click(function () {
+    const recordId = $(this).data("record-id");
+    
+    $.ajax({
+      url: `/get-reconciliation-record/${recordId}/`,
+      method: "GET",
+      success: function (data) {
+        $("#recordDetailsContent").html(`
+          <div class="record-details">
+            <div class="details-row" style="margin-bottom: 0.75rem; padding: 0.5rem 0; border-bottom: 1px solid var(--border-color);">
+              <strong style="min-width: 150px; display: inline-block;">Location:</strong> ${data.location}
+            </div>
+            <div class="details-row" style="margin-bottom: 0.75rem; padding: 0.5rem 0; border-bottom: 1px solid var(--border-color);">
+              <strong style="min-width: 150px; display: inline-block;">MPP Code:</strong> ${data.mpp_code}
+            </div>
+            <div class="details-row" style="margin-bottom: 0.75rem; padding: 0.5rem 0; border-bottom: 1px solid var(--border-color);">
+              <strong style="min-width: 150px; display: inline-block;">MPP Name:</strong> ${data.mpp_name}
+            </div>
+            <div class="details-row" style="margin-bottom: 0.75rem; padding: 0.5rem 0; border-bottom: 1px solid var(--border-color);">
+              <strong style="min-width: 150px; display: inline-block;">Product:</strong> ${data.product_name}
+            </div>
+            <div class="details-row" style="margin-bottom: 0.75rem; padding: 0.5rem 0; border-bottom: 1px solid var(--border-color);">
+              <strong style="min-width: 150px; display: inline-block;">Advance Sale Qty:</strong> ${data.advance_sale_qty}
+            </div>
+            <div class="details-row" style="margin-bottom: 0.75rem; padding: 0.5rem 0; border-bottom: 1px solid var(--border-color);">
+              <strong style="min-width: 150px; display: inline-block;">SAP Entry Qty:</strong> ${data.sap_entry_qty}
+            </div>
+            <div class="details-row" style="margin-bottom: 0.75rem; padding: 0.5rem 0; border-bottom: 1px solid var(--border-color);">
+              <strong style="min-width: 150px; display: inline-block;">Difference:</strong> 
+              <span class="difference ${data.quantity_difference > 0 ? 'positive' : data.quantity_difference < 0 ? 'negative' : ''}">
+                ${data.quantity_difference}
+              </span>
+            </div>
+            <div class="details-row" style="margin-bottom: 0.75rem; padding: 0.5rem 0; border-bottom: 1px solid var(--border-color);">
+              <strong style="min-width: 150px; display: inline-block;">Status:</strong> 
+              <span class="status-badge ${data.status === 'PERFECT_MATCH' ? 'perfect' : data.status === 'OVER_RECORDED' ? 'over' : data.status === 'UNDER_RECORDED' ? 'under' : 'not-recorded'}">
+                <i class="fas ${data.status === 'PERFECT_MATCH' ? 'fa-check-circle' : data.status === 'OVER_RECORDED' ? 'fa-arrow-up' : data.status === 'UNDER_RECORDED' ? 'fa-arrow-down' : 'fa-ban'}"></i>
+                ${data.status_display || data.status}
+              </span>
+            </div>
+            <div class="details-row" style="margin-bottom: 0.75rem; padding: 0.5rem 0; border-bottom: 1px solid var(--border-color);">
+              <strong style="min-width: 150px; display: inline-block;">Match Quality:</strong> ${data.match_quality}
+            </div>
+            <div class="details-row" style="margin-bottom: 0.75rem; padding: 0.5rem 0; border-bottom: 1px solid var(--border-color);">
+              <strong style="min-width: 150px; display: inline-block;">To Be Sent To MPP:</strong> 
+              <span class="send-badge">${data.to_be_sent_to_mpp}</span>
+            </div>
+            <div class="details-row" style="margin-bottom: 0.75rem; padding: 0.5rem 0;">
+              <strong style="min-width: 150px; display: inline-block;">To Be Deducted:</strong> 
+              <span class="deduct-badge">${data.to_be_deducted}</span>
+            </div>
+          </div>
+        `);
+        $("#recordDetailsModal").modal("show");
+      },
+      error: function () {
+        alert("Error fetching record details. Please try again.");
+      }
+    });
+  });
+});
+</script>
+{% endblock %}

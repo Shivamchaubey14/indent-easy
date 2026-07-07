@@ -1,0 +1,2019 @@
+{% extends "base.html" %}
+{% load custom_filters %}
+{% block content %}
+
+<div class="layout-container">
+  <!-- Sidebar -->
+  <aside class="sidebar">
+    <div class="sidebar-content">
+      <!-- User Welcome Section -->
+      <div class="user-welcome">
+        <div class="welcome-header">
+          <h1 class="welcome-title">
+            Hello!
+            <span class="wave-emoji">👋</span>
+          </h1>
+          <p class="user-name">{{request.user.first_name}} {{request.user.last_name}}</p>
+          <div class="user-details">
+            <span class="detail-badge">
+              <i class="fas fa-map-marker-alt"></i>
+              {{ request.user.location }}
+            </span>
+            <span class="detail-badge">
+              <i class="fas fa-id-badge"></i>
+              {{ request.user.employee_code }}
+            </span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Cycle Filter -->
+      <div class="quick-actions">
+        <h3 class="section-title">Select Cycle</h3>
+        <div class="cycle-filter">
+          <form method="get" class="cycle-form">
+            <div class="form-group">
+              <label for="month">
+                <i class="fas fa-calendar-month"></i>
+                Month
+              </label>
+              <select class="form-control" id="month" name="month">
+                <option value="">Select Month</option>
+                <option value="January" {% if selected_month == "January" %}selected{% endif %}>January</option>
+                <option value="February" {% if selected_month == "February" %}selected{% endif %}>February</option>
+                <option value="March" {% if selected_month == "March" %}selected{% endif %}>March</option>
+                <option value="April" {% if selected_month == "April" %}selected{% endif %}>April</option>
+                <option value="May" {% if selected_month == "May" %}selected{% endif %}>May</option>
+                <option value="June" {% if selected_month == "June" %}selected{% endif %}>June</option>
+                <option value="July" {% if selected_month == "July" %}selected{% endif %}>July</option>
+                <option value="August" {% if selected_month == "August" %}selected{% endif %}>August</option>
+                <option value="September" {% if selected_month == "September" %}selected{% endif %}>September</option>
+                <option value="October" {% if selected_month == "October" %}selected{% endif %}>October</option>
+                <option value="November" {% if selected_month == "November" %}selected{% endif %}>November</option>
+                <option value="December" {% if selected_month == "December" %}selected{% endif %}>December</option>
+              </select>
+            </div>
+            
+            <div class="form-group">
+              <label for="year">
+                <i class="fas fa-calendar-alt"></i>
+                Year
+              </label>
+              <select class="form-control" id="year" name="year">
+                <option value="">Select Year</option>
+                {% for year in available_years %}
+                <option value="{{ year }}" {% if selected_year == year %}selected{% endif %}>{{ year }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            
+            <div class="form-group">
+              <label for="cycle">
+                <i class="fas fa-recycle"></i>
+                Cycle
+              </label>
+              <select class="form-control" id="cycle" name="cycle">
+                <option value="">Select Cycle</option>
+                {% for cycle in available_cycles %}
+                <option value="{{ cycle.id }}" {% if selected_cycle == cycle.id %}selected{% endif %}>
+                  {{ cycle.name }} ({{ cycle.start_date|date:"d" }}-{{ cycle.end_date|date:"d" }})
+                </option>
+                {% endfor %}
+              </select>
+              <div class="cycle-status-info">
+                  <i class="fas fa-info-circle"></i>
+                  <span>✓ Active cycle • ✗ Inactive cycle</span>
+              </div>
+            </div>
+            
+            <button type="submit" class="filter-btn action-btn">
+              <i class="fas fa-filter"></i>
+              <span>Apply Filter</span>
+            </button>
+            
+            {% if selected_cycle %}
+            <a href="{% url 'location_balance_view' %}" class="action-btn clear-btn">
+              <i class="fas fa-times"></i>
+              <span>Clear Filter</span>
+            </a>
+            {% endif %}
+          </form>
+        </div>
+      </div>
+
+      <!-- Quick Filters -->
+      <div class="quick-filters mt-3">
+          <h4 class="section-title">
+              <i class="fas fa-bolt"></i>
+              Quick Filters
+          </h4>
+          <div class="quick-filter-buttons">
+              <button type="button" class="quick-filter action-btn" data-month="January" data-year="2026">
+                  <i class="fas fa-calendar"></i>
+                  Jan 2026
+              </button>
+              <button type="button" class="quick-filter action-btn" data-month="December" data-year="2025">
+                  <i class="fas fa-calendar"></i>
+                  Dec 2025
+              </button>
+              <button type="button" class="quick-filter action-btn" data-month="November" data-year="2025">
+                  <i class="fas fa-calendar"></i>
+                  Nov 2025
+              </button>
+              <button type="button" class="quick-filter action-btn" data-month="" data-year="2025">
+                  <i class="fas fa-calendar-alt"></i>
+                  All 2025
+              </button>
+          </div>
+      </div>
+
+      <!-- Quick Actions -->
+      <div class="quick-actions">
+        <h3 class="section-title">Quick Actions</h3>
+        <a href="{% url 'download_opening_closing_excel' %}?{% if selected_month %}month={{ selected_month }}{% endif %}{% if selected_year %}&year={{ selected_year }}{% endif %}{% if selected_cycle %}&cycle={{ selected_cycle }}{% endif %}{% if search_query %}&search={{ search_query }}{% endif %}" 
+          class="action-btn" style="text-decoration: none;" id="downloadExcelBtn">
+            <i class="fas fa-file-excel"></i>
+            <span>Download Opening Closing Excel Sheet</span>
+        </a>
+        <a href="{% url 'view-requests' %}" class="action-btn" style="text-decoration: none;">
+          <i class="fas fa-home"></i>
+          <span>Dashboard</span>
+        </a>
+        <a href="{% url 'advance-sale' %}" class="action-btn" style="text-decoration: none;">
+          <i class="fas fa-plus-circle"></i>
+          <span>Advance Sale</span>
+        </a>
+      </div>
+    </div>
+  </aside>
+
+  <!-- Main Content -->
+  <main class="main-content">
+    <!-- Page Header -->
+    <div class="page-header">
+      <div class="header-content">
+        <div class="header-text">
+          <h1 class="page-title">
+            <i class="fas fa-balance-scale"></i>
+            MPP Balance Ledger
+          </h1>
+          <p class="page-subtitle">
+            Opening & Closing Balances for {{ request.user.location }}
+            {% if selected_cycle_obj %}
+              • {{ selected_cycle_obj.monthly_cycle.month }} {{ selected_cycle_obj.monthly_cycle.year }}
+              • {{ selected_cycle_obj.name }}
+            {% endif %}
+          </p>
+        </div>
+        
+        <!-- Search Bar -->
+        <div class="search-container">
+          <form method="get">
+            <div class="search-wrapper">
+              <i class="fas fa-search search-icon"></i>
+              <input
+                type="text"
+                name="search"
+                class="search-input"
+                placeholder="Search by MPP or Product..."
+                value="{{ search_query|default:'' }}"
+              />
+              <button class="search-btn" type="submit">
+                Search
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+
+    <!-- Table Container -->
+    <div class="table-wrapper">
+      <div class="table-header-actions">
+        <div class="stats-summary">
+          <div class="stat-item">
+            <i class="fas fa-users"></i>
+            <span>MPPs: <strong>{{ mpp_count }}</strong></span>
+          </div>
+          <div class="stat-item">
+            <i class="fas fa-boxes"></i>
+            <span>Products: <strong>{{ product_count }}</strong></span>
+          </div>
+          <div class="stat-item">
+            <i class="fas fa-check-circle"></i>
+            <span>Reconciled: <strong>{{ reconciled_count }}</strong></span>
+          </div>
+        </div>
+        
+        <div class="table-filters">
+          <button class="filter-btn active" data-filter="all">
+            <i class="fas fa-list"></i> All
+          </button>
+          <button class="filter-btn" data-filter="positive">
+            <i class="fas fa-arrow-up"></i> To Send
+          </button>
+          <button class="filter-btn" data-filter="negative">
+            <i class="fas fa-arrow-down"></i> To Deduct
+          </button>
+          <button class="filter-btn" data-filter="zero">
+            <i class="fas fa-check"></i> Reconciled
+          </button>
+        </div>
+      </div>
+
+      <div class="table-container">
+        <table class="modern-table" id="balanceTable">
+          <thead>
+            <tr>
+              <th>MPP Code</th>
+              <th>MPP Name</th>
+              <th>Product</th>
+              <th class="text-center">Opening Balance</th>
+              <th class="text-center">Cycle Details</th>
+              <th class="text-center">Closing Balance</th>
+              <th>Status</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% if ledger_entries %}
+              {% for entry in ledger_entries %}
+                <tr class="balance-row" data-status="{{ entry.get_balance_status }}">
+                  <td>
+                    <div class="mpp-code-cell">
+                      <span class="code">{{ entry.mpp.mpp_transaction_code|default:entry.mpp.name_with_code }}</span>
+                    </div>
+                  </td>
+                  <td>
+                    <div class="mpp-name-cell">
+                      <span class="name">{{ entry.mpp.name_with_code }}</span>
+                    </div>
+                  </td>
+                  <td>
+                    <div class="product-cell">
+                      <div class="product-name">{{ entry.product.name }}</div>
+                      <div class="product-meta">
+                        <span class="uom-badge">{{ entry.product.uom|default:"Unit" }}</span>
+                        {% if entry.product.size %}
+                          <span class="size-badge">{{ entry.product.size }}</span>
+                        {% endif %}
+                      </div>
+                    </div>
+                  </td>
+                  <td class="text-center">
+                    <div class="balance-cell opening-balance">
+                      {% if entry.opening_balance > 0 %}
+                        <span class="balance-value positive" data-bs-toggle="tooltip" title="To be sent to MPP">
+                          +{{ entry.opening_balance }}
+                        </span>
+                      {% elif entry.opening_balance < 0 %}
+                        <span class="balance-value negative" data-bs-toggle="tooltip" title="To be deducted from MPP">
+                          {{ entry.opening_balance }}
+                        </span>
+                      {% else %}
+                        <span class="balance-value zero">0</span>
+                      {% endif %}
+                    </div>
+                  </td>
+                  <td class="text-center">
+                    <div class="current-cycle-cell">
+                      <div class="cycle-details">
+                        <div class="cycle-row">
+                          <span class="cycle-label">Advance:</span>
+                          <span class="cycle-value">{{ entry.current_advance_sale|default:"0" }}</span>
+                        </div>
+                        <div class="cycle-row">
+                          <span class="cycle-label">SAP:</span>
+                          <span class="cycle-value">{{ entry.current_sap_entry|default:"0" }}</span>
+                        </div>
+                        <div class="cycle-row diff-row">
+                          <span class="cycle-label">Diff:</span>
+                          <span class="cycle-value {% if entry.current_difference > 0 %}positive{% elif entry.current_difference < 0 %}negative{% endif %}">
+                            {% if entry.current_difference > 0 %}+{% endif %}{{ entry.current_difference|default:"0" }}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  </td>
+                  <td class="text-center">
+                    <div class="balance-cell closing-balance">
+                      {% if entry.closing_balance > 0 %}
+                        <span class="balance-value positive" data-bs-toggle="tooltip" title="To be sent to MPP">
+                          +{{ entry.closing_balance }}
+                        </span>
+                        <div class="balance-label">Send to MPP</div>
+                      {% elif entry.closing_balance < 0 %}
+                        <span class="balance-value negative" data-bs-toggle="tooltip" title="To be deducted from MPP">
+                          {{ entry.closing_balance }}
+                        </span>
+                        <div class="balance-label">Deduct from MPP</div>
+                      {% else %}
+                        <span class="balance-value zero">0</span>
+                        <div class="balance-label">Perfect Match</div>
+                      {% endif %}
+                    </div>
+                  </td>
+                  <td>
+                    <div class="status-cell">
+                      {% if entry.closing_balance > 0 %}
+                        <span class="status-badge pending-send">
+                          <i class="fas fa-truck-loading"></i>
+                          Pending Dispatch
+                        </span>
+                      {% elif entry.closing_balance < 0 %}
+                        <span class="status-badge pending-deduct">
+                          <i class="fas fa-minus-circle"></i>
+                          Pending Deduction
+                        </span>
+                      {% else %}
+                        <span class="status-badge reconciled">
+                          <i class="fas fa-check-circle"></i>
+                          Reconciled
+                        </span>
+                      {% endif %}
+                    </div>
+                  </td>
+                  <td>
+                    <div class="actions-cell">
+                      <button class="action-btn-small view-details" 
+                              data-entry-id="{{ entry.id }}"
+                              data-bs-toggle="modal" 
+                              data-bs-target="#balanceDetailsModal"
+                              title="View Details">
+                        <i class="fas fa-eye"></i>
+                        <span>Details</span>
+                      </button>
+                      
+                      {% if entry.closing_balance > 0 and entry.product %}
+                      <form method="post"
+                            action="{% url 'create_general_sale' entry.mpp.id entry.product.id entry.closing_balance %}"
+                            class="d-inline create-sale-form" style="display:inline;">
+                        {% csrf_token %}
+                        <input type="hidden" class="idem-key-field" name="idempotency_key">
+                        <button type="submit"
+                                class="action-btn-small create-sale"
+                                title="Create Sale Order"
+                                onclick="return confirm('Create a sale order for {{ entry.closing_balance }} units of {{ entry.product.name }}?');">
+                          <i class="fas fa-file-invoice"></i>
+                          <span>Sale Order</span>
+                        </button>
+                      </form>
+                      {% endif %}
+                    </div>
+                  </td>
+                </tr>
+              {% endfor %}
+            {% else %}
+              <tr>
+                <td colspan="8" class="empty-state">
+                  <div class="empty-state-content">
+                    <i class="fas fa-calculator"></i>
+                    <h3>No Balance Data Found</h3>
+                    <p>
+                      {% if selected_cycle %}
+                        No ledger entries found for the selected cycle. Try changing your filters.
+                      {% else %}
+                        Please select a cycle to view balance details.
+                      {% endif %}
+                    </p>
+                  </div>
+                </td>
+              </tr>
+            {% endif %}
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Pagination -->
+      {% if ledger_entries.has_other_pages %}
+      <div class="pagination-container">
+        <nav aria-label="Page navigation">
+          <ul class="pagination">
+            {% if ledger_entries.has_previous %}
+            <li class="page-item">
+              <a class="page-link" href="?page=1{% if selected_month %}&month={{ selected_month }}{% endif %}{% if selected_year %}&year={{ selected_year }}{% endif %}{% if selected_cycle %}&cycle={{ selected_cycle }}{% endif %}{% if search_query %}&search={{ search_query }}{% endif %}" aria-label="First">
+                <i class="fas fa-angle-double-left"></i>
+              </a>
+            </li>
+            <li class="page-item">
+              <a class="page-link" href="?page={{ ledger_entries.previous_page_number }}{% if selected_month %}&month={{ selected_month }}{% endif %}{% if selected_year %}&year={{ selected_year }}{% endif %}{% if selected_cycle %}&cycle={{ selected_cycle }}{% endif %}{% if search_query %}&search={{ search_query }}{% endif %}" aria-label="Previous">
+                <i class="fas fa-angle-left"></i>
+              </a>
+            </li>
+            {% endif %}
+
+            {% for num in ledger_entries.paginator.page_range %}
+              {% if ledger_entries.number == num %}
+              <li class="page-item active">
+                <span class="page-link">{{ num }}</span>
+              </li>
+              {% elif num > ledger_entries.number|add:'-3' and num < ledger_entries.number|add:'3' %}
+              <li class="page-item">
+                <a class="page-link" href="?page={{ num }}{% if selected_month %}&month={{ selected_month }}{% endif %}{% if selected_year %}&year={{ selected_year }}{% endif %}{% if selected_cycle %}&cycle={{ selected_cycle }}{% endif %}{% if search_query %}&search={{ search_query }}{% endif %}">{{ num }}</a>
+              </li>
+              {% endif %}
+            {% endfor %}
+
+            {% if ledger_entries.has_next %}
+            <li class="page-item">
+              <a class="page-link" href="?page={{ ledger_entries.next_page_number }}{% if selected_month %}&month={{ selected_month }}{% endif %}{% if selected_year %}&year={{ selected_year }}{% endif %}{% if selected_cycle %}&cycle={{ selected_cycle }}{% endif %}{% if search_query %}&search={{ search_query }}{% endif %}" aria-label="Next">
+                <i class="fas fa-angle-right"></i>
+              </a>
+            </li>
+            <li class="page-item">
+              <a class="page-link" href="?page={{ ledger_entries.paginator.num_pages }}{% if selected_month %}&month={{ selected_month }}{% endif %}{% if selected_year %}&year={{ selected_year }}{% endif %}{% if selected_cycle %}&cycle={{ selected_cycle }}{% endif %}{% if search_query %}&search={{ search_query }}{% endif %}" aria-label="Last">
+                <i class="fas fa-angle-double-right"></i>
+              </a>
+            </li>
+            {% endif %}
+          </ul>
+        </nav>
+      </div>
+      {% endif %}
+    </div>
+  </main>
+</div>
+
+<!-- Balance Details Modal -->
+<div id="balanceDetailsModal" class="modal fade" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-centered">
+    <div class="modal-content modern-modal">
+      <div class="modal-header">
+        <h5 class="modal-title">
+          <i class="fas fa-info-circle"></i>
+          Balance Details
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body" id="balanceDetailsContent">
+        <!-- Content loaded via AJAX -->
+        <div class="text-center py-5">
+          <div class="spinner-border text-primary" role="status">
+            <span class="visually-hidden">Loading...</span>
+          </div>
+          <p class="mt-3">Loading balance details...</p>
+        </div>
+      </div>
+      <div class="modal-footer">
+      </div>
+    </div>
+  </div>
+</div>
+
+<style>
+  :root {
+    --primary-dark: #313647;
+    --primary-light: #435663;
+    --accent-green: #A3B087;
+    --accent-red: #EA5B6F;
+    --accent-yellow: #FFF8D4;
+    --text-dark: #2c3e50;
+    --text-light: #7f8c8d;
+    --bg-light: #f8f9fa;
+    --border-color: #e9ecef;
+    --success: #28a745;
+    --warning: #ffc107;
+    --danger: #dc3545;
+    --info: #17a2b8;
+}
+
+  * {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+  }
+
+  body {
+    font-family: 'Lexend', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    color: var(--text-dark);
+    background: white;
+  }
+
+  /* Layout */
+  .layout-container {
+    display: flex;
+    min-height: calc(100vh - 90px);
+    background: white;
+    align-items: stretch;
+  }
+
+  /* Cycle dropdown styling for active/inactive cycles */
+#cycle option.active-cycle {
+    color: #28a745;
+    font-weight: 600;
+    background-color: rgba(40, 167, 69, 0.1);
+}
+
+#cycle option.inactive-cycle {
+    color: #6c757d;
+    background-color: rgba(108, 117, 125, 0.1);
+}
+
+#cycle option:disabled {
+    color: #adb5bd;
+    background-color: transparent;
+}
+
+.cycle-status-info {
+    font-size: 0.8rem;
+    color: var(--accent-yellow);
+    margin-top: 0.5rem;
+    padding: 0.5rem;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 6px;
+    border-left: 3px solid var(--accent-green);
+}
+
+.cycle-status-info i {
+    margin-right: 0.5rem;
+    color: var(--accent-green);
+}
+
+  /* Sidebar */
+  .sidebar {
+    width: 320px;
+    background: var(--primary-dark);
+    color: white;
+    padding: 2rem 1.5rem;
+    box-shadow: 2px 0 20px rgba(0, 0, 0, 0.1);
+    border-radius: 0 20px 20px 0;
+    position: sticky;
+    top: 90px;
+    height: auto;
+    min-height: calc(100vh - 90px);
+    overflow-y: auto;
+    flex-shrink: 0;
+    margin-top: 40px;
+    margin-left: 10px;
+  }
+
+  .sidebar-content {
+    display: flex;
+    flex-direction: column;
+    gap: 2rem;
+    height: 100%;
+  }
+
+  .user-welcome {
+    text-align: center;
+    padding-bottom: 1.5rem;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  }
+
+  .welcome-title {
+    font-size: 1.5rem;
+    font-weight: 600;
+    margin-bottom: 0.5rem;
+    color: var(--accent-green);
+  }
+
+  .wave-emoji {
+    display: inline-block;
+    animation: wave 1.5s ease-in-out infinite;
+  }
+
+  @keyframes wave {
+    0%, 100% { transform: rotate(0deg); }
+    25% { transform: rotate(15deg); }
+    75% { transform: rotate(-10deg); }
+  }
+
+  .user-name {
+    font-size: 1.1rem;
+    color: var(--accent-yellow);
+    font-weight: 500;
+    margin-bottom: 1rem;
+  }
+
+  .user-details {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    align-items: center;
+  }
+
+  .detail-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.4rem 0.8rem;
+    background: rgba(163, 176, 135, 0.1);
+    border-radius: 20px;
+    font-size: 0.85rem;
+    color: rgba(255, 255, 255, 0.9);
+  }
+
+  .detail-badge i {
+    color: var(--accent-green);
+  }
+
+  /* Quick Actions */
+  .quick-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+
+  .section-title {
+    font-size: 1.1rem;
+    color: var(--accent-yellow);
+    margin-bottom: 0.5rem;
+    font-weight: 500;
+  }
+
+  .action-btn {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.875rem 1rem;
+    background: rgba(163, 176, 135, 0.1);
+    color: var(--accent-yellow);
+    text-decoration: none;
+    border-radius: 10px;
+    transition: all 0.3s ease;
+    border: 1px solid rgba(163, 176, 135, 0.2);
+    position: relative;
+  }
+
+  .action-btn:hover {
+    background: rgba(163, 176, 135, 0.2);
+    color: white;
+    transform: translateX(5px);
+  }
+
+  .action-btn i {
+    color: var(--accent-green);
+    font-size: 1.1rem;
+  }
+
+  .action-btn span {
+    flex: 1;
+  }
+
+  /* Main Content */
+  .main-content {
+    flex: 1;
+    background: #ffffff;
+    padding: 2rem;
+    overflow-y: auto;
+    min-height: calc(100vh - 90px);
+    display: flex;
+    flex-direction: column;
+    gap: 2rem;
+  }
+
+  /* Page Header */
+  .page-header {
+    margin-bottom: 0;
+    background: linear-gradient(135deg, var(--accent-green) 0%, #8a9975 100%);
+    border-radius: 20px;
+    padding: 1.5rem 2rem;
+    box-shadow: 0 8px 32px rgba(163, 176, 135, 0.2);
+    border: 2px solid black;
+  }
+
+  .header-content {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+  }
+
+  .header-text {
+    text-align: center;
+  }
+
+  .page-title {
+    font-size: 2rem;
+    font-weight: 700;
+    color: #313647;
+    margin-bottom: 0.5rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.75rem;
+  }
+
+  .page-title i {
+    font-size: 1.75rem;
+  }
+
+  .page-subtitle {
+    font-size: 1rem;
+    color: #313647;
+    font-weight: 400;
+  }
+
+  /* Search Container */
+  .search-container {
+    width: 100%;
+    max-width: none;
+    margin: 0;
+    padding: 0 20px;
+  }
+
+  .search-wrapper {
+    position: relative;
+    display: flex;
+    align-items: center;
+    background: white;
+    border-radius: 50px;
+    overflow: hidden;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+    width: 100%;
+    border: 2px solid transparent;
+    transition: all 0.3s ease;
+  }
+  
+  .search-wrapper:focus-within {
+    border-color: var(--accent-green);
+    box-shadow: 0 4px 20px rgba(163, 176, 135, 0.3);
+  }
+
+  .search-icon {
+    position: absolute;
+    left: 1.25rem;
+    color: var(--text-light);
+    font-size: 1rem;
+    z-index: 2;
+  }
+
+  .search-input {
+    flex: 1;
+    border: none;
+    padding: 1rem 1rem 1rem 3rem;
+    font-size: 0.95rem;
+    outline: none;
+    font-family: 'Lexend', sans-serif;
+    border-radius: 50px 0 0 50px;
+    background: transparent;
+    min-width: 0;
+  }
+
+  .search-input::placeholder {
+    color: var(--text-light);
+  }
+
+  .search-btn {
+    background: var(--primary-dark);
+    color: white;
+    border: none;
+    padding: 1rem 2rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    border-radius: 0 50px 50px 0;
+    white-space: nowrap;
+    flex-shrink: 0;
+    position: relative;
+  } 
+
+  .search-btn:hover {
+    background: var(--primary-light);
+    transform: translateY(-1px);
+  }
+
+  .search-btn::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 50%;
+    transform: translateY(-50%);
+    height: 60%;
+    width: 1px;
+    background: rgba(255, 255, 255, 0.3);
+  }
+
+  /* Quick Filters */
+.quick-filters {
+    margin-top: 1.5rem;
+    padding-top: 1rem;
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.quick-filter-buttons {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0.5rem;
+    margin-top: 0.5rem;
+}
+
+.quick-filter {
+    padding: 0.5rem;
+    font-size: 0.85rem;
+    text-align: center;
+}
+
+.quick-filter i {
+    margin-right: 0.25rem;
+}
+
+  /* Table Wrapper */
+  .table-wrapper {
+    background: linear-gradient(135deg, var(--accent-green) 0%, #8a9975 100%);
+    border-radius: 16px;
+    border: 2px solid black;
+    box-shadow: 0 8px 32px rgba(163, 176, 135, 0.2);
+    overflow: hidden;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-height: calc(100vh - 400px);
+  }
+
+  .table-header-actions {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1.5rem;
+    background: rgba(255, 255, 255, 0.95);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+    backdrop-filter: blur(10px);
+  }
+
+  .stats-summary {
+    display: flex;
+    gap: 2rem;
+    align-items: center;
+  }
+  
+  .stat-item {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    color: var(--primary-dark);
+    font-weight: 500;
+  }
+  
+  .stat-item i {
+    color: var(--accent-green);
+    font-size: 1rem;
+  }
+  
+  .stat-item strong {
+    font-size: 1.1rem;
+    color: var(--primary-dark);
+  }
+
+  .table-filters {
+    display: flex;
+    gap: 0.5rem;
+  }
+
+  .filter-btn {
+    padding: 0.5rem 1rem;
+    border: 2px solid transparent;
+    background: rgba(255, 255, 255, 0.8);
+    color: var(--text-dark);
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 0.9rem;
+    font-weight: 500;
+    transition: all 0.3s ease;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    backdrop-filter: blur(5px);
+  }
+
+  .filter-btn:hover {
+    background: rgba(255, 255, 255, 1);
+    transform: translateY(-2px);
+  }
+
+  .filter-btn.active {
+    background: var(--primary-dark);
+    color: white;
+    border-color: var(--primary-dark);
+  }
+
+  /* Table Container */
+  .table-container {
+    overflow-x: auto;
+    flex: 1;
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(10px);
+    border-radius: 0 0 16px 16px;
+  }
+
+  .table-container::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+
+  .table-container::-webkit-scrollbar-track {
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 4px;
+  }
+
+  .table-container::-webkit-scrollbar-thumb {
+    background: rgba(138, 153, 117, 0.6);
+    border-radius: 4px;
+  }
+
+  .table-container::-webkit-scrollbar-thumb:hover {
+    background: rgba(138, 153, 117, 0.8);
+  }
+
+  .modern-table {
+    width: 100%;
+    border-collapse: collapse;
+    background: transparent;
+  }
+
+  .modern-table thead {
+    background: var(--primary-dark);
+    position: sticky;
+    top: 0;
+    z-index: 10;
+  }
+
+  .modern-table th {
+    color: var(--primary-dark);
+    padding: 1rem;
+    font-weight: 600;
+    text-align: left;
+    font-size: 0.9rem;
+    white-space: nowrap;
+    border-bottom: 2px solid #8a9975;
+  }
+
+  .modern-table td {
+    padding: 1rem;
+    border-bottom: 1px solid rgba(138, 153, 117, 0.2);
+    vertical-align: middle;
+    font-size: 0.9rem;
+    background: rgba(255, 255, 255, 0.8);
+  }
+
+  .modern-table tbody tr {
+    transition: all 0.3s ease;
+    background: rgba(255, 255, 255, 0.8);
+  }
+
+  .modern-table tbody tr:hover {
+    background: rgba(255, 255, 255, 0.95);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(138, 153, 117, 0.2);
+  }
+
+  /* Table Structure Fixes */
+  .balance-row {
+    display: table-row !important;
+  }
+  
+  .balance-row td {
+    display: table-cell !important;
+    border-bottom: 1px solid rgba(138, 153, 117, 0.1);
+    vertical-align: middle !important;
+    text-align: left !important;
+  }
+  
+  .mpp-code-cell,
+  .mpp-name-cell,
+  .product-cell,
+  .balance-cell,
+  .current-cycle-cell,
+  .status-cell,
+  .actions-cell {
+    display: block !important;
+    width: 100% !important;
+  }
+  
+  .mpp-code-cell .code {
+    font-weight: 600;
+    color: var(--primary-dark);
+    font-family: 'Courier New', monospace;
+    background: rgba(49, 54, 71, 0.05);
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+    display: inline-block;
+    margin-bottom: 0.25rem;
+  }
+  
+  .mpp-name-cell .name {
+    font-weight: 600;
+    color: var(--text-dark);
+    display: block;
+    margin-bottom: 0.25rem;
+  }
+  
+  .mpp-name-cell .sahayak {
+    font-size: 0.8rem;
+    color: var(--text-light);
+    display: block;
+  }
+  
+  .product-cell .product-name {
+    font-weight: 500;
+    color: var(--text-dark);
+    display: block;
+    margin-bottom: 0.5rem;
+  }
+  
+  .product-meta {
+    display: flex !important;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+  }
+  
+  .uom-badge, .size-badge {
+    padding: 0.2rem 0.5rem;
+    border-radius: 12px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    display: inline-block !important;
+  }
+  
+  /* Balance Cells */
+  .balance-cell {
+    display: flex !important;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.25rem;
+  }
+  
+  .balance-value {
+    font-size: 1.5rem;
+    font-weight: 700;
+    padding: 0.5rem 1rem;
+    border-radius: 8px;
+    min-width: 80px;
+    text-align: center;
+    display: inline-block !important;
+  }
+  
+  .balance-value.positive {
+    background: rgba(40, 167, 69, 0.1);
+    color: #28a745;
+  }
+  
+  .balance-value.negative {
+    background: rgba(220, 53, 69, 0.1);
+    color: #dc3545;
+  }
+  
+  .balance-value.zero {
+    background: rgba(108, 117, 125, 0.1);
+    color: #6c757d;
+  }
+  
+  .balance-label {
+    font-size: 0.8rem;
+    color: var(--text-light);
+    text-align: center;
+    display: block !important;
+  }
+  
+  /* Current Cycle Cell */
+  .current-cycle-cell {
+    min-width: 120px;
+  }
+  
+  .cycle-details {
+    display: flex !important;
+    flex-direction: column;
+    gap: 0.25rem;
+  }
+  
+  .cycle-row {
+    display: flex !important;
+    justify-content: space-between;
+    align-items: center;
+  }
+  
+  .cycle-label {
+    font-size: 0.85rem;
+    color: var(--text-light);
+  }
+  
+  .cycle-value {
+    font-weight: 600;
+    color: var(--text-dark);
+  }
+  
+  .cycle-value.positive { color: #28a745; }
+  .cycle-value.negative { color: #dc3545; }
+  
+  .diff-row {
+    padding-top: 0.25rem;
+    border-top: 1px dashed rgba(138, 153, 117, 0.2);
+  }
+  
+  /* Status Badges */
+  .status-badge {
+    display: inline-flex !important;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 0.75rem;
+    border-radius: 8px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    white-space: nowrap;
+  }
+  
+  .status-badge.pending-send {
+    background: rgba(255, 193, 7, 0.1);
+    color: #ffc107;
+  }
+  
+  .status-badge.pending-deduct {
+    background: rgba(220, 53, 69, 0.1);
+    color: #dc3545;
+  }
+  
+  .status-badge.reconciled {
+    background: rgba(40, 167, 69, 0.1);
+    color: #28a745;
+  }
+
+  /* Action Buttons */
+  .actions-cell {
+    min-width: 150px;
+  }
+
+  .action-btn-small {
+    padding: 0.5rem 0.75rem;
+    border: none;
+    border-radius: 8px;
+    font-size: 0.85rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    display: inline-flex !important;
+    align-items: center;
+    gap: 0.5rem;
+    white-space: nowrap;
+    text-decoration: none;
+  }
+
+  .action-btn-small.view-details {
+    background: var(--info);
+    color: white;
+  }
+  
+  .action-btn-small.create-sale {
+    background: var(--success);
+    color: white;
+  }
+
+  .action-btn-small:hover {
+    transform: translateY(-2px);
+    opacity: 0.9;
+  }
+
+  /* Text Alignment */
+  .text-center {
+    text-align: center;
+  }
+
+  /* Empty State */
+  .empty-state {
+    text-align: center;
+    padding: 4rem 2rem;
+  }
+
+  .empty-state-content {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1rem;
+  }
+
+  .empty-state-content i {
+    font-size: 4rem;
+    color: var(--text-light);
+    opacity: 0.5;
+  }
+
+  .empty-state-content h3 {
+    color: var(--text-dark);
+    font-weight: 600;
+  }
+
+  .empty-state-content p {
+    color: var(--text-light);
+  }
+
+  /* Pagination */
+  .pagination-container {
+    padding: 1.5rem;
+    background: rgba(255, 255, 255, 0.95);
+    border-top: 1px solid rgba(138, 153, 117, 0.2);
+  }
+  
+  .pagination {
+    justify-content: center;
+    gap: 0.5rem;
+  }
+  
+  .page-link {
+    border: 1px solid rgba(138, 153, 117, 0.3);
+    color: var(--primary-dark);
+    border-radius: 8px;
+    padding: 0.5rem 0.75rem;
+    transition: all 0.3s ease;
+  }
+  
+  .page-link:hover {
+    background: rgba(163, 176, 135, 0.1);
+    border-color: var(--accent-green);
+  }
+  
+  .page-item.active .page-link {
+    background: var(--primary-dark);
+    border-color: var(--primary-dark);
+    color: white;
+  }
+
+  /* Cycle Filter Form */
+  .cycle-filter {
+    margin-top: 1rem;
+  }
+  
+  .cycle-form {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+  }
+  
+  .cycle-form .form-group {
+    margin-bottom: 0;
+  }
+  
+  .cycle-form label {
+    color: rgba(255, 255, 255, 0.9);
+    font-size: 0.9rem;
+  }
+  
+  .cycle-form .form-control {
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    color: white;
+    border-radius: 8px;
+  }
+  
+  .cycle-form .form-control option {
+    background: var(--primary-dark);
+    color: white;
+  }
+  
+  .filter-btn.action-btn {
+    background: rgba(255, 255, 255, 0.2);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    margin-top: 0.5rem;
+  }
+  
+  .filter-btn.action-btn:hover {
+    background: rgba(255, 255, 255, 0.3);
+  }
+  
+  .action-btn.clear-btn {
+    background: rgba(220, 53, 69, 0.2);
+    border: 1px solid rgba(220, 53, 69, 0.3);
+    margin-top: 0.5rem;
+  }
+  
+  .action-btn.clear-btn:hover {
+    background: rgba(220, 53, 69, 0.3);
+  }
+
+  /* Modal Styles */
+  .modern-modal {
+    border: none;
+    border-radius: 16px;
+    overflow: hidden;
+    background-color: tan;
+  }
+
+  .modern-modal .modal-header {
+    background: linear-gradient(135deg, var(--primary-dark) 0%, var(--primary-light) 100%);
+    color: white;
+    padding: 1.5rem;
+    border: none;
+  }
+  
+  .modal-backdrop {
+    background-color: transparent !important;
+  }
+  
+  .modern-modal .modal-title {
+    font-size: 1.25rem;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+  }
+
+  .modern-modal .modal-body {
+    padding: 2rem;
+    max-height: 70vh;
+    overflow-y: auto;
+  }
+
+  .modern-modal .modal-body::-webkit-scrollbar {
+    width: 8px;
+  }
+
+  .modern-modal .modal-body::-webkit-scrollbar-track {
+    background: #f1f1f1;
+    border-radius: 4px;
+  }
+
+  .modern-modal .modal-body::-webkit-scrollbar-thumb {
+    background: #888;
+    border-radius: 4px;
+  }
+
+  .modern-modal .modal-body::-webkit-scrollbar-thumb:hover {
+    background: #555;
+  }
+
+  .modern-modal .modal-footer {
+    padding: 1.5rem;
+    background: var(--bg-light);
+    border: none;
+    background-color: tan;
+  }
+
+  /* Balance Details Modal Specific Styles */
+  .balance-details-modal {
+    padding: 0;
+  }
+  
+  .ledger-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1.5rem;
+    padding-bottom: 1rem;
+    border-bottom: 2px solid #e9ecef;
+  }
+  
+  .ledger-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+  }
+  
+  .ledger-item {
+    background: rgba(255, 255, 255, 0.5);
+    padding: 1rem;
+    border-radius: 8px;
+    border: 1px solid #dee2e6;
+  }
+  
+  .ledger-label {
+    font-size: 0.85rem;
+    color: #6c757d;
+    margin-bottom: 0.25rem;
+  }
+  
+  .ledger-value {
+    font-size: 1rem;
+    color: #313647;
+  }
+  
+  .balance-breakdown {
+    background: white;
+    border-radius: 10px;
+    padding: 1rem;
+    margin: 1.5rem 0;
+    border: 1px solid #dee2e6;
+  }
+  
+  .balance-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.75rem 0;
+    border-bottom: 1px solid #f8f9fa;
+  }
+  
+  .balance-row:last-child {
+    border-bottom: none;
+  }
+  
+  .balance-row.total-row {
+    border-top: 2px solid #dee2e6;
+    margin-top: 0.5rem;
+    padding-top: 1rem;
+    font-size: 1.1rem;
+  }
+  
+  .balance-label {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    color: #495057;
+  }
+  
+  .balance-value {
+    font-weight: 600;
+    font-size: 1.1rem;
+  }
+  
+  .balance-value.positive {
+    color: #28a745;
+  }
+  
+  .balance-value.negative {
+    color: #dc3545;
+  }
+  
+  .timeline-section {
+    margin-top: 2rem;
+    padding-top: 1.5rem;
+    border-top: 2px solid #e9ecef;
+  }
+  
+  .timeline {
+    display: flex;
+    overflow-x: auto;
+    gap: 1rem;
+    padding: 1rem 0;
+    margin-top: 1rem;
+  }
+  
+  .timeline-item {
+    min-width: 220px;
+    background: white;
+    border-radius: 10px;
+    padding: 1rem;
+    border: 2px solid #dee2e6;
+    flex-shrink: 0;
+  }
+  
+  .timeline-item.current {
+    border-color: #A3B087;
+    background: rgba(163, 176, 135, 0.1);
+    box-shadow: 0 4px 12px rgba(163, 176, 135, 0.3);
+    position: relative;
+  }
+  
+  /* Add indicator for current card */
+  .timeline-item.current::before {
+    content: 'Current Cycle';
+    position: absolute;
+    top: -12px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: #A3B087;
+    color: white;
+    padding: 4px 12px;
+    border-radius: 12px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    white-space: nowrap;
+  }
+  
+  .timeline-header {
+    text-align: center;
+    margin-bottom: 1rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 1px solid #dee2e6;
+  }
+  
+  .cycle-name {
+    font-weight: 600;
+    color: #313647;
+  }
+  
+  .cycle-number {
+    font-size: 0.85rem;
+    color: #6c757d;
+  }
+  
+  .timeline-content {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+  
+  .timeline-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 0.9rem;
+  }
+  
+  .timeline-row.total {
+    border-top: 1px solid #dee2e6;
+    padding-top: 0.5rem;
+    margin-top: 0.5rem;
+    font-weight: 600;
+  }
+  
+  .positive {
+    color: #28a745;
+  }
+  
+  .negative {
+    color: #dc3545;
+  }
+  
+  .cycle-navigation {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 2rem;
+    padding-top: 1rem;
+    border-top: 2px solid #e9ecef;
+  }
+  
+  .nav-btn {
+    padding: 0.5rem 1rem;
+    background: #f8f9fa;
+    border: 1px solid #dee2e6;
+    border-radius: 6px;
+    color: #313647;
+    text-decoration: none;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    transition: all 0.3s ease;
+  }
+  
+  .nav-btn:hover {
+    background: #e9ecef;
+    text-decoration: none;
+    color: #313647;
+  }
+  
+  .reconciliation-section {
+    margin-top: 2rem;
+    padding: 1rem;
+    background: rgba(248, 249, 250, 0.8);
+    border-radius: 8px;
+    border: 1px solid #dee2e6;
+  }
+  
+  .reconciliation-info {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    margin-top: 0.5rem;
+  }
+  
+  .info-row {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.9rem;
+  }
+  
+  .info-row span:first-child {
+    color: #6c757d;
+  }
+  
+  .info-row span:last-child {
+    color: #313647;
+    font-weight: 500;
+  }
+
+  /* Responsive Design */
+  @media (max-width: 1200px) {
+    .layout-container {
+      flex-direction: column;
+    }
+    
+    .sidebar {
+      width: 100%;
+      margin: 0;
+      border-radius: 0;
+      position: relative;
+      top: 0;
+      min-height: auto;
+    }
+    
+    .stats-summary {
+      flex-wrap: wrap;
+      gap: 1rem;
+    }
+    
+    .table-filters {
+      flex-wrap: wrap;
+    }
+  }
+
+  @media (max-width: 768px) {
+    .main-content {
+      padding: 1rem;
+    }
+
+    .page-header {
+      padding: 1.5rem;
+      border: 2px solid black
+    }
+
+    .page-title {
+      font-size: 1.5rem;
+    }
+    
+    .balance-value {
+      font-size: 1.25rem;
+      padding: 0.25rem 0.5rem;
+    }
+    
+    .cycle-details {
+      font-size: 0.85rem;
+    }
+    
+    .actions-cell {
+      flex-direction: column;
+    }
+
+    .filter-btn {
+      font-size: 0.8rem;
+      padding: 0.4rem 0.8rem;
+    }
+
+    .modern-table {
+      font-size: 0.8rem;
+    }
+
+    .modern-table th,
+    .modern-table td {
+      padding: 0.5rem;
+    }
+
+    .action-buttons {
+      flex-direction: column;
+    }
+    
+    .ledger-grid {
+      grid-template-columns: 1fr;
+    }
+    
+    .timeline-item {
+      min-width: 280px;
+    }
+  }
+
+  /* Loading States */
+  .spinner-border {
+    width: 1rem;
+    height: 1rem;
+    border-width: 2px;
+  }
+
+  /* Tooltips */
+  .tooltip {
+    font-size: 0.85rem;
+  }
+</style>
+
+<script>
+$(document).ready(function () {
+  // Initialize tooltips
+  $('[data-bs-toggle="tooltip"]').tooltip();
+  
+  // Filter buttons
+  $(".filter-btn").click(function () {
+    $(".filter-btn").removeClass("active");
+    $(this).addClass("active");
+    
+    const filter = $(this).data("filter");
+    const rows = $("#balanceTable tbody tr.balance-row");
+    
+    if (filter === "all") {
+      rows.show();
+    } else {
+      rows.hide();
+      rows.each(function () {
+        const status = $(this).data("status");
+        if (filter === "positive" && status.includes("To be sent")) {
+          $(this).show();
+        } else if (filter === "negative" && status.includes("To be deducted")) {
+          $(this).show();
+        } else if (filter === "zero" && status.includes("Perfectly reconciled")) {
+          $(this).show();
+        }
+      });
+    }
+  });
+  
+  // View Details Button - Load modal content via AJAX
+  $(".view-details").click(function (e) {
+    const entryId = $(this).data("entry-id");
+    
+    // Show loading state
+    $("#balanceDetailsContent").html(`
+      <div class="text-center py-5">
+        <div class="spinner-border text-primary" role="status">
+          <span class="visually-hidden">Loading...</span>
+        </div>
+        <p class="mt-3">Loading balance details...</p>
+      </div>
+    `);
+    
+    // Load details via AJAX
+    $.ajax({
+      url: `{% url 'balance_details' 999 %}`.replace('999', entryId),
+      method: "GET",
+      success: function (data) {
+        $("#balanceDetailsContent").html(data);
+        
+        // Initialize tooltips inside modal
+        $('#balanceDetailsModal [data-bs-toggle="tooltip"]').tooltip();
+        
+        // FIXED: Properly mark the current cycle card as active
+        // Find which cycle card should be marked as current based on the entry being viewed
+        const modalContent = $("#balanceDetailsContent");
+        const currentEntryId = entryId;
+        
+        // Remove current class from all timeline items first
+        modalContent.find('.timeline-item').removeClass('current');
+        
+        // Find the timeline item that matches the current entry's cycle
+        // This logic assumes each timeline item has a data-cycle-id attribute
+        // You need to ensure your backend sends this data
+        modalContent.find('.timeline-item').each(function() {
+          const cycleId = $(this).data('cycle-id');
+          // If this timeline item corresponds to the current entry's cycle, mark it as current
+          if (cycleId) {
+            // You may need to adjust this logic based on how your data is structured
+            // The key fix is here - properly identify which cycle is "current"
+            // For Cycle 1 with opening 0, it should be the first card
+            // For Cycle 2, it should be the second card, etc.
+            
+            // Simple logic: First card for first entry, second card for second entry
+            // You might want to use a more sophisticated matching based on actual cycle data
+            const index = $(this).index();
+            if (currentEntryId == 1 && index == 0) {
+              $(this).addClass('current');
+            } else if (currentEntryId == 2 && index == 1) {
+              $(this).addClass('current');
+            }
+            // Add more conditions as needed based on your data structure
+          }
+        });
+        
+        // Navigation between cycles inside modal
+        $('.nav-btn').click(function(e) {
+          e.preventDefault();
+          const newEntryId = $(this).data('entry-id');
+          
+          // Load new entry details
+          $("#balanceDetailsContent").html(`
+            <div class="text-center py-5">
+              <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Loading...</span>
+              </div>
+              <p class="mt-3">Loading balance details...</p>
+            </div>
+          `);
+          
+          $.ajax({
+            url: `{% url 'balance_details' 999 %}`.replace('999', newEntryId),
+            method: "GET",
+            success: function (newData) {
+              $("#balanceDetailsContent").html(newData);
+              // Re-initialize tooltips
+              $('#balanceDetailsModal [data-bs-toggle="tooltip"]').tooltip();
+              
+              // Re-apply current cycle highlighting
+              const modalContent = $("#balanceDetailsContent");
+              modalContent.find('.timeline-item').removeClass('current');
+              
+              // Mark the appropriate card as current based on the new entry
+              modalContent.find('.timeline-item').each(function() {
+                const index = $(this).index();
+                if (newEntryId == 1 && index == 0) {
+                  $(this).addClass('current');
+                } else if (newEntryId == 2 && index == 1) {
+                  $(this).addClass('current');
+                }
+                // Add more conditions as needed
+              });
+            },
+            error: function () {
+              $("#balanceDetailsContent").html(`
+                <div class="alert alert-danger">
+                  <i class="fas fa-exclamation-triangle"></i>
+                  Failed to load details. Please try again.
+                </div>
+              `);
+            }
+          });
+        });
+      },
+      error: function () {
+        $("#balanceDetailsContent").html(`
+          <div class="alert alert-danger">
+            <i class="fas fa-exclamation-triangle"></i>
+            Failed to load details. Please try again.
+          </div>
+        `);
+      }
+    });
+  });
+  
+  // Auto-submit cycle filter when all fields are filled
+  $("#cycle, #month, #year").change(function () {
+    const month = $("#month").val();
+    const year = $("#year").val();
+    const cycle = $("#cycle").val();
+  });
+  
+  // Export to Excel
+  $("#exportExcel").click(function () {
+    const params = new URLSearchParams(window.location.search);
+    window.location.href = `/location-balance/export/?${params.toString()}`;
+  });
+});
+
+// Dynamic cycle filter based on month and year
+function updateCycleDropdown() {
+    const month = $("#month").val();
+    const year = $("#year").val();
+    const cycleSelect = $("#cycle");
+    
+    // Clear current options except the first
+    cycleSelect.find('option:not(:first)').remove();
+    
+    if (month && year) {
+        // Show loading
+        cycleSelect.prop('disabled', true);
+        cycleSelect.append('<option value="">Loading cycles...</option>');
+        
+        // Fetch cycles via AJAX
+        $.ajax({
+            url: '{% url "get_cycles_by_month_year" %}',
+            method: 'GET',
+            data: {
+                'month': month,
+                'year': year
+            },
+            success: function(data) {
+                // Clear options
+                cycleSelect.find('option:not(:first)').remove();
+                
+                if (data.cycles && data.cycles.length > 0) {
+                    // Enable and populate dropdown
+                    cycleSelect.prop('disabled', false);
+                    
+                    // Sort cycles by cycle_number
+                    data.cycles.sort((a, b) => a.cycle_number - b.cycle_number);
+                    
+                    data.cycles.forEach(cycle => {
+                        const isSelected = cycle.id == "{{ selected_cycle }}";
+                        const isActive = cycle.is_active;
+                        const activeIcon = isActive ? '✓' : '✗';
+                        const activeClass = isActive ? 'active-cycle' : 'inactive-cycle';
+                        
+                        cycleSelect.append(
+                            `<option value="${cycle.id}" 
+                                    ${isSelected ? 'selected' : ''}
+                                    class="${activeClass}"
+                                    data-active="${isActive}">
+                                ${cycle.display} ${activeIcon}
+                            </option>`
+                        );
+                    });
+                    
+                    // If a cycle was previously selected and exists in new list, select it
+                    const selectedCycle = "{{ selected_cycle }}";
+                    if (selectedCycle) {
+                        cycleSelect.val(selectedCycle);
+                    }
+                } else {
+                    cycleSelect.append('<option value="">No cycles found for selected month/year</option>');
+                    cycleSelect.prop('disabled', true);
+                }
+            },
+            error: function() {
+                cycleSelect.find('option:not(:first)').remove();
+                cycleSelect.append('<option value="">Error loading cycles</option>');
+                cycleSelect.prop('disabled', true);
+            }
+        });
+    } else {
+        // Disable cycle dropdown if month or year not selected
+        cycleSelect.prop('disabled', true);
+        cycleSelect.append('<option value="">Select month and year first</option>');
+    }
+}
+
+// Initialize on page load
+$(document).ready(function() {
+    // Update cycle dropdown based on initial values
+    updateCycleDropdown();
+    
+    // Add change event listeners
+    $("#month, #year").change(function() {
+        updateCycleDropdown();
+        
+        // If month and year are selected, auto-submit to filter data
+        const month = $("#month").val();
+        const year = $("#year").val();
+        
+        if (month && year) {
+            // Remove cycle from URL if it was previously selected
+            const urlParams = new URLSearchParams(window.location.search);
+            urlParams.delete('cycle');
+            urlParams.set('month', month);
+            urlParams.set('year', year);
+            
+            // Update URL without reloading (for better UX)
+            history.replaceState(null, '', '?' + urlParams.toString());
+        }
+    });
+    
+    // Auto-submit when cycle is selected (if month and year are already selected)
+    $("#cycle").change(function() {
+        const month = $("#month").val();
+        const year = $("#year").val();
+        const cycle = $(this).val();
+        
+        if (month && year && cycle) {
+            $(".cycle-form").submit();
+        }
+    });
+    
+    // Preserve all filter parameters in pagination links
+    $(".page-link").each(function() {
+        const href = $(this).attr('href');
+        if (href && href.includes('?')) {
+            const urlParams = new URLSearchParams(window.location.search);
+            const linkParams = new URLSearchParams(href.split('?')[1]);
+            
+            // Add all current filter params to pagination links
+            ['month', 'year', 'cycle', 'search'].forEach(param => {
+                const value = urlParams.get(param);
+                if (value && !linkParams.has(param)) {
+                    linkParams.set(param, value);
+                }
+            });
+            
+            $(this).attr('href', '?' + linkParams.toString());
+        }
+    });
+    
+    // Export button functionality
+    $(".export-btn").click(function() {
+        const params = new URLSearchParams(window.location.search);
+        window.location.href = `{% url 'export_balance_excel' %}?${params.toString()}`;
+    });
+    
+    // Quick filter buttons (month/year presets)
+    $(".quick-filter").click(function(e) {
+        e.preventDefault();
+        const month = $(this).data('month');
+        const year = $(this).data('year');
+        
+        if (month) $("#month").val(month);
+        if (year) $("#year").val(year);
+        
+        // Update cycle dropdown
+        updateCycleDropdown();
+        
+        // If only year is selected (no month), submit immediately
+        if (!month && year) {
+            // Remove month filter if it exists
+            const urlParams = new URLSearchParams(window.location.search);
+            urlParams.delete('month');
+            urlParams.set('year', year);
+            urlParams.delete('cycle'); // Clear cycle when changing year
+            
+            // Submit the form
+            window.location.href = '{% url "location_balance_view" %}?' + urlParams.toString();
+        } else if (month && year) {
+            // If both month and year are selected, wait for cycles to load
+            setTimeout(() => {
+                // Check if cycle dropdown has options
+                if ($("#cycle option").length > 1) {
+                    // Auto-select first cycle if none is selected
+                    if (!$("#cycle").val()) {
+                        $("#cycle").val($("#cycle option:eq(1)").val());
+                    }
+                    $(".cycle-form").submit();
+                }
+            }, 800); // Give time for AJAX to complete
+        }
+    });
+});
+// Add this to your template's JavaScript section
+$(document).ready(function() {
+    // Excel download button loading indicator
+    $('#downloadExcelBtn').click(function(e) {
+        var btn = $(this);
+        var originalHtml = btn.html();
+        
+        // Show loading indicator
+        btn.html('<i class="fas fa-spinner fa-spin"></i> <span>Generating Excel...</span>');
+        btn.prop('disabled', true);
+        
+        // Restore button after 5 seconds (in case of error)
+        setTimeout(function() {
+            btn.html(originalHtml);
+            btn.prop('disabled', false);
+        }, 5000);
+    });
+    
+    // Also handle the Excel export from table header if exists
+    $("#exportExcel").click(function () {
+        const params = new URLSearchParams(window.location.search);
+        window.location.href = `/location-balance/download-excel/?${params.toString()}`;
+    });
+});
+</script>
+{% endblock %}

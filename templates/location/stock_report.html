@@ -1,0 +1,323 @@
+{% extends "base.html" %}
+{% block title %}My Sale &amp; Stock Report{% endblock %}
+{% block content %}
+{% csrf_token %}
+
+<div class="sr-wrap">
+  <!-- Header -->
+  <div class="sr-header">
+    <div>
+      <h1 class="sr-title"><i class="fas fa-warehouse"></i> My Sale &amp; Stock Report</h1>
+      <p class="sr-sub">Location: <strong>{{ location }}</strong> — review your products, enter Damage / Expire, and download your report.</p>
+    </div>
+    <a href="{% url 'create-an-indent' %}" class="sr-btn sr-btn-ghost"><i class="fas fa-arrow-left"></i> Back to Menu</a>
+  </div>
+
+  <!-- Cycle picker -->
+  <div class="sr-card">
+    <div class="sr-cycle-row">
+      <div class="sr-field">
+        <label for="monthYear">Month &amp; Year</label>
+        <select id="monthYear" class="sr-select">
+          <option value="">— Choose month —</option>
+        </select>
+      </div>
+      <div class="sr-field">
+        <label for="cycleSelect">Cycle</label>
+        <select id="cycleSelect" class="sr-select" disabled>
+          <option value="">— Choose cycle —</option>
+        </select>
+      </div>
+      <div id="statusBox" class="sr-status-box" style="display:none;">
+        <span class="sr-status-label">Status</span>
+        <span id="statusBadge" class="sr-badge">—</span>
+      </div>
+    </div>
+  </div>
+  {{ month_years|json_script:"monthYearsData" }}
+
+  <!-- Toast -->
+  <div id="toast" class="sr-toast" style="display:none;"></div>
+
+  <!-- Empty prompt -->
+  <div id="emptyPrompt" class="sr-empty">
+    <i class="fas fa-hand-pointer"></i>
+    <p>Pick a month &amp; cycle above to see your products.</p>
+  </div>
+
+  <!-- Report -->
+  <div id="reportArea" style="display:none;">
+    <!-- Summary cards -->
+    <div class="sr-summary">
+      <div class="sr-stat"><span class="sr-stat-num" id="sProducts">0</span><span class="sr-stat-lbl">Products</span></div>
+      <div class="sr-stat"><span class="sr-stat-num" id="sOpening">0</span><span class="sr-stat-lbl">Opening</span></div>
+      <div class="sr-stat"><span class="sr-stat-num" id="sSale">0</span><span class="sr-stat-lbl">MPP Sale</span></div>
+      <div class="sr-stat sr-stat-ok"><span class="sr-stat-num" id="sClosing">0</span><span class="sr-stat-lbl">Closing</span></div>
+    </div>
+
+    <div class="sr-actions">
+      <div class="sr-hint" id="editHint"><i class="fas fa-pen"></i> Enter Damage &amp; Expire, then Save. Closing updates automatically.</div>
+      <div class="sr-actions-btns">
+        <button id="btnDownload" class="sr-btn sr-btn-secondary"><i class="fas fa-download"></i> Download My Report</button>
+        <button id="btnSave" class="sr-btn sr-btn-primary"><i class="fas fa-save"></i> Save Damage / Expire</button>
+      </div>
+    </div>
+
+    <div class="sr-table-scroll">
+      <table class="sr-table">
+        <thead>
+          <tr>
+            <th>#</th><th>Product</th>
+            <th class="num">Opening</th>
+            <th class="num">Received<br>NDS/Other Co.</th><th class="num">Received<br>MCC/BMC</th>
+            <th class="num">Transfer</th>
+            <th class="num">MPP Sale</th>
+            <th class="num edit">Damage</th><th class="num edit">Expire</th>
+            <th class="num">Closing</th><th>Remark</th>
+          </tr>
+        </thead>
+        <tbody id="rows"></tbody>
+        <tfoot><tr class="total-row" id="totalRow"></tr></tfoot>
+      </table>
+    </div>
+  </div>
+</div>
+
+<style>
+  .sr-wrap { max-width: 1200px; margin: 0 auto; padding: 1.5rem; color:#2c3e50; }
+  .sr-header { display:flex; justify-content:space-between; align-items:flex-start; gap:1rem; margin-bottom:1.25rem; flex-wrap:wrap; }
+  .sr-title { font-size:1.6rem; font-weight:700; color:#313647; margin:0; }
+  .sr-title i { color:#A3B087; }
+  .sr-sub { color:#7f8c8d; margin:.35rem 0 0; font-size:.9rem; }
+  .sr-card { background:#fff; border:1px solid #e9ecef; border-radius:14px; padding:1.1rem 1.25rem; margin-bottom:1.1rem; box-shadow:0 2px 8px rgba(0,0,0,.04); }
+  .sr-cycle-row { display:flex; align-items:flex-end; gap:1.5rem; flex-wrap:wrap; }
+  .sr-field { display:flex; flex-direction:column; gap:.4rem; min-width:230px; flex:1; }
+  .sr-field label { font-size:.8rem; font-weight:600; color:#435663; text-transform:uppercase; letter-spacing:.4px; }
+  .sr-select { padding:.6rem .8rem; border:1px solid #cdd4da; border-radius:9px; font-size:.95rem; background:#fff; }
+  .sr-select:focus { outline:none; border-color:#A3B087; box-shadow:0 0 0 3px rgba(163,176,135,.2); }
+  .sr-select:disabled { background:#f1f3f5; color:#adb5bd; }
+  .sr-status-box { display:flex; flex-direction:column; gap:.35rem; }
+  .sr-status-label { font-size:.72rem; font-weight:600; color:#7f8c8d; text-transform:uppercase; letter-spacing:.5px; }
+  .sr-badge { padding:.35rem .8rem; border-radius:20px; font-size:.8rem; font-weight:600; text-align:center; background:#e9ecef; color:#435663; }
+  .sr-badge.DRAFT { background:rgba(255,193,7,.15); color:#b8860b; border:1px solid rgba(255,193,7,.5); }
+  .sr-badge.SALE_UPLOADED { background:rgba(23,162,184,.12); color:#0b7285; border:1px solid rgba(23,162,184,.4); }
+  .sr-badge.FINALIZED { background:rgba(40,167,69,.12); color:#1e7e34; border:1px solid rgba(40,167,69,.4); }
+  .sr-empty { text-align:center; color:#adb5bd; padding:3rem 1rem; }
+  .sr-empty i { font-size:2.2rem; margin-bottom:.6rem; display:block; }
+  .sr-summary { display:grid; grid-template-columns:repeat(4,1fr); gap:.9rem; margin-bottom:1.1rem; }
+  .sr-stat { background:#fff; border:1px solid #e9ecef; border-radius:12px; padding:1rem; text-align:center; box-shadow:0 2px 8px rgba(0,0,0,.04); }
+  .sr-stat-num { display:block; font-size:1.7rem; font-weight:700; color:#313647; }
+  .sr-stat-lbl { font-size:.72rem; text-transform:uppercase; letter-spacing:.5px; color:#7f8c8d; }
+  .sr-stat-ok .sr-stat-num { color:#28a745; }
+  .sr-actions { display:flex; justify-content:space-between; align-items:center; gap:1rem; margin-bottom:.9rem; flex-wrap:wrap; }
+  .sr-actions-btns { display:flex; gap:.6rem; flex-wrap:wrap; }
+  .sr-hint { font-size:.82rem; color:#0b7285; }
+  .sr-hint-locked { color:#b8860b; font-weight:600; }
+  .sr-btn { border:none; border-radius:9px; padding:.55rem 1rem; font-size:.88rem; font-weight:600; cursor:pointer; display:inline-flex; align-items:center; gap:.5rem; transition:all .2s ease; text-decoration:none; }
+  .sr-btn:disabled { opacity:.5; cursor:not-allowed; }
+  .sr-btn-primary { background:#313647; color:#fff; }
+  .sr-btn-primary:hover:not(:disabled) { background:#435663; transform:translateY(-1px); }
+  .sr-btn-secondary { background:#A3B087; color:#fff; }
+  .sr-btn-secondary:hover:not(:disabled) { background:#8f9e72; transform:translateY(-1px); }
+  .sr-btn-ghost { background:#f1f3f5; color:#435663; }
+  .sr-btn-ghost:hover { background:#e2e6ea; }
+  .sr-toast { padding:.8rem 1.1rem; border-radius:10px; margin-bottom:1.1rem; font-size:.9rem; font-weight:500; }
+  .sr-toast.ok { background:rgba(40,167,69,.1); color:#1e7e34; border:1px solid rgba(40,167,69,.35); }
+  .sr-toast.err { background:rgba(220,53,69,.1); color:#c82333; border:1px solid rgba(220,53,69,.35); }
+  .sr-toast.info { background:rgba(23,162,184,.1); color:#0b7285; border:1px solid rgba(23,162,184,.35); }
+  .sr-table-scroll { overflow-x:auto; background:#fff; border:1px solid #e9ecef; border-radius:14px; box-shadow:0 2px 8px rgba(0,0,0,.04); }
+  .sr-table { width:100%; border-collapse:collapse; font-size:.85rem; }
+  .sr-table th, .sr-table td { border:1px solid #e9ecef; padding:.5rem .65rem; text-align:left; white-space:nowrap; }
+  .sr-table th { background:#313647; color:#fff; font-weight:600; }
+  .sr-table th.edit { background:#5a4b7a; }
+  .sr-table td.num, .sr-table th.num { text-align:right; }
+  .sr-table tr:nth-child(even) td { background:#f8f9fa; }
+  .sr-table td.neg { color:#dc3545; font-weight:700; }
+  .sr-table .total-row td { background:#D9E1F2 !important; font-weight:700; }
+  .sr-inp { width:74px; padding:.28rem .4rem; border:1px solid #cdd4da; border-radius:6px; text-align:right; font-size:.82rem; }
+  .sr-inp:focus { outline:none; border-color:#5a4b7a; box-shadow:0 0 0 2px rgba(90,75,122,.2); }
+  .sr-inp:disabled { background:#f1f3f5; color:#868e96; }
+  .sr-remark { width:150px; padding:.28rem .4rem; border:1px solid #cdd4da; border-radius:6px; font-size:.8rem; }
+  .sr-remark:disabled { background:#f1f3f5; color:#868e96; }
+  .sr-spin { animation:sr-rot 1s linear infinite; }
+  @keyframes sr-rot { to { transform:rotate(360deg); } }
+  @media (max-width:800px){ .sr-summary{ grid-template-columns:1fr 1fr; } }
+  @media (max-width:520px){ .sr-field{ min-width:100%; } }
+</style>
+
+<script>
+(function(){
+  const CSRF = document.querySelector('[name=csrfmiddlewaretoken]').value;
+  const $ = (id) => document.getElementById(id);
+  let currentCycle = "";
+  let editable = true;
+  const MONTH_YEARS = JSON.parse(document.getElementById('monthYearsData').textContent || '[]');
+
+  const URLS = {
+    data:     "{% url 'location_stock_report_data' %}",
+    submit:   "{% url 'location_stock_report_submit' %}",
+    download: "{% url 'location_stock_report_download' %}",
+  };
+
+  function toast(msg, kind){
+    const t = $('toast');
+    t.className = 'sr-toast ' + (kind||'info');
+    t.textContent = msg; t.style.display = 'block';
+    if (kind === 'ok') setTimeout(()=>{ t.style.display='none'; }, 6000);
+  }
+  function busy(btn, on, label){
+    if(!btn) return;
+    if(on){ btn.dataset.html = btn.innerHTML; btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner sr-spin"></i> '+(label||'Working…'); }
+    else { btn.disabled = false; if(btn.dataset.html) btn.innerHTML = btn.dataset.html; }
+  }
+  function n(v){ return (v===null||v===undefined)?'':v; }
+  function num(v){ const x = parseInt(v,10); return isNaN(x)?0:x; }
+
+  function recomputeRow(tr){
+    const opening=num(tr.dataset.opening), received=num(tr.dataset.received),
+          receivedMcc=num(tr.dataset.receivedMcc), transfer=num(tr.dataset.transfer), sale=num(tr.dataset.sale);
+    const damage=num(tr.querySelector('.damage').value), expire=num(tr.querySelector('.expire').value);
+    const closing = opening + received + receivedMcc + transfer - sale - damage - expire;
+    const cell = tr.querySelector('.closing');
+    cell.textContent = closing;
+    cell.className = 'num closing' + (closing<0?' neg':'');
+    recomputeTotals();
+  }
+  function recomputeTotals(){
+    const t = {opening:0,received:0,received_mcc:0,transfer:0,sale:0,damage:0,expire:0,closing:0};
+    document.querySelectorAll('#rows tr').forEach(tr => {
+      t.opening += num(tr.dataset.opening); t.received += num(tr.dataset.received);
+      t.received_mcc += num(tr.dataset.receivedMcc);
+      t.transfer += num(tr.dataset.transfer); t.sale += num(tr.dataset.sale);
+      t.damage += num(tr.querySelector('.damage').value);
+      t.expire += num(tr.querySelector('.expire').value);
+      t.closing += num(tr.querySelector('.closing').textContent);
+    });
+    $('totalRow').innerHTML =
+      `<td colspan="2">Total</td>
+       <td class="num">${t.opening}</td><td class="num">${t.received}</td><td class="num">${t.received_mcc}</td><td class="num">${t.transfer}</td>
+       <td class="num">${t.sale}</td><td class="num">${t.damage}</td><td class="num">${t.expire}</td>
+       <td class="num">${t.closing}</td><td></td>`;
+    $('sOpening').textContent = t.opening;
+    $('sSale').textContent = t.sale;
+    $('sClosing').textContent = t.closing;
+  }
+
+  function render(data){
+    $('statusBox').style.display = 'flex';
+    const badge = $('statusBadge');
+    editable = !!data.editable;
+
+    if(data.exists === false){
+      badge.textContent = 'Not available yet'; badge.className = 'sr-badge';
+      $('reportArea').style.display = 'none';
+      toast('The admin has not generated this cycle’s statement yet.', 'info');
+      return;
+    }
+    badge.textContent = data.status_display || '—';
+    badge.className = 'sr-badge ' + (data.status || '');
+
+    if(!data.rows || !data.rows.length){
+      $('reportArea').style.display = 'none';
+      toast('No products found for your location in this cycle.', 'info');
+      return;
+    }
+    $('reportArea').style.display = 'block';
+    $('btnSave').style.display = editable ? '' : 'none';
+    if(editable){
+      $('editHint').innerHTML = '<i class="fas fa-pen"></i> Enter Damage &amp; Expire, then Save. Closing updates automatically.';
+      $('editHint').className = 'sr-hint';
+    } else {
+      $('editHint').innerHTML = '<i class="fas fa-lock"></i> ' + (data.locked_reason || 'Editing is locked.');
+      $('editHint').className = 'sr-hint sr-hint-locked';
+    }
+    $('editHint').style.display = '';
+    $('sProducts').textContent = data.row_count || data.rows.length;
+
+    $('rows').innerHTML = data.rows.map((r,i) => {
+      const dis = editable ? '' : 'disabled';
+      const clc = 'num closing' + (r.closing<0?' neg':'');
+      return `<tr data-id="${r.id}" data-opening="${r.opening}" data-received="${r.received}" data-received-mcc="${r.received_mcc}" data-transfer="${r.transfer}" data-sale="${r.sale}">
+        <td>${i+1}</td><td>${n(r.product)}</td>
+        <td class="num">${r.opening}</td><td class="num">${r.received}</td><td class="num">${r.received_mcc}</td><td class="num">${r.transfer}</td>
+        <td class="num">${r.sale}</td>
+        <td class="num"><input type="number" min="0" class="sr-inp damage" value="${r.damage}" ${dis}></td>
+        <td class="num"><input type="number" min="0" class="sr-inp expire" value="${r.expire}" ${dis}></td>
+        <td class="${clc}">${r.closing}</td>
+        <td><input type="text" class="sr-remark remark" value="${n(r.remark)}" ${dis}></td>
+      </tr>`;
+    }).join('');
+
+    document.querySelectorAll('#rows .damage, #rows .expire').forEach(inp => {
+      inp.addEventListener('input', e => recomputeRow(e.target.closest('tr')));
+    });
+    recomputeTotals();
+  }
+
+  async function loadCycle(id){
+    currentCycle = id;
+    if(!id){ $('reportArea').style.display='none'; $('emptyPrompt').style.display='block'; $('statusBox').style.display='none'; return; }
+    $('emptyPrompt').style.display='none'; $('toast').style.display='none';
+    try {
+      const res = await fetch(URLS.data + '?cycle=' + encodeURIComponent(id));
+      const data = await res.json();
+      if(!data.success){ toast(data.error || 'Failed to load.', 'err'); return; }
+      render(data);
+    } catch(e){ toast('Could not load cycle data.', 'err'); }
+  }
+
+  // ---- cascading Month-Year -> Cycle picker ----
+  (function initPicker(){
+    const my = $('monthYear');
+    MONTH_YEARS.forEach((g, i) => {
+      const o = document.createElement('option');
+      o.value = i; o.textContent = g.label;
+      my.appendChild(o);
+    });
+  })();
+  $('monthYear').addEventListener('change', e => {
+    const cyc = $('cycleSelect');
+    cyc.innerHTML = '<option value="">— Choose cycle —</option>';
+    const g = MONTH_YEARS[e.target.value];
+    if(g){
+      g.cycles.forEach(c => {
+        const o = document.createElement('option');
+        o.value = c.id;
+        o.textContent = c.name + (c.range ? ` (${c.range})` : '');
+        cyc.appendChild(o);
+      });
+      cyc.disabled = false;
+    } else { cyc.disabled = true; }
+    loadCycle('');
+  });
+  $('cycleSelect').addEventListener('change', e => loadCycle(e.target.value));
+
+  $('btnDownload').addEventListener('click', () => {
+    if(!currentCycle) return;
+    window.location = URLS.download + '?cycle=' + encodeURIComponent(currentCycle);
+  });
+
+  $('btnSave').addEventListener('click', async () => {
+    if(!currentCycle || !editable) return;
+    const items = Array.from(document.querySelectorAll('#rows tr')).map(tr => ({
+      id: num(tr.dataset.id),
+      damage: num(tr.querySelector('.damage').value),
+      expire: num(tr.querySelector('.expire').value),
+      remark: tr.querySelector('.remark').value,
+    }));
+    busy($('btnSave'), true, 'Saving…');
+    try {
+      const res = await fetch(URLS.submit, {
+        method:'POST',
+        headers:{'X-CSRFToken':CSRF, 'Content-Type':'application/json'},
+        body: JSON.stringify({ cycle: currentCycle, items })
+      });
+      const data = await res.json();
+      busy($('btnSave'), false);
+      if(data.success){ render(data); toast(data.message || 'Saved.', 'ok'); }
+      else toast(data.error || 'Save failed.', 'err');
+    } catch(e){ busy($('btnSave'), false); toast('Save failed.', 'err'); }
+  });
+})();
+</script>
+{% endblock %}

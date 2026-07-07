@@ -1,0 +1,619 @@
+{% extends "base.html" %}
+{% block title %}Sale &amp; Stock Report{% endblock %}
+{% block content %}
+{% csrf_token %}
+
+<div class="sr-layout">
+  <!-- Admin sidebar (mirrors the Admin Dashboard) -->
+  <aside class="sr-side">
+    <div class="sr-side-content">
+      <div class="sr-side-welcome">
+        <h2 class="sr-side-title">Welcome! <span>👋</span></h2>
+        <p class="sr-side-name">{{ request.user.first_name }} {{ request.user.last_name }}</p>
+        <div class="sr-side-badges">
+          <span class="sr-side-badge"><i class="fas fa-id-badge"></i> {{ request.user.employee_code }}</span>
+          <span class="sr-side-badge"><i class="fas fa-building"></i> {{ request.user.department }}</span>
+        </div>
+      </div>
+      <div class="sr-side-group">
+        <h3 class="sr-side-heading">Admin Actions</h3>
+        <a href="{% url 'admin_dashboard' %}" class="sr-side-btn"><i class="fas fa-user-shield"></i><span>Admin Dashboard</span></a>
+        <a href="{% url 'stock_report' %}" class="sr-side-btn active"><i class="fas fa-file-invoice"></i><span>Sale &amp; Stock Report</span></a>
+        <a href="{% url 'advance-sale-admin' %}" class="sr-side-btn"><i class="fas fa-warning"></i><span>Unique Code For Sahayak</span></a>
+        <a href="{% url 'whatsapp_analytics' %}" class="sr-side-btn"><i class="fas fa-chart-bar"></i><span>WhatsApp Analytics</span></a>
+        <a href="{% url 'admin_dashboard' %}" class="sr-side-btn"><i class="fas fa-file-excel"></i><span>Upload MPP Excel</span></a>
+        <a href="{% url 'admin_dashboard' %}" class="sr-side-btn"><i class="fas fa-edit"></i><span>Edit MPP Data</span></a>
+        <a href="{% url 'admin_dashboard' %}" class="sr-side-btn"><i class="fas fa-map-marked-alt"></i><span>Map Product</span></a>
+      </div>
+    </div>
+  </aside>
+  <main class="sr-main">
+<div class="sr-wrap">
+  <!-- Header -->
+  <div class="sr-header">
+    <div>
+      <h1 class="sr-title"><i class="fas fa-file-invoice"></i> Sale &amp; Stock Report</h1>
+      <p class="sr-sub">Generate the monthly-cycle stock statement, upload the SAP sale, then finalize Damage/Expire.</p>
+    </div>
+    <a href="{% url 'admin_dashboard' %}" class="sr-btn sr-btn-ghost"><i class="fas fa-arrow-left"></i> Admin Dashboard</a>
+  </div>
+
+  <!-- Cycle picker -->
+  <div class="sr-card">
+    <div class="sr-cycle-row">
+      <div class="sr-field">
+        <label for="monthYear">Month &amp; Year</label>
+        <select id="monthYear" class="sr-select">
+          <option value="">— Choose month —</option>
+        </select>
+      </div>
+      <div class="sr-field">
+        <label for="cycleSelect">Cycle</label>
+        <select id="cycleSelect" class="sr-select" disabled>
+          <option value="">— Choose cycle —</option>
+        </select>
+      </div>
+      <div id="statusBox" class="sr-status-box" style="display:none;">
+        <span class="sr-status-label">Status</span>
+        <span id="statusBadge" class="sr-badge">—</span>
+      </div>
+    </div>
+  </div>
+  {{ month_years|json_script:"monthYearsData" }}
+
+  <!-- Toast / message -->
+  <div id="toast" class="sr-toast" style="display:none;"></div>
+
+  <!-- Empty prompt -->
+  <div id="emptyPrompt" class="sr-empty">
+    <i class="fas fa-hand-pointer"></i>
+    <p>Pick a cycle above to begin.</p>
+  </div>
+
+  <!-- Workflow -->
+  <div id="workflow" style="display:none;">
+
+    <!-- Summary cards -->
+    <div id="summaryCards" class="sr-summary" style="display:none;">
+      <div class="sr-stat"><span class="sr-stat-num" id="sEntries">0</span><span class="sr-stat-lbl">Entries</span></div>
+      <div class="sr-stat"><span class="sr-stat-num" id="sTotal">0</span><span class="sr-stat-lbl">Sale Rows</span></div>
+      <div class="sr-stat sr-stat-ok"><span class="sr-stat-num" id="sMatched">0</span><span class="sr-stat-lbl">Matched</span></div>
+      <div class="sr-stat sr-stat-warn"><span class="sr-stat-num" id="sUnmatched">0</span><span class="sr-stat-lbl">Unmatched</span></div>
+    </div>
+
+    <!-- Steps -->
+    <div class="sr-steps">
+      <!-- Step 1 -->
+      <div class="sr-step">
+        <div class="sr-step-head"><span class="sr-step-no">1</span> Generate Statement</div>
+        <p class="sr-step-desc">Builds Opening, Received (GRN) and Stock Transfer from inventory history for the cycle date range. Safe to re-run — it preserves already-entered Sale/Damage/Expire.</p>
+        <button id="btnGenerate" class="sr-btn sr-btn-primary"><i class="fas fa-cogs"></i> Generate / Refresh</button>
+      </div>
+      <!-- Step 2 -->
+      <div class="sr-step" id="step2">
+        <div class="sr-step-head"><span class="sr-step-no">2</span> Upload SAP Sale</div>
+        <p class="sr-step-desc">Upload the SAP sale export (.xlsx). MPP Sale is summed per MCC/BMC × product. <span id="saleFileInfo" class="sr-file-info"></span></p>
+        <div class="sr-upload">
+          <input type="file" id="saleFile" accept=".xlsx,.xls" hidden>
+          <button id="pickSale" class="sr-btn sr-btn-secondary"><i class="fas fa-file-excel"></i> Choose Sale File</button>
+          <span id="saleName" class="sr-picked"></span>
+          <button id="btnUploadSale" class="sr-btn sr-btn-primary" disabled><i class="fas fa-upload"></i> Upload &amp; Process</button>
+        </div>
+      </div>
+      <!-- Step 3 -->
+      <div class="sr-step" id="step3">
+        <div class="sr-step-head"><span class="sr-step-no">3</span> Download Report</div>
+        <p class="sr-step-desc">Download the formatted workbook (one sheet per MCC/BMC). Fill the <strong>Damage Product</strong> and <strong>Expire Product</strong> columns offline.</p>
+        <button id="btnDownload" class="sr-btn sr-btn-secondary"><i class="fas fa-download"></i> Download Report</button>
+      </div>
+      <!-- Step 4 -->
+      <div class="sr-step" id="step4">
+        <div class="sr-step-head"><span class="sr-step-no">4</span> Upload Filled Report</div>
+        <p class="sr-step-desc">Re-upload the filled workbook. Closing Stock is recomputed and the statement is finalized.</p>
+        <div class="sr-upload">
+          <input type="file" id="filledFile" accept=".xlsx,.xls" hidden>
+          <button id="pickFilled" class="sr-btn sr-btn-secondary"><i class="fas fa-file-excel"></i> Choose Filled File</button>
+          <span id="filledName" class="sr-picked"></span>
+          <button id="btnUploadFilled" class="sr-btn sr-btn-primary" disabled><i class="fas fa-check-double"></i> Finalize</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Correction upload: overwrite everything from a fixed Excel -->
+    <div class="sr-card sr-correction">
+      <div class="sr-step-head"><span class="sr-step-no"><i class="fas fa-file-import"></i></span> Upload Corrected Report — fix anything</div>
+      <p class="sr-step-desc">Downloaded the report and fixed values in Excel? Upload it here to overwrite <strong>every column</strong> (Opening, both Received, Stock Transfer, MPP Sale, Damage, Expire) for all locations. Auto-refresh pauses so your corrections stick — click <strong>Generate / Refresh</strong> to recompute from inventory again.</p>
+      <div class="sr-upload">
+        <input type="file" id="fullFile" accept=".xlsx,.xls" hidden>
+        <button id="pickFull" class="sr-btn sr-btn-secondary"><i class="fas fa-file-excel"></i> Choose Corrected File</button>
+        <span id="fullName" class="sr-picked"></span>
+        <button id="btnUploadFull" class="sr-btn sr-btn-primary" disabled><i class="fas fa-file-import"></i> Update from Excel</button>
+      </div>
+      <div id="overrideNotice" class="sr-override-note" style="display:none;"></div>
+    </div>
+
+    <!-- Unmatched -->
+    <div id="unmatchedCard" class="sr-card" style="display:none;">
+      <div class="sr-card-head sr-clickable" id="toggleUnmatched">
+        <span><i class="fas fa-triangle-exclamation"></i> Unmatched Sale Rows (<span id="unmatchedCount">0</span>)</span>
+        <i class="fas fa-chevron-down" id="unmatchedChevron"></i>
+      </div>
+      <div id="unmatchedBody" class="sr-table-scroll" style="display:none;">
+        <table class="sr-table">
+          <thead><tr><th>Plant</th><th>MCC</th><th>MPP Code</th><th>MPP Name</th><th>Material</th><th>Description</th><th class="num">Qty</th></tr></thead>
+          <tbody id="unmatchedRows"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Location editing lock control -->
+    <div id="lockToolbar" class="sr-card" style="display:none;">
+      <div class="sr-lock-bar">
+        <span class="sr-lock-title"><i class="fas fa-user-lock"></i> Location editing (Damage / Expire) — open a location so its user can fill it in.</span>
+        <div class="sr-lock-btns">
+          <button id="openAllBtn" class="sr-btn sr-btn-secondary"><i class="fas fa-lock-open"></i> Open ALL locations</button>
+          <button id="lockAllBtn" class="sr-btn sr-btn-ghost"><i class="fas fa-lock"></i> Lock ALL</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Entries -->
+    <div id="entriesArea"></div>
+  </div>
+</div>
+  </main>
+</div>
+
+<style>
+  .sr-layout { display:flex; align-items:stretch; min-height:calc(100vh - 90px); background:#fff; }
+  .sr-main { flex:1; min-width:0; }
+  .sr-side { width:300px; flex-shrink:0; background:#313647; color:#fff; padding:2rem 1.5rem; border-radius:0 20px 20px 0; }
+  .sr-side-content { display:flex; flex-direction:column; gap:1.75rem; }
+  .sr-side-welcome { text-align:center; padding-bottom:1.25rem; border-bottom:1px solid rgba(255,255,255,.1); }
+  .sr-side-title { font-size:1.35rem; font-weight:600; color:#A3B087; margin:0 0 .4rem; }
+  .sr-side-name { font-size:1.05rem; color:#FFF8D4; font-weight:500; margin:0 0 .8rem; }
+  .sr-side-badges { display:flex; flex-direction:column; gap:.5rem; align-items:center; }
+  .sr-side-badge { display:inline-flex; align-items:center; gap:.5rem; padding:.35rem .8rem; background:rgba(163,176,135,.12); border-radius:20px; font-size:.82rem; color:rgba(255,255,255,.9); }
+  .sr-side-badge i { color:#A3B087; }
+  .sr-side-group { display:flex; flex-direction:column; gap:.7rem; }
+  .sr-side-heading { font-size:1.05rem; color:#FFF8D4; font-weight:500; margin:0 0 .3rem; }
+  .sr-side-btn { display:flex; align-items:center; gap:.75rem; padding:.8rem 1rem; background:rgba(163,176,135,.1); color:#FFF8D4; text-decoration:none; border-radius:10px; border:1px solid rgba(163,176,135,.2); transition:all .25s ease; font-size:.9rem; }
+  .sr-side-btn:hover { background:rgba(163,176,135,.22); color:#fff; transform:translateX(4px); }
+  .sr-side-btn.active { background:rgba(163,176,135,.3); color:#fff; border-color:#A3B087; box-shadow:0 0 0 2px #A3B087; }
+  .sr-side-btn i { color:#A3B087; font-size:1.05rem; width:18px; text-align:center; }
+  .sr-side-btn span { flex:1; }
+  .sr-wrap { max-width: 1200px; margin: 0 auto; padding: 1.5rem; color: #2c3e50; }
+  .sr-header { display:flex; justify-content:space-between; align-items:flex-start; gap:1rem; margin-bottom:1.25rem; flex-wrap:wrap; }
+  .sr-title { font-size:1.6rem; font-weight:700; color:#313647; margin:0; }
+  .sr-title i { color:#A3B087; }
+  .sr-sub { color:#7f8c8d; margin:.35rem 0 0; font-size:.9rem; }
+  .sr-card { background:#fff; border:1px solid #e9ecef; border-radius:14px; padding:1.1rem 1.25rem; margin-bottom:1.1rem; box-shadow:0 2px 8px rgba(0,0,0,.04); }
+  .sr-card-head { display:flex; justify-content:space-between; align-items:center; font-weight:600; color:#313647; }
+  .sr-clickable { cursor:pointer; }
+  .sr-cycle-row { display:flex; align-items:flex-end; gap:1.5rem; flex-wrap:wrap; }
+  .sr-field { display:flex; flex-direction:column; gap:.4rem; min-width:320px; flex:1; }
+  .sr-field label { font-size:.8rem; font-weight:600; color:#435663; text-transform:uppercase; letter-spacing:.4px; }
+  .sr-select { padding:.6rem .8rem; border:1px solid #cdd4da; border-radius:9px; font-size:.95rem; background:#fff; }
+  .sr-select:focus { outline:none; border-color:#A3B087; box-shadow:0 0 0 3px rgba(163,176,135,.2); }
+  .sr-status-box { display:flex; flex-direction:column; gap:.35rem; }
+  .sr-status-label { font-size:.72rem; font-weight:600; color:#7f8c8d; text-transform:uppercase; letter-spacing:.5px; }
+  .sr-badge { padding:.35rem .8rem; border-radius:20px; font-size:.8rem; font-weight:600; text-align:center; background:#e9ecef; color:#435663; }
+  .sr-badge.DRAFT { background:rgba(255,193,7,.15); color:#b8860b; border:1px solid rgba(255,193,7,.5); }
+  .sr-badge.SALE_UPLOADED { background:rgba(23,162,184,.12); color:#0b7285; border:1px solid rgba(23,162,184,.4); }
+  .sr-badge.FINALIZED { background:rgba(40,167,69,.12); color:#1e7e34; border:1px solid rgba(40,167,69,.4); }
+  .sr-empty { text-align:center; color:#adb5bd; padding:3rem 1rem; }
+  .sr-empty i { font-size:2.2rem; margin-bottom:.6rem; display:block; }
+  .sr-summary { display:grid; grid-template-columns:repeat(4,1fr); gap:.9rem; margin-bottom:1.1rem; }
+  .sr-stat { background:#fff; border:1px solid #e9ecef; border-radius:12px; padding:1rem; text-align:center; box-shadow:0 2px 8px rgba(0,0,0,.04); }
+  .sr-stat-num { display:block; font-size:1.7rem; font-weight:700; color:#313647; }
+  .sr-stat-lbl { font-size:.72rem; text-transform:uppercase; letter-spacing:.5px; color:#7f8c8d; }
+  .sr-stat-ok .sr-stat-num { color:#28a745; }
+  .sr-stat-warn .sr-stat-num { color:#dc3545; }
+  .sr-steps { display:grid; grid-template-columns:repeat(2,1fr); gap:1.1rem; margin-bottom:1.1rem; }
+  .sr-step { background:#fff; border:1px solid #e9ecef; border-radius:14px; padding:1.1rem 1.25rem; box-shadow:0 2px 8px rgba(0,0,0,.04); }
+  .sr-step.locked { opacity:.5; pointer-events:none; }
+  .sr-step-head { font-weight:600; color:#313647; display:flex; align-items:center; gap:.6rem; margin-bottom:.5rem; }
+  .sr-step-no { width:26px; height:26px; border-radius:50%; background:#313647; color:#fff; display:inline-flex; align-items:center; justify-content:center; font-size:.85rem; }
+  .sr-step-desc { font-size:.85rem; color:#7f8c8d; line-height:1.5; margin-bottom:.9rem; }
+  .sr-file-info { color:#0b7285; font-weight:500; }
+  .sr-upload { display:flex; align-items:center; gap:.6rem; flex-wrap:wrap; }
+  .sr-picked { font-size:.82rem; color:#435663; font-style:italic; }
+  .sr-btn { border:none; border-radius:9px; padding:.55rem 1rem; font-size:.88rem; font-weight:600; cursor:pointer; display:inline-flex; align-items:center; gap:.5rem; transition:all .2s ease; text-decoration:none; }
+  .sr-btn:disabled { opacity:.5; cursor:not-allowed; }
+  .sr-btn-primary { background:#313647; color:#fff; }
+  .sr-btn-primary:hover:not(:disabled) { background:#435663; transform:translateY(-1px); }
+  .sr-btn-secondary { background:#A3B087; color:#fff; }
+  .sr-btn-secondary:hover:not(:disabled) { background:#8f9e72; transform:translateY(-1px); }
+  .sr-btn-ghost { background:#f1f3f5; color:#435663; }
+  .sr-btn-ghost:hover { background:#e2e6ea; }
+  .sr-toast { padding:.8rem 1.1rem; border-radius:10px; margin-bottom:1.1rem; font-size:.9rem; font-weight:500; }
+  .sr-toast.ok { background:rgba(40,167,69,.1); color:#1e7e34; border:1px solid rgba(40,167,69,.35); }
+  .sr-toast.err { background:rgba(220,53,69,.1); color:#c82333; border:1px solid rgba(220,53,69,.35); }
+  .sr-toast.info { background:rgba(23,162,184,.1); color:#0b7285; border:1px solid rgba(23,162,184,.35); }
+  .sr-table-scroll { overflow-x:auto; margin-top:.8rem; }
+  .sr-table { width:100%; border-collapse:collapse; font-size:.82rem; }
+  .sr-table th, .sr-table td { border:1px solid #e9ecef; padding:.45rem .6rem; text-align:left; white-space:nowrap; }
+  .sr-table th { background:#313647; color:#fff; font-weight:600; position:sticky; top:0; }
+  .sr-table td.num, .sr-table th.num { text-align:right; }
+  .sr-table tr:nth-child(even) td { background:#f8f9fa; }
+  .sr-table tr.total-row td { background:#D9E1F2 !important; font-weight:700; }
+  .sr-table td.neg { color:#dc3545; font-weight:600; }
+  .sr-table th.edit { background:#5a4b7a; }
+  .sr-inp { width:74px; padding:.28rem .4rem; border:1px solid #cdd4da; border-radius:6px; text-align:right; font-size:.82rem; }
+  .sr-inp:focus { outline:none; border-color:#5a4b7a; box-shadow:0 0 0 2px rgba(90,75,122,.2); }
+  .sr-inp:disabled { background:#f1f3f5; color:#868e96; }
+  .sr-remark { width:140px; padding:.28rem .4rem; border:1px solid #cdd4da; border-radius:6px; font-size:.8rem; }
+  .sr-remark:disabled { background:#f1f3f5; color:#868e96; }
+  .sr-bmc-head { font-weight:600; color:#313647; margin:1.2rem 0 .5rem; display:flex; align-items:center; justify-content:space-between; gap:.5rem; flex-wrap:wrap; }
+  .sr-bmc-head > span { display:inline-flex; align-items:center; gap:.5rem; }
+  .sr-bmc-actions { display:inline-flex; align-items:center; gap:.5rem; flex-wrap:wrap; }
+  .sr-bmc-head i { color:#A3B087; }
+  .sr-save-loc { padding:.4rem .85rem; font-size:.8rem; }
+  .sr-lockpill { padding:.4rem .85rem; font-size:.8rem; }
+  .sr-lockpill.locked { background:#f1f3f5; color:#b8860b; border:1px solid rgba(255,193,7,.5); }
+  .sr-lockpill.locked:hover { background:#fff3cd; }
+  .sr-lockpill.open { background:rgba(40,167,69,.12); color:#1e7e34; border:1px solid rgba(40,167,69,.4); }
+  .sr-lockpill.open:hover { background:rgba(40,167,69,.2); }
+  .sr-lockpill i { color:inherit !important; }
+  .sr-lock-bar { display:flex; align-items:center; justify-content:space-between; gap:1rem; flex-wrap:wrap; }
+  .sr-lock-title { font-weight:600; color:#313647; font-size:.9rem; }
+  .sr-lock-title i { color:#5a4b7a; }
+  .sr-lock-btns { display:flex; gap:.6rem; flex-wrap:wrap; }
+  .sr-correction { border-left:4px solid #5a4b7a; }
+  .sr-override-note { margin-top:.8rem; padding:.6rem .8rem; border-radius:8px; font-size:.82rem; font-weight:600;
+                      background:rgba(90,75,122,.1); color:#5a4b7a; border:1px solid rgba(90,75,122,.3); }
+  .sr-spin { animation:sr-rot 1s linear infinite; }
+  @keyframes sr-rot { to { transform:rotate(360deg); } }
+  @media (max-width:900px){ .sr-layout{ flex-direction:column; } .sr-side{ width:auto; border-radius:0; } }
+  @media (max-width:800px){ .sr-steps,.sr-summary{ grid-template-columns:1fr 1fr; } }
+  @media (max-width:520px){ .sr-summary{ grid-template-columns:1fr 1fr; } .sr-steps{ grid-template-columns:1fr; } }
+</style>
+
+<script>
+(function(){
+  const CSRF = document.querySelector('[name=csrfmiddlewaretoken]').value;
+  const $ = (id) => document.getElementById(id);
+  let currentCycle = "";
+  const MONTH_YEARS = JSON.parse(document.getElementById('monthYearsData').textContent || '[]');
+
+  const URLS = {
+    data:        "{% url 'stock_report_data' %}",
+    generate:    "{% url 'stock_report_generate' %}",
+    uploadSale:  "{% url 'stock_report_upload_sale' %}",
+    download:    "{% url 'stock_report_download' %}",
+    uploadFilled:"{% url 'stock_report_upload_filled' %}",
+    uploadFull:  "{% url 'stock_report_upload_full' %}",
+    adminSubmit: "{% url 'stock_report_admin_submit' %}",
+    toggleLock:  "{% url 'stock_report_toggle_lock' %}",
+  };
+
+  function toast(msg, kind){
+    const t = $('toast');
+    t.className = 'sr-toast ' + (kind||'info');
+    t.textContent = msg;
+    t.style.display = 'block';
+    if (kind === 'ok') setTimeout(()=>{ t.style.display='none'; }, 6000);
+  }
+  function busy(btn, on, label){
+    if(!btn) return;
+    if(on){ btn.dataset.html = btn.innerHTML; btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner sr-spin"></i> '+(label||'Working…'); }
+    else { btn.disabled = false; if(btn.dataset.html) btn.innerHTML = btn.dataset.html; }
+  }
+  function n(v){ return (v===null||v===undefined)?'':v; }
+  function num(v){ const x = parseInt(v,10); return isNaN(x)?0:x; }
+
+  // Inline Damage/Expire editing (admin, per location) — live Closing recompute.
+  function recomputeRow(tr){
+    const opening=num(tr.dataset.opening), received=num(tr.dataset.received),
+          receivedMcc=num(tr.dataset.receivedMcc), transfer=num(tr.dataset.transfer), sale=num(tr.dataset.sale);
+    const damage=num(tr.querySelector('.damage').value), expire=num(tr.querySelector('.expire').value);
+    const closing = opening + received + receivedMcc + transfer - sale - damage - expire;
+    const cell = tr.querySelector('.closing');
+    cell.textContent = closing;
+    cell.className = 'num closing' + (closing<0?' neg':'');
+    recomputeGroupTotals(tr.closest('table'));
+  }
+  function recomputeGroupTotals(table){
+    let d=0,e=0,c=0;
+    table.querySelectorAll('tbody tr').forEach(tr=>{
+      d += num(tr.querySelector('.damage').value);
+      e += num(tr.querySelector('.expire').value);
+      c += num(tr.querySelector('.closing').textContent);
+    });
+    const foot = table.querySelector('tfoot .total-row');
+    if(foot){ foot.querySelector('.tdmg').textContent=d; foot.querySelector('.texp').textContent=e; foot.querySelector('.tcls').textContent=c; }
+  }
+  async function saveLocation(bmcId, btn){
+    const table = document.querySelector(`.sr-table-scroll[data-group="${bmcId}"] table`);
+    if(!table || !currentCycle) return;
+    const items = Array.from(table.querySelectorAll('tbody tr')).map(tr=>({
+      id: num(tr.dataset.id),
+      damage: num(tr.querySelector('.damage').value),
+      expire: num(tr.querySelector('.expire').value),
+      remark: tr.querySelector('.remark').value,
+    }));
+    busy(btn, true, 'Saving…');
+    try {
+      const res = await fetch(URLS.adminSubmit, {
+        method:'POST', headers:{'X-CSRFToken':CSRF, 'Content-Type':'application/json'},
+        body: JSON.stringify({ cycle: currentCycle, bmc: bmcId, items })
+      });
+      const data = await res.json();
+      busy(btn, false);
+      if(data.success){ render(data); toast(data.message || 'Saved.', 'ok'); }
+      else toast(data.error || 'Save failed.', 'err');
+    } catch(e){ busy(btn, false); toast('Save failed.', 'err'); }
+  }
+  async function toggleLock(bmcId, openFlag, btn){
+    if(!currentCycle) return;
+    if(btn) busy(btn, true, openFlag ? 'Opening…' : 'Locking…');
+    try {
+      const res = await fetch(URLS.toggleLock, {
+        method:'POST', headers:{'X-CSRFToken':CSRF, 'Content-Type':'application/json'},
+        body: JSON.stringify({ cycle: currentCycle, bmc: bmcId, open: openFlag, scope:'one' })
+      });
+      const data = await res.json();
+      if(data.success){ render(data); toast(data.message, 'ok'); }
+      else { if(btn) busy(btn, false); toast(data.error || 'Failed.', 'err'); }
+    } catch(e){ if(btn) busy(btn, false); toast('Failed to update lock.', 'err'); }
+  }
+  async function bulkLock(openFlag, btn){
+    if(!currentCycle) return;
+    busy(btn, true, openFlag ? 'Opening…' : 'Locking…');
+    try {
+      const res = await fetch(URLS.toggleLock, {
+        method:'POST', headers:{'X-CSRFToken':CSRF, 'Content-Type':'application/json'},
+        body: JSON.stringify({ cycle: currentCycle, open: openFlag, scope:'all' })
+      });
+      const data = await res.json();
+      busy(btn, false);
+      if(data.success){ render(data); toast(data.message, 'ok'); }
+      else toast(data.error || 'Failed.', 'err');
+    } catch(e){ busy(btn, false); toast('Failed to update lock.', 'err'); }
+  }
+
+  async function postForm(url, formData){
+    const res = await fetch(url, { method:'POST', headers:{'X-CSRFToken':CSRF}, body:formData });
+    let json = {};
+    try { json = await res.json(); } catch(e) { json = {success:false, error:'Server error ('+res.status+').'}; }
+    return json;
+  }
+
+  function render(data){
+    // status
+    $('statusBox').style.display = 'flex';
+    const badge = $('statusBadge');
+    badge.textContent = data.status_display || '—';
+    badge.className = 'sr-badge ' + (data.status || '');
+
+    if(data.exists === false){
+      $('summaryCards').style.display = 'none';
+      $('entriesArea').innerHTML = '';
+      $('unmatchedCard').style.display = 'none';
+      $('saleFileInfo').textContent = '';
+      badge.textContent = 'Not generated';
+      badge.className = 'sr-badge';
+      lockSteps(true);
+      return;
+    }
+    lockSteps(false);
+    // manual-override notice
+    const note = $('overrideNotice');
+    if(data.is_manual_override){
+      note.style.display = 'block';
+      note.innerHTML = '<i class="fas fa-triangle-exclamation"></i> Manually overridden from Excel'
+        + (data.override_uploaded_at ? ' on ' + data.override_uploaded_at : '')
+        + ' — auto-refresh is paused. Click Generate / Refresh to recompute from inventory.';
+    } else {
+      note.style.display = 'none';
+    }
+    // summary
+    $('summaryCards').style.display = 'grid';
+    $('sEntries').textContent = data.entry_count || 0;
+    $('sTotal').textContent = data.sale_rows_total || 0;
+    $('sMatched').textContent = data.sale_rows_matched || 0;
+    $('sUnmatched').textContent = data.sale_rows_unmatched || 0;
+    $('saleFileInfo').textContent = data.sale_file_name ? ('Last: ' + data.sale_file_name) : '';
+
+    // unmatched
+    if((data.unmatched_count||0) > 0){
+      $('unmatchedCard').style.display = 'block';
+      $('unmatchedCount').textContent = data.unmatched_count;
+      $('unmatchedRows').innerHTML = (data.unmatched||[]).map(u =>
+        `<tr><td>${n(u.plant)}</td><td>${n(u.mcc)}</td><td>${n(u.mpp_code)}</td><td>${n(u.mpp_name)}</td><td>${n(u.material_code)}</td><td>${n(u.material_desc)}</td><td class="num">${n(u.quantity)}</td></tr>`
+      ).join('');
+    } else {
+      $('unmatchedCard').style.display = 'none';
+    }
+
+    // entries grouped by bmc — Damage/Expire editable inline per location (locked once Finalized)
+    const editable = data.status !== 'FINALIZED';
+    const parts = [];
+    (data.groups||[]).forEach(g => {
+      const dis = editable ? '' : 'disabled';
+      const rows = g.rows.map((r,i) => {
+        const clc = 'num closing' + (r.closing<0?' neg':'');
+        return `<tr data-id="${r.id}" data-opening="${r.opening}" data-received="${r.received}" data-received-mcc="${r.received_mcc}" data-transfer="${r.transfer}" data-sale="${r.sale}">
+          <td>${i+1}</td><td>${n(r.product)}</td>
+          <td class="num">${r.opening}</td><td class="num">${r.received}</td><td class="num">${r.received_mcc}</td><td class="num">${r.transfer}</td>
+          <td class="num">${r.sale}</td>
+          <td class="num"><input type="number" min="0" class="sr-inp damage" value="${r.damage}" ${dis}></td>
+          <td class="num"><input type="number" min="0" class="sr-inp expire" value="${r.expire}" ${dis}></td>
+          <td class="${clc}">${r.closing}</td>
+          <td><input type="text" class="sr-remark remark" value="${n(r.remark)}" ${dis}></td>
+        </tr>`;
+      }).join('');
+      const t = g.totals;
+      const lockBtn = editable
+        ? (g.open
+            ? `<button class="sr-btn sr-lockpill open sr-toggle-lock" data-bmc="${g.bmc_id}" data-open="0"><i class="fas fa-lock-open"></i> Open for location · lock</button>`
+            : `<button class="sr-btn sr-lockpill locked sr-toggle-lock" data-bmc="${g.bmc_id}" data-open="1"><i class="fas fa-lock"></i> Locked · open for location</button>`)
+        : '';
+      const saveBtn = editable
+        ? `<button class="sr-btn sr-btn-primary sr-save-loc" data-bmc="${g.bmc_id}"><i class="fas fa-save"></i> Save ${n(g.bmc)}</button>`
+        : '';
+      parts.push(`
+        <div class="sr-bmc-head"><span><i class="fas fa-industry"></i> ${n(g.bmc)}</span><span class="sr-bmc-actions">${lockBtn}${saveBtn}</span></div>
+        <div class="sr-table-scroll" data-group="${g.bmc_id}"><table class="sr-table">
+          <thead><tr>
+            <th>#</th><th>Product</th><th class="num">Opening</th>
+            <th class="num">Received<br>NDS/Other Co.</th><th class="num">Received<br>MCC/BMC</th>
+            <th class="num">Transfer</th><th class="num">MPP Sale</th><th class="num edit">Damage</th>
+            <th class="num edit">Expire</th><th class="num">Closing</th><th>Remark</th>
+          </tr></thead>
+          <tbody>${rows}</tbody>
+          <tfoot><tr class="total-row"><td colspan="2">Total</td>
+              <td class="num">${t.opening}</td><td class="num">${t.received}</td><td class="num">${t.received_mcc}</td><td class="num">${t.transfer}</td>
+              <td class="num">${t.sale}</td><td class="num tdmg">${t.damage}</td><td class="num texp">${t.expire}</td>
+              <td class="num tcls">${t.closing}</td><td></td></tr></tfoot>
+        </table></div>`);
+    });
+    $('entriesArea').innerHTML = parts.join('');
+    $('lockToolbar').style.display = editable ? 'block' : 'none';
+
+    document.querySelectorAll('#entriesArea .damage, #entriesArea .expire').forEach(inp => {
+      inp.addEventListener('input', e => recomputeRow(e.target.closest('tr')));
+    });
+    document.querySelectorAll('#entriesArea .sr-save-loc').forEach(btn => {
+      btn.addEventListener('click', () => saveLocation(btn.dataset.bmc, btn));
+    });
+    document.querySelectorAll('#entriesArea .sr-toggle-lock').forEach(btn => {
+      btn.addEventListener('click', () => toggleLock(btn.dataset.bmc, btn.dataset.open === '1', btn));
+    });
+  }
+
+  function lockSteps(lock){
+    ['step2','step3','step4'].forEach(id => $(id).classList.toggle('locked', lock));
+  }
+
+  async function loadCycle(id){
+    currentCycle = id;
+    if(!id){
+      $('workflow').style.display = 'none';
+      $('emptyPrompt').style.display = 'block';
+      $('statusBox').style.display = 'none';
+      return;
+    }
+    $('emptyPrompt').style.display = 'none';
+    $('workflow').style.display = 'block';
+    $('toast').style.display = 'none';
+    try {
+      const res = await fetch(URLS.data + '?cycle=' + encodeURIComponent(id));
+      const data = await res.json();
+      if(!data.success){ toast(data.error || 'Failed to load.', 'err'); return; }
+      render(data);
+      if(!data.exists){ toast('No statement yet for this cycle. Start with Step 1.', 'info'); }
+    } catch(e){ toast('Could not load cycle data.', 'err'); }
+  }
+
+  // ---- events ----
+  // ---- cascading Month-Year -> Cycle picker ----
+  (function initPicker(){
+    const my = $('monthYear');
+    MONTH_YEARS.forEach((g, i) => {
+      const o = document.createElement('option');
+      o.value = i; o.textContent = g.label;
+      my.appendChild(o);
+    });
+  })();
+  $('monthYear').addEventListener('change', e => {
+    const cyc = $('cycleSelect');
+    cyc.innerHTML = '<option value="">— Choose cycle —</option>';
+    const g = MONTH_YEARS[e.target.value];
+    if(g){
+      g.cycles.forEach(c => {
+        const o = document.createElement('option');
+        o.value = c.id;
+        o.textContent = c.name + (c.range ? ` (${c.range})` : '');
+        cyc.appendChild(o);
+      });
+      cyc.disabled = false;
+    } else {
+      cyc.disabled = true;
+    }
+    loadCycle('');   // reset until a cycle is chosen
+  });
+  $('cycleSelect').addEventListener('change', e => loadCycle(e.target.value));
+  $('openAllBtn').addEventListener('click', () => bulkLock(true, $('openAllBtn')));
+  $('lockAllBtn').addEventListener('click', () => bulkLock(false, $('lockAllBtn')));
+
+  $('btnGenerate').addEventListener('click', async () => {
+    if(!currentCycle) return;
+    busy($('btnGenerate'), true, 'Generating…');
+    const fd = new FormData(); fd.append('cycle', currentCycle);
+    const data = await postForm(URLS.generate, fd);
+    busy($('btnGenerate'), false);
+    if(data.success){ render(data); toast(data.message || 'Generated.', 'ok'); }
+    else toast(data.error || 'Failed.', 'err');
+  });
+
+  // sale file
+  $('pickSale').addEventListener('click', ()=> $('saleFile').click());
+  $('saleFile').addEventListener('change', e => {
+    const f = e.target.files[0];
+    $('saleName').textContent = f ? f.name : '';
+    $('btnUploadSale').disabled = !f;
+  });
+  $('btnUploadSale').addEventListener('click', async () => {
+    const f = $('saleFile').files[0];
+    if(!f || !currentCycle) return;
+    busy($('btnUploadSale'), true, 'Processing…');
+    const fd = new FormData(); fd.append('cycle', currentCycle); fd.append('file', f);
+    const data = await postForm(URLS.uploadSale, fd);
+    busy($('btnUploadSale'), false);
+    if(data.success){ render(data); toast(data.message, 'ok'); $('saleFile').value=''; $('saleName').textContent=''; $('btnUploadSale').disabled=true; }
+    else toast(data.error || 'Failed.', 'err');
+  });
+
+  // download
+  $('btnDownload').addEventListener('click', () => {
+    if(!currentCycle) return;
+    window.location = URLS.download + '?cycle=' + encodeURIComponent(currentCycle);
+  });
+
+  // filled file
+  $('pickFilled').addEventListener('click', ()=> $('filledFile').click());
+  $('filledFile').addEventListener('change', e => {
+    const f = e.target.files[0];
+    $('filledName').textContent = f ? f.name : '';
+    $('btnUploadFilled').disabled = !f;
+  });
+  $('btnUploadFilled').addEventListener('click', async () => {
+    const f = $('filledFile').files[0];
+    if(!f || !currentCycle) return;
+    busy($('btnUploadFilled'), true, 'Finalizing…');
+    const fd = new FormData(); fd.append('cycle', currentCycle); fd.append('file', f);
+    const data = await postForm(URLS.uploadFilled, fd);
+    busy($('btnUploadFilled'), false);
+    if(data.success){ render(data); toast(data.message, 'ok'); $('filledFile').value=''; $('filledName').textContent=''; $('btnUploadFilled').disabled=true; }
+    else toast(data.error || 'Failed.', 'err');
+  });
+
+  // correction / full override upload
+  $('pickFull').addEventListener('click', ()=> $('fullFile').click());
+  $('fullFile').addEventListener('change', e => {
+    const f = e.target.files[0];
+    $('fullName').textContent = f ? f.name : '';
+    $('btnUploadFull').disabled = !f;
+  });
+  $('btnUploadFull').addEventListener('click', async () => {
+    const f = $('fullFile').files[0];
+    if(!f || !currentCycle) return;
+    busy($('btnUploadFull'), true, 'Updating…');
+    const fd = new FormData(); fd.append('cycle', currentCycle); fd.append('file', f);
+    const data = await postForm(URLS.uploadFull, fd);
+    busy($('btnUploadFull'), false);
+    if(data.success){ render(data); toast(data.message, 'ok'); $('fullFile').value=''; $('fullName').textContent=''; $('btnUploadFull').disabled=true; }
+    else toast(data.error || 'Failed.', 'err');
+  });
+
+  // unmatched toggle
+  $('toggleUnmatched').addEventListener('click', () => {
+    const body = $('unmatchedBody');
+    const open = body.style.display !== 'none';
+    body.style.display = open ? 'none' : 'block';
+    $('unmatchedChevron').className = 'fas fa-chevron-' + (open ? 'down' : 'up');
+  });
+})();
+</script>
+{% endblock %}

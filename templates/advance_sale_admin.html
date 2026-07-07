@@ -1,0 +1,2295 @@
+{% extends "base.html" %}
+{% block content %}
+
+<div class="layout-container">
+  <!-- Sidebar -->
+  <aside class="sidebar">
+    <div class="sidebar-content">
+      <!-- User Welcome Section -->
+      <div class="user-welcome">
+        <div class="welcome-header">
+          <h1 class="welcome-title">
+            Welcome!
+            <span class="wave-emoji">👋</span>
+          </h1>
+          <p class="user-name">{{request.user.first_name}} {{request.user.last_name}}</p>
+          <div class="user-details">
+            <span class="detail-badge">
+              <i class="fas fa-id-badge"></i>
+              {{ request.user.employee_code }}
+            </span>
+            <span class="detail-badge">
+              <i class="fas fa-building"></i>
+              {{ request.user.department }}
+            </span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Stats Section -->
+      <div class="stats-section">
+        <div class="stat-card">
+          <div class="stat-icon inventory-icon">
+            <i class="fas fa-shopping-cart"></i>
+          </div>
+          <div class="stat-info">
+            <span class="stat-value">Advance</span>
+            <span class="stat-label">Sale Admin</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Quick Actions -->
+      <div class="quick-actions">
+        <h3 class="section-title">Quick Actions</h3>
+        <button class="action-btn" id="exportReportsBtn">
+          <i class="fas fa-download"></i>
+          <span>Export Reports</span>
+        </button>
+        <button class="action-btn" id="refreshDataBtn">
+          <i class="fas fa-sync-alt"></i>
+          <span>Refresh Data</span>
+        </button>
+      </div>
+      
+      <!-- Navigation -->
+      <div class="admin-actions">
+        <h3 class="section-title">Navigation</h3>
+        <a href="{% url 'admin_dashboard' %}" class="action-btn">
+          <i class="fas fa-arrow-left"></i>
+          <span>Back to Admin</span>
+        </a>
+        <a href="#" class="action-btn active">
+          <i class="fas fa-shopping-cart"></i>
+          <span>Advance Sale Data</span>
+        </a>
+      </div>
+    </div>
+  </aside>
+
+  <!-- Main Content -->
+  <main class="main-content">
+    <!-- Page Header -->
+    <div class="page-header">
+      <div class="header-content">
+        <div class="header-text">
+          <h1 class="page-title">
+            <i class="fas fa-shopping-cart"></i>
+            Advance Sale Data
+          </h1>
+          <p class="page-subtitle">View all advance sale records with unique codes</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Advance Sale Data Section -->
+    <div class="advance-sale-card">
+      <div class="card-header">
+        <h2 class="card-title">
+          <i class="fas fa-shopping-cart"></i>
+          Advance Sale Records
+        </h2>
+        <p class="card-subtitle">Browse and filter advance sale transactions</p>
+      </div>
+      
+      <div class="card-content">
+        <!-- Filters and Controls -->
+        <div class="filters-section">
+          <div class="filter-row">
+            <div class="filter-group">
+              <label for="bmcFilterAdvanceSale">Filter by BMC/MCC:</label>
+              <select id="bmcFilterAdvanceSale" class="form-select">
+                <option value="">All BMC/MCC</option>
+              </select>
+            </div>
+            <div class="filter-group">
+              <label for="mppFilterAdvanceSale">Filter by MPP:</label>
+              <select id="mppFilterAdvanceSale" class="form-select">
+                <option value="">All MPP</option>
+              </select>
+            </div>
+            <div class="filter-group">
+              <label for="cycleFilterAdvanceSale">Filter by Cycle:</label>
+              <select id="cycleFilterAdvanceSale" class="form-select">
+                <option value="">All Cycles</option>
+              </select>
+            </div>
+          </div>
+          <div class="filter-row">
+            <div class="filter-group">
+              <label for="productFilterAdvanceSale">Filter by Product:</label>
+              <select id="productFilterAdvanceSale" class="form-select">
+                <option value="">All Products</option>
+              </select>
+            </div>
+            <!-- Add this to the filter section, in the second filter-row div -->
+            <div class="filter-group">
+            <label for="podFileFilterAdvanceSale">POD File:</label>
+            <select id="podFileFilterAdvanceSale" class="form-select">
+                <option value="">All</option>
+                <option value="uploaded">With POD File</option>
+                <option value="no_file">Without POD File</option>
+            </select>
+            </div>
+            <div class="filter-group">
+              <label for="dateFilterAdvanceSale">Filter by Sale Date:</label>
+              <input type="date" id="dateFilterAdvanceSale" class="form-control">
+            </div>
+            <div class="filter-group">
+              <label for="podFilterAdvanceSale">POD Status:</label>
+              <select id="podFilterAdvanceSale" class="form-select">
+                <option value="">All</option>
+                <option value="uploaded">POD Uploaded</option>
+                <option value="pending">POD Pending</option>
+              </select>
+            </div>
+          </div>
+          <div class="filter-row">
+            <div class="filter-group">
+              <label for="searchInputAdvanceSale">Search:</label>
+              <input type="text" id="searchInputAdvanceSale" class="form-control" 
+                     placeholder="Search unique codes, MPP names, products...">
+            </div>
+            <div class="filter-group">
+              <label for="itemsPerPageAdvanceSale">Items per page:</label>
+              <select id="itemsPerPageAdvanceSale" class="form-select">
+                <option value="10">10</option>
+                <option value="25">25</option>
+                <option value="50">50</option>
+                <option value="100">100</option>
+              </select>
+            </div>
+            <div class="action-buttons">
+              <button class="btn btn-primary" id="refreshAdvanceSaleBtn">
+                <i class="fas fa-sync-alt"></i>
+                Refresh Data
+              </button>
+              <button class="btn btn-secondary" id="exportAdvanceSaleBtn">
+                <i class="fas fa-download"></i>
+                Export CSV
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Stats Summary -->
+        <div class="stats-summary-section" id="advanceSaleStatsSummary" style="display: none;">
+          <div class="stats-summary">
+            <div class="stat-summary-item">
+              <div class="stat-summary-icon">
+                <i class="fas fa-cart-plus"></i>
+              </div>
+              <div class="stat-summary-details">
+                <span class="stat-summary-value" id="totalSalesCount">0</span>
+                <span class="stat-summary-label">Total Sales</span>
+              </div>
+            </div>
+            <div class="stat-summary-item">
+              <div class="stat-summary-icon">
+                <i class="fas fa-boxes"></i>
+              </div>
+              <div class="stat-summary-details">
+                <span class="stat-summary-value" id="totalQuantitySum">0</span>
+                <span class="stat-summary-label">Total Quantity</span>
+              </div>
+            </div>
+            <div class="stat-summary-item">
+              <div class="stat-summary-icon">
+                <i class="fas fa-check-circle"></i>
+              </div>
+              <div class="stat-summary-details">
+                <span class="stat-summary-value" id="podUploadedCount">0</span>
+                <span class="stat-summary-label">POD Uploaded</span>
+              </div>
+            </div>
+            <div class="stat-summary-item">
+              <div class="stat-summary-icon">
+                <i class="fas fa-clock"></i>
+              </div>
+              <div class="stat-summary-details">
+                <span class="stat-summary-value" id="podPendingCount">0</span>
+                <span class="stat-summary-label">POD Pending</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Data Table -->
+        <div class="table-section">
+          <div class="table-responsive">
+            <table class="advance-sale-table" id="advanceSaleDataTable">
+              <thead>
+                <tr>
+                  <th>Unique Code</th>
+                  <th>BMC/MCC</th>
+                  <th>MPP with Code</th>
+                  <th>Cycle</th>
+                  <th>Product</th>
+                  <th>UOM</th>
+                  <th>Quantity</th>
+                  <th>Sale Date</th>
+                  <th>Dispatched By</th>
+                  <th>Dispatched At</th>
+                  <th>POD Status</th>
+                  <th>POD Uploaded At</th>
+                  <th>View POD</th>
+                </tr>
+              </thead>
+              <tbody id="advanceSaleTableBody">
+                <!-- Data will be loaded here -->
+              </tbody>
+            </table>
+          </div>
+          
+          <!-- Loading State -->
+          <div class="loading-state" id="advanceSaleLoadingState">
+            <div class="loading-spinner">
+              <i class="fas fa-spinner fa-spin"></i>
+            </div>
+            <p>Loading advance sale data...</p>
+          </div>
+
+          <!-- Empty State -->
+          <div class="empty-state" id="advanceSaleEmptyState" style="display: none;">
+            <i class="fas fa-shopping-cart"></i>
+            <p>No advance sale data found</p>
+            <p class="empty-state-sub">Try adjusting your filters or refresh the data</p>
+          </div>
+
+          <!-- Pagination -->
+          <div class="pagination-container" id="advanceSalePaginationContainer" style="display: none;">
+            <div class="pagination-info">
+              Showing <span id="advanceSaleShowingStart">0</span>-<span id="advanceSaleShowingEnd">0</span> of 
+              <span id="advanceSaleTotalRecords">0</span> records
+            </div>
+            <div class="pagination-controls">
+              <button class="btn-pagination" id="advanceSalePrevPageBtn" disabled>
+                <i class="fas fa-chevron-left"></i>
+              </button>
+              <span class="page-info">
+                Page <span id="advanceSaleCurrentPage">1</span> of <span id="advanceSaleTotalPages">1</span>
+              </span>
+              <button class="btn-pagination" id="advanceSaleNextPageBtn" disabled>
+                <i class="fas fa-chevron-right"></i>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <div class="card-footer">
+        <div class="footer-info">
+          <h5>View Only Interface:</h5>
+          <ul>
+            <li><i class="fas fa-eye"></i> <strong>View-Only Mode:</strong> This interface is for viewing records only</li>
+            <li><i class="fas fa-filter"></i> <strong>Advanced Filtering:</strong> Filter by BMC, MPP, Cycle, Product, Date, and POD status</li>
+            <li><i class="fas fa-search"></i> <strong>Search Functionality:</strong> Search across all fields including unique codes</li>
+            <li><i class="fas fa-chart-bar"></i> <strong>Real-time Stats:</strong> View summary statistics for filtered data</li>
+            <li><i class="fas fa-download"></i> <strong>Export Capability:</strong> Export filtered data to CSV format</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<!-- Modal Container -->
+<div id="modalContainer"></div>
+
+<!-- Image Preview Modal -->
+<div class="modal fade" id="imagePreviewModal" tabindex="-1">
+  <div class="modal-dialog modal-xl">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">POD Document Preview</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body text-center">
+        <div id="imagePreviewContainer">
+          <!-- Image will be loaded here -->
+        </div>
+        <div id="pdfPreviewContainer" style="display: none;">
+          <iframe id="pdfViewer" style="width: 100%; height: 600px; border: none;"></iframe>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <a href="#" id="downloadPODLink" class="btn btn-primary">
+          <i class="fas fa-download"></i> Download
+        </a>
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+          <i class="fas fa-times"></i> Close
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<style>
+  /* CSS Variables */
+  :root {
+    --primary-dark: #313647;
+    --primary-light: #435663;
+    --accent-green: #A3B087;
+    --accent-red: #EA5B6F;
+    --accent-yellow: #FFF8D4;
+    --text-dark: #2c3e50;
+    --text-light: #7f8c8d;
+    --bg-light: #f8f9fa;
+    --border-color: #e9ecef;
+    --success: #28a745;
+    --warning: #ffc107;
+    --danger: #dc3545;
+    --info: #17a2b8;
+  }
+
+  /* Base Styles */
+  * {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+  }
+
+  body {
+    font-family: 'Lexend', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    color: var(--text-dark);
+    background: white;
+  }
+  
+  /* POD Button Styles */
+  .pod-cell {
+    text-align: center;
+    min-width: 120px;
+  }
+
+  .btn-pod-download {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 1rem;
+    background: var(--accent-green);
+    color: white;
+    text-decoration: none;
+    border-radius: 6px;
+    font-size: 0.85rem;
+    font-weight: 500;
+    transition: all 0.3s ease;
+    border: none;
+    cursor: pointer;
+  }
+
+  .btn-pod-download:hover {
+    background: #8a9975;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(138, 153, 117, 0.3);
+    color: white;
+    text-decoration: none;
+  }
+
+  .btn-pod-download i {
+    font-size: 1rem;
+  }
+
+  .no-pod-text {
+    color: var(--text-light);
+    font-size: 0.85rem;
+    font-style: italic;
+  }
+
+  /* ============================================
+     CRITICAL FIX: COMPLETELY REMOVE BACKDROP 
+     ============================================ */
+  
+  /* This is the KEY FIX - exactly like the first code */
+  .modal-backdrop {
+    background-color: transparent !important;
+    z-index: -1 !important;
+  }
+  
+  .modal-backdrop.show {
+    opacity: 0 !important;
+  }
+  
+  /* Ensure modal appears above everything */
+  .modal {
+    z-index: 1060 !important;
+    background-color: transparent !important;
+  }
+  
+  .modal.show {
+    background-color: transparent !important;
+  }
+  
+  /* Modal content should have proper background */
+  .modal-content {
+    background-color: white !important;
+    border-radius: 16px !important;
+    border: 2px solid var(--primary-dark) !important;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2) !important;
+  }
+
+  /* When modal is open, body should not scroll */
+  body.modal-open {
+    overflow: hidden;
+    padding-right: 0 !important;
+  }
+
+  /* Sidebar fix */
+  .sidebar {
+    z-index: 1;
+  }
+
+  /* Modal specific styles */
+  .sale-details-modal .modal-content {
+    border-radius: 16px;
+    border: 2px solid var(--primary-dark);
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+    background: white;
+  }
+
+  .sale-details-modal .modal-header {
+    background: var(--primary-dark);
+    color: white;
+    border-bottom: 2px solid var(--accent-green);
+    border-radius: 14px 14px 0 0;
+    padding: 1.5rem;
+  }
+
+  .sale-details-modal .modal-title {
+    color: white;
+    font-weight: 600;
+    font-size: 1.25rem;
+  }
+
+  .sale-details-modal .modal-title i {
+    color: var(--accent-yellow);
+  }
+
+  .sale-details-modal .modal-body {
+    padding: 1.5rem;
+    background: #f8f9fa;
+  }
+
+  .sale-details-modal .modal-footer {
+    background: #f8f9fa;
+    border-top: 1px solid rgba(163, 176, 135, 0.2);
+    border-radius: 0 0 14px 14px;
+    padding: 1rem 1.5rem;
+  }
+
+  /* Detail sections in modal */
+  .detail-section {
+    background: white;
+    padding: 1.25rem;
+    border-radius: 10px;
+    border: 1px solid rgba(163, 176, 135, 0.2);
+    margin-bottom: 1.5rem;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+  }
+
+  .detail-section h6 {
+    color: var(--primary-dark);
+    font-weight: 600;
+    margin-bottom: 1rem;
+    padding-bottom: 0.75rem;
+    border-bottom: 2px solid var(--accent-green);
+    font-size: 1rem;
+  }
+
+  .detail-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.5rem 0;
+    border-bottom: 1px solid rgba(163, 176, 135, 0.1);
+  }
+
+  .detail-row:last-child {
+    border-bottom: none;
+  }
+
+  .detail-label {
+    font-weight: 600;
+    color: var(--text-dark);
+    font-size: 0.9rem;
+    min-width: 140px;
+  }
+
+  .detail-value {
+    color: var(--text-light);
+    font-size: 0.9rem;
+    text-align: right;
+    flex: 1;
+    word-break: break-word;
+  }
+
+  /* Button fixes */
+  .sale-details-modal .btn {
+    padding: 0.75rem 1.5rem;
+    font-weight: 600;
+    border-radius: 8px;
+    transition: all 0.3s ease;
+  }
+
+  .sale-details-modal .btn-secondary {
+    background: var(--accent-green);
+    border-color: var(--accent-green);
+    color: white;
+  }
+
+  .sale-details-modal .btn-secondary:hover {
+    background: #8a9975;
+    border-color: #8a9975;
+    transform: translateY(-2px);
+  }
+
+  .sale-details-modal .btn-primary {
+    background: var(--primary-dark);
+    border-color: var(--primary-dark);
+    color: white;
+  }
+
+  .sale-details-modal .btn-primary:hover {
+    background: var(--primary-light);
+    border-color: var(--primary-light);
+    transform: translateY(-2px);
+  }
+
+  /* Modal close button fix */
+  .sale-details-modal .btn-close {
+    filter: invert(1) grayscale(100%) brightness(200%);
+    opacity: 0.8;
+  }
+
+  .sale-details-modal .btn-close:hover {
+    opacity: 1;
+  }
+
+  /* Image Preview Modal Styles */
+  #imagePreviewContainer img {
+    max-width: 100%;
+    max-height: 70vh;
+    border-radius: 8px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+  }
+
+  /* Layout */
+  .layout-container {
+    display: flex;
+    min-height: calc(100vh - 90px);
+    background: white;
+    align-items: stretch;
+    position: relative;
+  }
+
+  /* Sidebar */
+  .sidebar {
+    width: 320px;
+    background: var(--primary-dark);
+    color: white;
+    padding: 2rem 1.5rem;
+    box-shadow: 2px 0 20px rgba(0, 0, 0, 0.1);
+    border-radius: 0 20px 20px 0;
+    position: sticky;
+    top: 90px;
+    height: auto;
+    min-height: calc(100vh - 90px);
+    overflow-y: auto;
+    flex-shrink: 0;
+    margin-top: 40px;
+    margin-left: 10px;
+  }
+
+  .sidebar-content {
+    display: flex;
+    flex-direction: column;
+    gap: 2rem;
+    height: 100%;
+  }
+
+  .user-welcome {
+    text-align: center;
+    padding-bottom: 1.5rem;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  }
+
+  .welcome-title {
+    font-size: 1.5rem;
+    font-weight: 600;
+    margin-bottom: 0.5rem;
+    color: var(--accent-green);
+  }
+
+  .wave-emoji {
+    display: inline-block;
+    animation: wave 1.5s ease-in-out infinite;
+  }
+
+  @keyframes wave {
+    0%, 100% { transform: rotate(0deg); }
+    25% { transform: rotate(15deg); }
+    75% { transform: rotate(-10deg); }
+  }
+
+  .user-name {
+    font-size: 1.1rem;
+    color: var(--accent-yellow);
+    font-weight: 500;
+    margin-bottom: 1rem;
+  }
+
+  .user-details {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    align-items: center;
+  }
+
+  .detail-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.4rem 0.8rem;
+    background: rgba(163, 176, 135, 0.1);
+    border-radius: 20px;
+    font-size: 0.85rem;
+    color: rgba(255, 255, 255, 0.9);
+  }
+
+  .detail-badge i {
+    color: var(--accent-green);
+  }
+
+  /* Stats Section in Sidebar */
+  .stats-section {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 1rem;
+    padding-bottom: 1.5rem;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  }
+
+  .stat-card {
+    background: rgba(163, 176, 135, 0.1);
+    padding: 1rem;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    border: 1px solid rgba(163, 176, 135, 0.2);
+  }
+
+  .stat-icon {
+    width: 48px;
+    height: 48px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.5rem;
+  }
+
+  .inventory-icon {
+    background: rgba(163, 176, 135, 0.2);
+    color: var(--accent-green);
+  }
+
+  .stat-info {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .stat-value {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: white;
+  }
+
+  .stat-label {
+    font-size: 0.75rem;
+    color: rgba(255, 255, 255, 0.7);
+  }
+
+  /* Quick Actions */
+  .quick-actions, .admin-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+
+  .section-title {
+    font-size: 1.1rem;
+    color: var(--accent-yellow);
+    margin-bottom: 0.5rem;
+    font-weight: 500;
+  }
+
+  .action-btn {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.875rem 1rem;
+    background: rgba(163, 176, 135, 0.1);
+    color: var(--accent-yellow);
+    text-decoration: none;
+    border-radius: 10px;
+    transition: all 0.3s ease;
+    border: 1px solid rgba(163, 176, 135, 0.2);
+    position: relative;
+    border: none;
+    width: 100%;
+    text-align: left;
+    cursor: pointer;
+  }
+
+  .action-btn:hover {
+    background: rgba(163, 176, 135, 0.2);
+    color: white;
+    transform: translateX(5px);
+    text-decoration: none;
+  }
+
+  .action-btn i {
+    color: var(--accent-green);
+    font-size: 1.1rem;
+  }
+
+  .action-btn span {
+    flex: 1;
+  }
+
+  .action-btn.active {
+    background: rgba(163, 176, 135, 0.3);
+    border-color: var(--accent-green);
+  }
+
+  /* Main Content */
+  .main-content {
+    flex: 1;
+    background: #ffffff;
+    padding: 2rem;
+    overflow-y: auto;
+    min-height: calc(100vh - 90px);
+    display: flex;
+    flex-direction: column;
+    gap: 2rem;
+    position: relative;
+  }
+
+  /* Page Header */
+  .page-header {
+    margin-bottom: 0;
+    background: linear-gradient(135deg, var(--accent-green) 0%, #8a9975 100%);
+    border-radius: 20px;
+    padding: 1.5rem 2rem;
+    box-shadow: 0 8px 32px rgba(163, 176, 135, 0.2);
+    border: 2px solid black;
+  }
+
+  .header-content {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+  }
+
+  .header-text {
+    text-align: center;
+  }
+
+  .page-title {
+    font-size: 2rem;
+    font-weight: 700;
+    color: white;
+    margin-bottom: 0.5rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.75rem;
+  }
+
+  .page-title i {
+    font-size: 1.75rem;
+  }
+
+  .page-subtitle {
+    font-size: 1rem;
+    color: white;
+    font-weight: 400;
+  }
+
+  /* Advance Sale Card */
+  .advance-sale-card {
+    background: white;
+    border-radius: 16px;
+    border: 2px solid black;
+    overflow: hidden;
+    box-shadow: 0 8px 32px rgba(163, 176, 135, 0.2);
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .card-header {
+    background: var(--primary-dark);
+    color: white;
+    padding: 1.5rem 2rem;
+    border-bottom: 2px solid var(--accent-green);
+  }
+
+  .card-title {
+    font-size: 1.5rem;
+    font-weight: 600;
+    margin-bottom: 0.5rem;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+  }
+
+  .card-title i {
+    color: var(--accent-yellow);
+  }
+
+  .card-subtitle {
+    color: rgba(255, 255, 255, 0.8);
+    font-size: 0.95rem;
+  }
+
+  .card-content {
+    flex: 1;
+    padding: 2rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+  }
+
+  /* Filters Section */
+  .filters-section {
+    background: rgba(163, 176, 135, 0.05);
+    padding: 1.5rem;
+    border-radius: 12px;
+    border: 1px solid rgba(163, 176, 135, 0.2);
+  }
+
+  .filter-row {
+    display: flex;
+    gap: 1rem;
+    margin-bottom: 1rem;
+  }
+
+  .filter-row:last-child {
+    margin-bottom: 0;
+  }
+
+  .filter-group {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
+  .filter-group label {
+    font-weight: 600;
+    color: var(--text-dark);
+    font-size: 0.9rem;
+  }
+
+  .form-select, .form-control {
+    padding: 0.75rem;
+    border: 2px solid var(--border-color);
+    border-radius: 8px;
+    font-size: 0.9rem;
+    transition: all 0.3s ease;
+    font-family: 'Lexend', sans-serif;
+    background: white;
+  }
+
+  .form-select:focus, .form-control:focus {
+    outline: none;
+    border-color: var(--accent-green);
+    box-shadow: 0 0 0 3px rgba(163, 176, 135, 0.1);
+  }
+
+  .action-buttons {
+    display: flex;
+    gap: 1rem;
+    align-items: flex-end;
+  }
+
+  .btn {
+    padding: 0.75rem 1.5rem;
+    border: none;
+    border-radius: 8px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    white-space: nowrap;
+    font-family: 'Lexend', sans-serif;
+  }
+
+  .btn-primary {
+    background: var(--primary-dark);
+    color: white;
+  }
+
+  .btn-primary:hover {
+    background: var(--primary-light);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(49, 54, 71, 0.3);
+  }
+
+  .btn-secondary {
+    background: var(--accent-green);
+    color: white;
+  }
+
+  .btn-secondary:hover {
+    background: #8a9975;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(138, 153, 117, 0.3);
+  }
+
+  /* Stats Summary Section */
+  .stats-summary-section {
+    margin-bottom: 1.5rem;
+    padding: 1.5rem;
+    background: rgba(255, 255, 255, 0.95);
+    border-radius: 12px;
+    border: 1px solid rgba(163, 176, 135, 0.2);
+  }
+
+  .stats-summary {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1rem;
+  }
+
+  .stat-summary-item {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 1rem;
+    background: rgba(163, 176, 135, 0.1);
+    border-radius: 8px;
+    border: 1px solid rgba(163, 176, 135, 0.2);
+  }
+
+  .stat-summary-icon {
+    width: 48px;
+    height: 48px;
+    border-radius: 10px;
+    background: var(--accent-green);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-size: 1.2rem;
+  }
+
+  .stat-summary-details {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .stat-summary-value {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: var(--text-dark);
+  }
+
+  .stat-summary-label {
+    font-size: 0.85rem;
+    color: var(--text-light);
+  }
+
+  /* Table Section */
+  .table-section {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .table-responsive {
+    overflow-x: auto;
+    flex: 1;
+    border: 1px solid rgba(163, 176, 135, 0.2);
+    border-radius: 8px;
+    background: white;
+  }
+
+  .advance-sale-table {
+    width: 100%;
+    border-collapse: collapse;
+    min-width: 1200px;
+  }
+
+  .advance-sale-table thead {
+    background: var(--primary-dark);
+    position: sticky;
+    top: 0;
+    z-index: 10;
+  }
+
+  .advance-sale-table th {
+    color: var(--primary-dark);
+    padding: 1rem;
+    font-weight: 600;
+    text-align: left;
+    font-size: 0.9rem;
+    white-space: nowrap;
+    border-bottom: 2px solid var(--accent-green);
+  }
+
+  .advance-sale-table td {
+    padding: 1rem;
+    border-bottom: 1px solid rgba(163, 176, 135, 0.1);
+    vertical-align: middle;
+    font-size: 0.9rem;
+  }
+
+  .advance-sale-table tbody tr {
+    transition: all 0.3s ease;
+  }
+
+  .advance-sale-table tbody tr:hover {
+    background: rgba(163, 176, 135, 0.05);
+    cursor: pointer;
+  }
+
+  /* Badges */
+  .badge {
+    display: inline-block;
+    padding: 0.25rem 0.5rem;
+    border-radius: 12px;
+    font-size: 0.75rem;
+    font-weight: 600;
+  }
+
+  .badge-success {
+    background: rgba(76, 175, 80, 0.1);
+    color: var(--success);
+    border: 1px solid rgba(76, 175, 80, 0.2);
+  }
+
+  .badge-warning {
+    background: rgba(255, 193, 7, 0.1);
+    color: var(--warning);
+    border: 1px solid rgba(255, 193, 7, 0.2);
+  }
+
+  .badge-info {
+    background: rgba(33, 150, 243, 0.1);
+    color: var(--info);
+    border: 1px solid rgba(33, 150, 243, 0.2);
+  }
+
+  /* Special Cells */
+  .unique-code-cell {
+    font-family: 'Courier New', monospace;
+    font-weight: 600;
+    color: var(--primary-dark);
+    background: rgba(163, 176, 135, 0.1);
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+    border: 1px solid rgba(163, 176, 135, 0.2);
+  }
+
+  .quantity-display {
+    font-weight: 600;
+    color: var(--text-dark);
+  }
+
+  /* Loading and Empty States */
+  .loading-state, .empty-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 3rem;
+    text-align: center;
+  }
+
+  .loading-spinner {
+    font-size: 2rem;
+    color: var(--accent-green);
+    margin-bottom: 1rem;
+  }
+
+  .loading-state p, .empty-state p {
+    color: var(--text-light);
+    font-size: 1rem;
+  }
+
+  .empty-state i {
+    font-size: 3rem;
+    color: var(--accent-green);
+    margin-bottom: 1rem;
+    opacity: 0.5;
+  }
+
+  .empty-state-sub {
+    font-size: 0.9rem;
+    color: var(--text-light);
+    margin-top: 0.5rem;
+  }
+
+  /* Pagination */
+  .pagination-container {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1.5rem;
+    background: white;
+    border-top: 1px solid rgba(163, 176, 135, 0.2);
+  }
+
+  .pagination-info {
+    color: var(--text-light);
+    font-size: 0.9rem;
+  }
+
+  .pagination-controls {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+  }
+
+  .btn-pagination {
+    width: 40px;
+    height: 40px;
+    border-radius: 8px;
+    border: 1px solid var(--border-color);
+    background: white;
+    color: var(--text-dark);
+    cursor: pointer;
+    transition: all 0.3s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .btn-pagination:hover:not(:disabled) {
+    background: var(--accent-green);
+    color: white;
+    border-color: var(--accent-green);
+  }
+
+  .btn-pagination:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  .page-info {
+    font-size: 0.9rem;
+    color: var(--text-dark);
+    font-weight: 500;
+  }
+
+  /* Card Footer */
+  .card-footer {
+    padding: 1.5rem 2rem;
+    background: rgba(163, 176, 135, 0.05);
+    border-top: 1px solid rgba(163, 176, 135, 0.2);
+  }
+
+  .footer-info h5 {
+    color: var(--text-dark);
+    margin-bottom: 1rem;
+    font-size: 1rem;
+  }
+
+  .footer-info ul {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 0.75rem;
+  }
+
+  .footer-info li {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.5rem;
+    font-size: 0.9rem;
+    color: var(--text-light);
+  }
+
+  .footer-info li i {
+    color: var(--accent-green);
+    margin-top: 0.25rem;
+  }
+
+  .footer-info strong {
+    color: var(--text-dark);
+  }
+
+  /* Responsive Design */
+  @media (max-width: 1200px) {
+    .layout-container {
+      flex-direction: column;
+    }
+    
+    .sidebar {
+      width: 100%;
+      margin: 0;
+      border-radius: 0;
+      position: relative;
+      top: 0;
+      min-height: auto;
+    }
+
+    .stats-section {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  @media (max-width: 992px) {
+    .filter-row {
+      flex-direction: column;
+    }
+    
+    .filter-group {
+      width: 100%;
+    }
+    
+    .action-buttons {
+      flex-direction: column;
+      width: 100%;
+    }
+    
+    .btn {
+      width: 100%;
+      justify-content: center;
+    }
+    
+    .stats-summary {
+      grid-template-columns: 1fr 1fr;
+    }
+  }
+
+  @media (max-width: 768px) {
+    .main-content {
+      padding: 1rem;
+    }
+
+    .page-header {
+      padding: 1.5rem;
+      border: 2px solid black;
+    }
+
+    .page-title {
+      font-size: 1.5rem;
+    }
+
+    .card-content {
+      padding: 1rem;
+    }
+
+    .stats-summary {
+      grid-template-columns: 1fr;
+    }
+
+    .footer-info ul {
+      grid-template-columns: 1fr;
+    }
+
+    .pagination-container {
+      flex-direction: column;
+      gap: 1rem;
+      text-align: center;
+    }
+    
+    /* Responsive modal */
+    .sale-details-modal .modal-dialog {
+      margin: 0.5rem;
+    }
+    
+    .detail-row {
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 0.25rem;
+    }
+    
+    .detail-label, .detail-value {
+      width: 100%;
+      text-align: left;
+    }
+    
+    .detail-value {
+      padding-left: 1rem;
+    }
+  }
+
+  @media (max-width: 576px) {
+    .sidebar {
+      padding: 1rem;
+    }
+    
+    .welcome-title {
+      font-size: 1.25rem;
+    }
+    
+    .card-header {
+      padding: 1rem;
+    }
+    
+    .card-title {
+      font-size: 1.25rem;
+    }
+    
+    .advance-sale-table th,
+    .advance-sale-table td {
+      padding: 0.5rem;
+      font-size: 0.8rem;
+    }
+  }
+</style>
+
+<!-- LOAD JQUERY AND BOOTSTRAP AT THE END -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
+<!-- CRITICAL INLINE STYLE FIX - This MUST be after Bootstrap -->
+<script>
+// This script will run after Bootstrap loads and override the backdrop
+document.addEventListener('DOMContentLoaded', function() {
+  // Add a style element to override Bootstrap's backdrop
+  const style = document.createElement('style');
+  style.innerHTML = `
+    /* COMPLETELY REMOVE BACKDROP - like first code */
+    .modal-backdrop {
+      background-color: transparent !important;
+      z-index: -1 !important;
+    }
+    
+    .modal-backdrop.show {
+      opacity: 0 !important;
+    }
+    
+    .modal {
+      background-color: transparent !important;
+      z-index: 1060 !important;
+    }
+    
+    .modal.show {
+      background-color: transparent !important;
+    }
+    
+    /* Prevent body scrolling when modal is open */
+    body.modal-open {
+      overflow: hidden;
+      padding-right: 0 !important;
+    }
+  `;
+  document.head.appendChild(style);
+});
+</script>
+
+<script>
+$(document).ready(function () {
+  // Initialize tooltips
+  $('[data-bs-toggle="tooltip"]').tooltip();
+
+  // Initialize image preview modal
+  const imagePreviewModal = new bootstrap.Modal(document.getElementById('imagePreviewModal'), {
+    backdrop: true,
+    keyboard: true
+  });
+
+  // CSRF Token Setup
+  function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+      const cookies = document.cookie.split(';');
+      for (let i = 0; i < cookies.length; i++) {
+        const cookie = cookies[i].trim();
+        if (cookie.substring(0, name.length + 1) === (name + '=')) {
+          cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+          break;
+        }
+      }
+    }
+    return cookieValue;
+  }
+
+  const csrftoken = getCookie('csrftoken');
+
+  // Use this in your AJAX calls
+  $.ajaxSetup({
+    beforeSend: function(xhr, settings) {
+      if (!this.crossDomain) {
+        xhr.setRequestHeader("X-CSRFToken", csrftoken);
+      }
+    }
+  });
+
+  /* ============================================
+     ELEMENT REFERENCES
+     ============================================ */
+
+  const bmcFilterAdvanceSale = $('#bmcFilterAdvanceSale');
+  const mppFilterAdvanceSale = $('#mppFilterAdvanceSale');
+  const cycleFilterAdvanceSale = $('#cycleFilterAdvanceSale');
+  const productFilterAdvanceSale = $('#productFilterAdvanceSale');
+  const dateFilterAdvanceSale = $('#dateFilterAdvanceSale');
+  const podFilterAdvanceSale = $('#podFilterAdvanceSale');
+  const podFileFilterAdvanceSale = $('#podFileFilterAdvanceSale');
+
+  const searchInputAdvanceSale = $('#searchInputAdvanceSale');
+  const itemsPerPageAdvanceSale = $('#itemsPerPageAdvanceSale');
+  const refreshAdvanceSaleBtn = $('#refreshAdvanceSaleBtn');
+  const exportAdvanceSaleBtn = $('#exportAdvanceSaleBtn');
+  const exportReportsBtn = $('#exportReportsBtn');
+  const refreshDataBtn = $('#refreshDataBtn');
+  
+  const advanceSaleDataTable = $('#advanceSaleDataTable');
+  const advanceSaleTableBody = $('#advanceSaleTableBody');
+  const advanceSaleLoadingState = $('#advanceSaleLoadingState');
+  const advanceSaleEmptyState = $('#advanceSaleEmptyState');
+  const advanceSalePaginationContainer = $('#advanceSalePaginationContainer');
+  const advanceSaleStatsSummary = $('#advanceSaleStatsSummary');
+
+  // Stats elements
+  const totalSalesCount = $('#totalSalesCount');
+  const totalQuantitySum = $('#totalQuantitySum');
+  const podUploadedCount = $('#podUploadedCount');
+  const podPendingCount = $('#podPendingCount');
+
+  // Pagination elements
+  const advanceSaleShowingStart = $('#advanceSaleShowingStart');
+  const advanceSaleShowingEnd = $('#advanceSaleShowingEnd');
+  const advanceSaleTotalRecords = $('#advanceSaleTotalRecords');
+  const advanceSaleCurrentPage = $('#advanceSaleCurrentPage');
+  const advanceSaleTotalPages = $('#advanceSaleTotalPages');
+  const advanceSalePrevPageBtn = $('#advanceSalePrevPageBtn');
+  const advanceSaleNextPageBtn = $('#advanceSaleNextPageBtn');
+
+  /* ============================================
+     STATE MANAGEMENT
+     ============================================ */
+
+  let advanceSaleData = [];
+  let filteredAdvanceSaleData = [];
+  let advanceSaleCurrentPageNum = 1;
+  let advanceSalePageSize = 10;
+  let advanceSaleTotalRecordsCount = 0;
+
+  // Modal instance tracking
+  let currentModalInstance = null;
+
+  /* ============================================
+     INITIALIZATION
+     ============================================ */
+
+  // Load data on page load
+  loadAdvanceSaleData();
+
+  // Quick action buttons
+  refreshDataBtn.on('click', function() {
+    loadAdvanceSaleData();
+    showToast('Data refreshed successfully', 'success');
+  });
+
+  exportReportsBtn.on('click', function() {
+    exportAdvanceSaleData();
+  });
+
+  /* ============================================
+     DATA LOADING FUNCTIONS
+     ============================================ */
+
+  function loadAdvanceSaleData() {
+    showAdvanceSaleLoadingState();
+    
+    $.ajax({
+      url: '/get-advance-sale-data-admin/',
+      type: 'GET',
+      success: function(response) {
+        if (response.success) {
+          advanceSaleData = response.data;
+          populateAdvanceSaleFilters(advanceSaleData);
+          applyAdvanceSaleFilters();
+          showToast('Advance sale data loaded successfully', 'success');
+        } else {
+          showError('Failed to load advance sale data: ' + response.message);
+        }
+      },
+      error: function(xhr, status, error) {
+        showError('Error loading advance sale data: ' + error);
+      }
+    });
+  }
+
+  function populateAdvanceSaleFilters(data) {
+    // BMC/MCC Filter
+    const uniqueBmcs = [...new Set(data.map(item => item.bmc_or_mcc))].filter(Boolean).sort();
+    bmcFilterAdvanceSale.empty().append('<option value="">All BMC/MCC</option>');
+    uniqueBmcs.forEach(bmc => {
+      bmcFilterAdvanceSale.append(`<option value="${bmc}">${bmc}</option>`);
+    });
+
+    // MPP Filter
+    const uniqueMpps = [...new Set(data.map(item => item.mpp_with_code))].filter(Boolean).sort();
+    mppFilterAdvanceSale.empty().append('<option value="">All MPP</option>');
+    uniqueMpps.forEach(mpp => {
+      mppFilterAdvanceSale.append(`<option value="${mpp}">${mpp}</option>`);
+    });
+
+    // Cycle Filter
+    const uniqueCycles = [...new Set(data.map(item => item.cycle_name))].filter(Boolean).sort();
+    cycleFilterAdvanceSale.empty().append('<option value="">All Cycles</option>');
+    uniqueCycles.forEach(cycle => {
+      cycleFilterAdvanceSale.append(`<option value="${cycle}">${cycle}</option>`);
+    });
+
+    // Product Filter
+    const uniqueProducts = [...new Set(data.map(item => item.stock_item))].filter(Boolean).sort();
+    productFilterAdvanceSale.empty().append('<option value="">All Products</option>');
+    uniqueProducts.forEach(product => {
+      productFilterAdvanceSale.append(`<option value="${product}">${product}</option>`);
+    });
+  }
+
+  function applyAdvanceSaleFilters() {
+    let filtered = [...advanceSaleData];
+
+    const podFileValue = podFileFilterAdvanceSale.val();
+    if (podFileValue === 'uploaded') {
+    filtered = filtered.filter(item => item.pod_file_url);
+    } else if (podFileValue === 'no_file') {
+    filtered = filtered.filter(item => !item.pod_file_url);
+    }
+
+    // Apply BMC/MCC filter
+    const bmcValue = bmcFilterAdvanceSale.val();
+    if (bmcValue) {
+      filtered = filtered.filter(item => item.bmc_or_mcc === bmcValue);
+    }
+
+    // Apply MPP filter
+    const mppValue = mppFilterAdvanceSale.val();
+    if (mppValue) {
+      filtered = filtered.filter(item => item.mpp_with_code === mppValue);
+    }
+
+    // Apply Cycle filter
+    const cycleValue = cycleFilterAdvanceSale.val();
+    if (cycleValue) {
+      filtered = filtered.filter(item => item.cycle_name === cycleValue);
+    }
+
+    // Apply Product filter
+    const productValue = productFilterAdvanceSale.val();
+    if (productValue) {
+      filtered = filtered.filter(item => item.stock_item === productValue);
+    }
+
+    // Apply Date filter
+    const dateValue = dateFilterAdvanceSale.val();
+    if (dateValue) {
+      filtered = filtered.filter(item => item.sale_date === dateValue);
+    }
+
+    // Apply POD filter
+    const podValue = podFilterAdvanceSale.val();
+    if (podValue === 'uploaded') {
+      filtered = filtered.filter(item => item.pod_uploaded === true);
+    } else if (podValue === 'pending') {
+      filtered = filtered.filter(item => !item.pod_uploaded);
+    }
+
+    // Apply search filter
+    const searchValue = searchInputAdvanceSale.val().toLowerCase();
+    if (searchValue) {
+      filtered = filtered.filter(item => 
+        (item.unique_code && item.unique_code.toLowerCase().includes(searchValue)) ||
+        (item.bmc_or_mcc && item.bmc_or_mcc.toLowerCase().includes(searchValue)) ||
+        (item.mpp_with_code && item.mpp_with_code.toLowerCase().includes(searchValue)) ||
+        (item.stock_item && item.stock_item.toLowerCase().includes(searchValue)) ||
+        (item.dispatched_by_name && item.dispatched_by_name.toLowerCase().includes(searchValue))
+      );
+    }
+
+    filteredAdvanceSaleData = filtered;
+    advanceSaleTotalRecordsCount = filtered.length;
+    advanceSaleCurrentPageNum = 1;
+    
+    renderAdvanceSaleTable();
+    updateAdvanceSalePagination();
+    updateAdvanceSaleStats();
+  }
+
+  function renderAdvanceSaleTable() {
+    if (filteredAdvanceSaleData.length === 0) {
+      showAdvanceSaleEmptyState();
+      return;
+    }
+
+    const startIndex = (advanceSaleCurrentPageNum - 1) * advanceSalePageSize;
+    const endIndex = Math.min(startIndex + advanceSalePageSize, filteredAdvanceSaleData.length);
+    const pageData = filteredAdvanceSaleData.slice(startIndex, endIndex);
+
+    advanceSaleTableBody.empty();
+    
+    pageData.forEach((sale, index) => {
+      // Determine POD button HTML - UPDATED VERSION
+      let podButtonHtml = '<span class="no-pod-text">No POD</span>';
+      
+      // Check if POD file exists - IMPORTANT FIX HERE
+      let podFileUrl = null;
+      let podFileName = null;
+      
+      if (sale.pod_file_url) {
+        // Use the URL provided by the API
+        podFileUrl = sale.pod_file_url;
+        podFileName = sale.pod_file_name || 'POD Document';
+      } else if (sale.pod_uploaded && sale.pod_file) {
+        // If API didn't provide URL but we know there's a POD file
+        // Construct the URL from the file path
+        podFileUrl = '/media/' + sale.pod_file;
+        podFileName = sale.pod_file.split('/').pop() || 'POD Document';
+      }
+      
+      if (podFileUrl) {
+        // Get file extension for icon
+        const fileExt = podFileName.split('.').pop().toLowerCase();
+        let fileIcon = 'fas fa-file';
+        let viewAction = 'View';
+        
+        if (fileExt === 'pdf') {
+          fileIcon = 'fas fa-file-pdf';
+          viewAction = 'View PDF';
+        } else if (['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp'].includes(fileExt)) {
+          fileIcon = 'fas fa-file-image';
+          viewAction = 'View Image';
+        } else if (['doc', 'docx'].includes(fileExt)) {
+          fileIcon = 'fas fa-file-word';
+          viewAction = 'View Document';
+        }
+        
+        // DEBUG: Log file info
+        console.log(`📁 POD File Info for Sale ID ${sale.id}:`, {
+          pod_uploaded: sale.pod_uploaded,
+          pod_file: sale.pod_file,
+          pod_file_url: sale.pod_file_url,
+          pod_file_name: sale.pod_file_name,
+          constructed_url: podFileUrl,
+          file_name: podFileName
+        });
+        
+        podButtonHtml = `
+          <button type="button" 
+             class="btn-pod-download view-pod-btn"
+             data-sale-id="${sale.id}"
+             data-file-url="${podFileUrl}"
+             data-file-name="${podFileName}"
+             data-file-ext="${fileExt}"
+             data-bs-toggle="tooltip" 
+             title="View ${podFileName || 'POD'}">
+            <i class="${fileIcon}"></i>
+            ${viewAction}
+          </button>
+        `;
+      }
+
+      const row = `
+        <tr data-sale-id="${sale.id}" style="cursor: pointer;" onclick="showSaleDetails(${sale.id})">
+          <td>
+            <span class="unique-code-cell" title="Click to view details">${escapeHtml(sale.unique_code || 'N/A')}</span>
+          </td>
+          <td>${escapeHtml(sale.bmc_or_mcc || 'N/A')}</td>
+          <td>${escapeHtml(sale.mpp_with_code || 'N/A')}</td>
+          <td>
+            ${sale.cycle_name ? 
+              `<span class="badge badge-info">${escapeHtml(sale.cycle_name)}</span>` : 
+              'N/A'}
+          </td>
+          <td>${escapeHtml(sale.stock_item || 'N/A')}</td>
+          <td>${escapeHtml(sale.uom || 'N/A')}</td>
+          <td class="text-center">
+            <span class="quantity-display">${sale.quantity || 0}</span>
+          </td>
+          <td>${formatDate(sale.sale_date) || 'N/A'}</td>
+          <td>${escapeHtml(sale.dispatched_by_name || 'N/A')}</td>
+          <td>${formatDateTime(sale.dispatched_at) || 'N/A'}</td>
+          <td>
+            ${sale.pod_uploaded ? 
+              `<span class="badge badge-success">Uploaded</span>` : 
+              `<span class="badge badge-warning">Pending</span>`}
+          </td>
+          <td>${sale.pod_uploaded_at ? formatDateTime(sale.pod_uploaded_at) : '-'}</td>
+          <td class="pod-cell">
+            ${podButtonHtml}
+          </td>
+        </tr>
+      `;
+      advanceSaleTableBody.append(row);
+    });
+
+    hideAdvanceSaleLoadingState();
+    
+    // Re-initialize tooltips for new elements
+    $('[data-bs-toggle="tooltip"]').tooltip();
+    
+    // Attach click event to POD view buttons
+    $('.view-pod-btn').on('click', function(e) {
+      e.stopPropagation(); // Prevent row click
+      const fileUrl = $(this).data('file-url');
+      const fileName = $(this).data('file-name');
+      const fileExt = $(this).data('file-ext');
+      
+      console.log(`🔍 POD Button Clicked:`, {
+        fileUrl: fileUrl,
+        fileName: fileName,
+        fileExt: fileExt
+      });
+      
+      if (fileUrl) {
+        showPODPreview(fileUrl, fileName, fileExt);
+      } else {
+        showToast('POD file URL not found', 'error');
+      }
+    });
+  }
+
+  function updateAdvanceSalePagination() {
+    const totalPagesCount = Math.ceil(advanceSaleTotalRecordsCount / advanceSalePageSize);
+    
+    advanceSaleShowingStart.text(((advanceSaleCurrentPageNum - 1) * advanceSalePageSize) + 1);
+    advanceSaleShowingEnd.text(Math.min(advanceSaleCurrentPageNum * advanceSalePageSize, advanceSaleTotalRecordsCount));
+    advanceSaleTotalRecords.text(advanceSaleTotalRecordsCount);
+    advanceSaleCurrentPage.text(advanceSaleCurrentPageNum);
+    advanceSaleTotalPages.text(totalPagesCount);
+    
+    advanceSalePrevPageBtn.prop('disabled', advanceSaleCurrentPageNum === 1);
+    advanceSaleNextPageBtn.prop('disabled', advanceSaleCurrentPageNum === totalPagesCount);
+    
+    if (advanceSaleTotalRecordsCount > 0) {
+      advanceSalePaginationContainer.show();
+    } else {
+      advanceSalePaginationContainer.hide();
+    }
+  }
+
+  function updateAdvanceSaleStats() {
+    const totalSales = filteredAdvanceSaleData.length;
+    const totalQuantity = filteredAdvanceSaleData.reduce((sum, sale) => sum + (sale.quantity || 0), 0);
+    const podUploaded = filteredAdvanceSaleData.filter(sale => sale.pod_uploaded).length;
+    const podPending = totalSales - podUploaded;
+    
+    totalSalesCount.text(totalSales.toLocaleString());
+    totalQuantitySum.text(totalQuantity.toLocaleString());
+    podUploadedCount.text(podUploaded.toLocaleString());
+    podPendingCount.text(podPending.toLocaleString());
+    
+    if (filteredAdvanceSaleData.length > 0) {
+      advanceSaleStatsSummary.show();
+    } else {
+      advanceSaleStatsSummary.hide();
+    }
+  }
+
+  /* ============================================
+     UI STATE FUNCTIONS
+     ============================================ */
+
+  function showAdvanceSaleLoadingState() {
+    advanceSaleLoadingState.show();
+    advanceSaleTableBody.hide();
+    advanceSaleEmptyState.hide();
+    advanceSalePaginationContainer.hide();
+    advanceSaleStatsSummary.hide();
+  }
+
+  function hideAdvanceSaleLoadingState() {
+    advanceSaleLoadingState.hide();
+    advanceSaleTableBody.show();
+  }
+
+  function showAdvanceSaleEmptyState() {
+    advanceSaleLoadingState.hide();
+    advanceSaleTableBody.hide();
+    advanceSaleEmptyState.show();
+    advanceSalePaginationContainer.hide();
+    advanceSaleStatsSummary.hide();
+  }
+
+  /* ============================================
+     POD PREVIEW FUNCTION
+     ============================================ */
+
+  function showPODPreview(fileUrl, fileName, fileExt) {
+    console.log(`🔍 Opening POD Preview:`, {
+      fileUrl: fileUrl,
+      fileName: fileName,
+      fileExt: fileExt
+    });
+    
+    const imageExtensions = ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp'];
+    const pdfExtensions = ['pdf'];
+    
+    // Set download link
+    $('#downloadPODLink').attr('href', fileUrl);
+    $('#downloadPODLink').attr('download', fileName || 'pod_document');
+    
+    // Clear previous content
+    $('#imagePreviewContainer').html('');
+    $('#pdfPreviewContainer').hide();
+    $('#imagePreviewContainer').hide();
+    
+    if (imageExtensions.includes(fileExt.toLowerCase())) {
+      // Show image preview
+      $('#imagePreviewContainer').html(`
+        <img src="${fileUrl}" alt="${fileName || 'POD Image'}" 
+             class="img-fluid" 
+             onerror="this.onerror=null; this.src='https://via.placeholder.com/600x400?text=Image+Not+Found';">
+      `);
+      $('#imagePreviewContainer').show();
+      $('#pdfPreviewContainer').hide();
+    } else if (pdfExtensions.includes(fileExt.toLowerCase())) {
+      // Show PDF preview
+      $('#pdfViewer').attr('src', fileUrl);
+      $('#pdfPreviewContainer').show();
+      $('#imagePreviewContainer').hide();
+    } else {
+      // For other file types, show download option only
+      $('#imagePreviewContainer').html(`
+        <div class="alert alert-info">
+          <i class="fas fa-info-circle me-2"></i>
+          This file type (${fileExt}) cannot be previewed directly. 
+          Please download the file to view it.
+        </div>
+      `);
+      $('#imagePreviewContainer').show();
+      $('#pdfPreviewContainer').hide();
+    }
+    
+    // Show modal
+    imagePreviewModal.show();
+  }
+
+  /* ============================================
+     EVENT HANDLERS
+     ============================================ */
+
+  bmcFilterAdvanceSale.on('change', applyAdvanceSaleFilters);
+  mppFilterAdvanceSale.on('change', applyAdvanceSaleFilters);
+  cycleFilterAdvanceSale.on('change', applyAdvanceSaleFilters);
+  productFilterAdvanceSale.on('change', applyAdvanceSaleFilters);
+  dateFilterAdvanceSale.on('change', applyAdvanceSaleFilters);
+  podFilterAdvanceSale.on('change', applyAdvanceSaleFilters);
+  podFileFilterAdvanceSale.on('change', applyAdvanceSaleFilters);
+  searchInputAdvanceSale.on('input', debounce(applyAdvanceSaleFilters, 300));
+  
+  itemsPerPageAdvanceSale.on('change', function() {
+    advanceSalePageSize = parseInt($(this).val());
+    advanceSaleCurrentPageNum = 1;
+    renderAdvanceSaleTable();
+    updateAdvanceSalePagination();
+  });
+
+  refreshAdvanceSaleBtn.on('click', function() {
+    loadAdvanceSaleData();
+    showToast('Advance sale data refreshed successfully', 'success');
+  });
+
+  exportAdvanceSaleBtn.on('click', function() {
+    exportAdvanceSaleData();
+  });
+
+  advanceSalePrevPageBtn.on('click', function() {
+    if (advanceSaleCurrentPageNum > 1) {
+      advanceSaleCurrentPageNum--;
+      renderAdvanceSaleTable();
+      updateAdvanceSalePagination();
+    }
+  });
+
+  advanceSaleNextPageBtn.on('click', function() {
+    const totalPagesCount = Math.ceil(advanceSaleTotalRecordsCount / advanceSalePageSize);
+    if (advanceSaleCurrentPageNum < totalPagesCount) {
+      advanceSaleCurrentPageNum++;
+      renderAdvanceSaleTable();
+      updateAdvanceSalePagination();
+    }
+  });
+
+  /* ============================================
+     DETAILS MODAL FUNCTION - UPDATED VERSION
+     ============================================ */
+
+  window.showSaleDetails = function(saleId) {
+    const sale = filteredAdvanceSaleData.find(s => s.id === saleId);
+    if (!sale) return;
+
+    // Clean up any existing modal
+    if (currentModalInstance) {
+      currentModalInstance.hide();
+      $(currentModalInstance._element).remove();
+      currentModalInstance = null;
+    }
+
+    // Prepare POD section HTML - UPDATED
+    let podSectionHtml = '';
+    let podFileUrl = null;
+    let podFileName = null;
+    
+    if (sale.pod_file_url) {
+      podFileUrl = sale.pod_file_url;
+      podFileName = sale.pod_file_name || 'POD Document';
+    } else if (sale.pod_uploaded && sale.pod_file) {
+      podFileUrl = '/media/' + sale.pod_file;
+      podFileName = sale.pod_file.split('/').pop() || 'POD Document';
+    }
+    
+    if (podFileUrl) {
+      const fileExt = podFileName.split('.').pop().toLowerCase();
+      const imageExtensions = ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp'];
+      const pdfExtensions = ['pdf'];
+      
+      let fileIcon = 'fas fa-file-download';
+      let buttonText = 'View POD Document';
+      
+      if (pdfExtensions.includes(fileExt)) {
+        fileIcon = 'fas fa-file-pdf';
+        buttonText = 'View PDF Document';
+      } else if (imageExtensions.includes(fileExt)) {
+        fileIcon = 'fas fa-file-image';
+        buttonText = 'View Image';
+      }
+      
+      podSectionHtml = `
+        <div class="detail-section">
+          <h6>Proof of Delivery</h6>
+          <div class="detail-row">
+            <span class="detail-label">File Name:</span>
+            <span class="detail-value">${escapeHtml(podFileName || 'Not specified')}</span>
+          </div>
+          <div class="detail-row">
+            <span class="detail-label">File Type:</span>
+            <span class="detail-value">${fileExt.toUpperCase()}</span>
+          </div>
+          <div class="detail-row">
+            <span class="detail-label">Uploaded At:</span>
+            <span class="detail-value">${formatDateTime(sale.pod_uploaded_at)}</span>
+          </div>
+          <div class="text-center mt-3">
+            <button type="button" 
+                    class="btn btn-primary btn-lg view-pod-from-modal"
+                    data-file-url="${podFileUrl}"
+                    data-file-name="${podFileName}"
+                    data-file-ext="${fileExt}">
+              <i class="${fileIcon} me-2"></i>
+              ${buttonText}
+            </button>
+            <a href="${podFileUrl}" 
+               class="btn btn-secondary btn-lg ms-2"
+               download="${podFileName || 'pod_document'}">
+              <i class="fas fa-download me-2"></i>
+              Download
+            </a>
+          </div>
+        </div>
+      `;
+    }
+
+    const modalHtml = `
+      <div class="modal fade sale-details-modal" id="saleDetailsModal-${saleId}" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+          <div class="modal-content">
+            <div class="modal-header">
+              <h5 class="modal-title">
+                <i class="fas fa-shopping-cart me-2"></i>
+                Sale Details - ${escapeHtml(sale.unique_code || 'N/A')}
+              </h5>
+              <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+              <div class="row">
+                <div class="col-md-6">
+                  <div class="detail-section">
+                    <h6>Transaction Information</h6>
+                    <div class="detail-row">
+                      <span class="detail-label">Unique Code:</span>
+                      <span class="detail-value">${escapeHtml(sale.unique_code || 'N/A')}</span>
+                    </div>
+                    <div class="detail-row">
+                      <span class="detail-label">Sale Date:</span>
+                      <span class="detail-value">${formatDate(sale.sale_date)}</span>
+                    </div>
+                    <div class="detail-row">
+                      <span class="detail-label">POD Status:</span>
+                      <span class="detail-value">
+                        ${sale.pod_uploaded ? 
+                          `<span class="badge badge-success">Uploaded</span>` : 
+                          `<span class="badge badge-warning">Pending</span>`}
+                      </span>
+                    </div>
+                    ${sale.pod_uploaded_at ? `
+                    <div class="detail-row">
+                      <span class="detail-label">POD Uploaded At:</span>
+                      <span class="detail-value">${formatDateTime(sale.pod_uploaded_at)}</span>
+                    </div>
+                    ` : ''}
+                  </div>
+                  
+                  <div class="detail-section">
+                    <h6>Location Details</h6>
+                    <div class="detail-row">
+                      <span class="detail-label">BMC/MCC:</span>
+                      <span class="detail-value">${escapeHtml(sale.bmc_or_mcc || 'N/A')}</span>
+                    </div>
+                    <div class="detail-row">
+                      <span class="detail-label">MPP with Code:</span>
+                      <span class="detail-value">${escapeHtml(sale.mpp_with_code || 'N/A')}</span>
+                    </div>
+                    <div class="detail-row">
+                      <span class="detail-label">Cycle:</span>
+                      <span class="detail-value">${escapeHtml(sale.cycle_name || 'N/A')}</span>
+                    </div>
+                  </div>
+                </div>
+                
+                <div class="col-md-6">
+                  <div class="detail-section">
+                    <h6>Product Details</h6>
+                    <div class="detail-row">
+                      <span class="detail-label">Product:</span>
+                      <span class="detail-value">${escapeHtml(sale.stock_item || 'N/A')}</span>
+                    </div>
+                    <div class="detail-row">
+                      <span class="detail-label">Quantity:</span>
+                      <span class="detail-value">${sale.quantity || 0}</span>
+                    </div>
+                    <div class="detail-row">
+                      <span class="detail-label">UOM:</span>
+                      <span class="detail-value">${escapeHtml(sale.uom || 'N/A')}</span>
+                    </div>
+                  </div>
+                  
+                  <div class="detail-section">
+                    <h6>Dispatched Information</h6>
+                    <div class="detail-row">
+                      <span class="detail-label">Dispatched By:</span>
+                      <span class="detail-value">${escapeHtml(sale.dispatched_by_name || 'N/A')}</span>
+                    </div>
+                    <div class="detail-row">
+                      <span class="detail-label">Dispatched At:</span>
+                      <span class="detail-value">${formatDateTime(sale.dispatched_at)}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              
+              ${podSectionHtml}
+            </div>
+            <div class="modal-footer">
+              <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                <i class="fas fa-times me-2"></i>Close
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    `;
+    
+    // Append to modal container instead of body directly
+    $('#modalContainer').html(modalHtml);
+    
+    // Get modal element
+    const modalElement = document.getElementById(`saleDetailsModal-${saleId}`);
+    
+    // Create Bootstrap modal instance with NO backdrop
+    currentModalInstance = new bootstrap.Modal(modalElement, {
+      backdrop: false,  // CRITICAL: Set backdrop to false
+      keyboard: true,
+      focus: true
+    });
+    
+    // Show modal
+    currentModalInstance.show();
+    
+    // Attach POD preview click handler
+    $(modalElement).find('.view-pod-from-modal').on('click', function() {
+      const fileUrl = $(this).data('file-url');
+      const fileName = $(this).data('file-name');
+      const fileExt = $(this).data('file-ext');
+      
+      // Close details modal
+      currentModalInstance.hide();
+      
+      // Show POD preview
+      setTimeout(() => {
+        showPODPreview(fileUrl, fileName, fileExt);
+      }, 300);
+    });
+    
+    // Cleanup on hidden event
+    modalElement.addEventListener('hidden.bs.modal', function() {
+      // Remove the modal element
+      $(this).remove();
+      // Clear the instance reference
+      currentModalInstance = null;
+    }, { once: true });
+  };
+
+  /* ============================================
+     EXPORT FUNCTION
+     ============================================ */
+
+  function exportAdvanceSaleData() {
+    if (filteredAdvanceSaleData.length === 0) {
+      showToast('No data to export', 'warning');
+      return;
+    }
+    
+    // Create CSV content
+    let csvContent = "data:text/csv;charset=utf-8,";
+    
+    // Headers - added POD File column
+    const headers = [
+      'Unique Code',
+      'BMC/MCC',
+      'MPP with Code',
+      'Cycle',
+      'Product',
+      'UOM',
+      'Quantity',
+      'Sale Date',
+      'Dispatched By',
+      'Dispatched At',
+      'POD Status',
+      'POD Uploaded At',
+      'POD File URL', // New column
+      'POD File Name' // New column
+    ];
+    csvContent += headers.join(',') + "\n";
+    
+    // Data rows
+    filteredAdvanceSaleData.forEach(sale => {
+      const row = [
+        `"${sale.unique_code || ''}"`,
+        `"${sale.bmc_or_mcc || ''}"`,
+        `"${sale.mpp_with_code || ''}"`,
+        `"${sale.cycle_name || ''}"`,
+        `"${sale.stock_item || ''}"`,
+        `"${sale.uom || ''}"`,
+        sale.quantity || 0,
+        `"${formatDate(sale.sale_date) || ''}"`,
+        `"${sale.dispatched_by_name || ''}"`,
+        `"${formatDateTime(sale.dispatched_at) || ''}"`,
+        `"${sale.pod_uploaded ? 'Uploaded' : 'Pending'}"`,
+        `"${sale.pod_uploaded_at ? formatDateTime(sale.pod_uploaded_at) : ''}"`,
+        `"${sale.pod_file_url || ''}"`, // New field
+        `"${sale.pod_file_name || ''}"` // New field
+      ];
+      csvContent += row.join(',') + "\n";
+    });
+    
+    // Create download link
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", `advance_sale_${new Date().toISOString().split('T')[0]}_${filteredAdvanceSaleData.length}_records.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    
+    showToast(`Exported ${filteredAdvanceSaleData.length} records successfully`, 'success');
+  }
+
+  /* ============================================
+     UTILITY FUNCTIONS
+     ============================================ */
+
+  function escapeHtml(text) {
+    if (!text) return '';
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+  }
+
+  function formatDate(dateString) {
+    if (!dateString) return '-';
+    try {
+      const date = new Date(dateString);
+      if (isNaN(date.getTime())) return '-';
+      return date.toLocaleDateString('en-IN', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric'
+      });
+    } catch (e) {
+      return '-';
+    }
+  }
+
+  function formatDateTime(dateTimeString) {
+    if (!dateTimeString) return '-';
+    try {
+      const date = new Date(dateTimeString);
+      if (isNaN(date.getTime())) return '-';
+      return date.toLocaleString('en-IN', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      });
+    } catch (e) {
+      return '-';
+    }
+  }
+
+  function showError(message) {
+    showToast(message, 'error');
+    showAdvanceSaleEmptyState();
+  }
+
+  function showToast(message, type = 'info') {
+    $('.alert-toast').remove();
+    
+    const icon = type === 'success' ? 'check-circle' : 
+                 type === 'error' ? 'exclamation-triangle' : 
+                 type === 'warning' ? 'exclamation-circle' : 'info-circle';
+    
+    const bgColor = type === 'success' ? 'success' : 
+                    type === 'error' ? 'danger' : 
+                    type === 'warning' ? 'warning' : 'info';
+    
+    const toast = $(`
+      <div class="alert alert-${bgColor} alert-dismissible fade show alert-toast" 
+           style="position: fixed; top: 20px; right: 20px; z-index: 9999; min-width: 300px; box-shadow: 0 4px 12px rgba(0,0,0,0.15);">
+        <div class="d-flex align-items-center">
+          <i class="fas fa-${icon} me-2"></i>
+          <span>${message}</span>
+        </div>
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+      </div>
+    `);
+    $('body').append(toast);
+    
+    setTimeout(() => {
+      toast.alert('close');
+    }, 5000);
+  }
+
+  function debounce(func, wait) {
+    let timeout;
+    return function executedFunction(...args) {
+      const later = () => {
+        clearTimeout(timeout);
+        func(...args);
+      };
+      clearTimeout(timeout);
+      timeout = setTimeout(later, wait);
+    };
+  }
+
+  console.log("✅ Advance Sale Admin View initialized successfully");
+});
+</script>
+
+{% endblock %}

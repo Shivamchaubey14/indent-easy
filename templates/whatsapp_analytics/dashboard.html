@@ -1,0 +1,2622 @@
+<!-- templates/whatsapp_analytics/dashboard.html -->
+{% extends "base.html" %}
+{% block content %}
+
+<div class="layout-container">
+  <!-- Sidebar -->
+  <aside class="sidebar">
+    <div class="sidebar-content">
+      <!-- User Welcome Section -->
+      <div class="user-welcome">
+        <div class="welcome-header">
+          <h1 class="welcome-title">
+            Welcome!
+            <span class="wave-emoji">👋</span>
+          </h1>
+          <p class="user-name">{{request.user.first_name}} {{request.user.last_name}}</p>
+          <div class="user-details">
+            <span class="detail-badge">
+              <i class="fas fa-id-badge"></i>
+              {{ request.user.employee_code }}
+            </span>
+            <span class="detail-badge">
+              <i class="fas fa-building"></i>
+              {{ request.user.department }}
+            </span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Stats Section -->
+      <div class="stats-section">
+        <div class="stat-card">
+          <div class="stat-icon inventory-icon">
+            <i class="fab fa-whatsapp"></i>
+          </div>
+          <div class="stat-info">
+            <span class="stat-value" id="todayReads">{{ today_reads|default:"0" }}</span>
+            <span class="stat-label">Today's Reads</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Quick Actions -->
+      <div class="quick-actions">
+        <h3 class="section-title">Quick Actions</h3>
+        <button class="action-btn" id="refreshAnalyticsBtn">
+          <i class="fas fa-sync-alt"></i>
+          <span>Refresh Data</span>
+        </button>
+        <button class="action-btn" id="exportAnalyticsBtn">
+          <i class="fas fa-download"></i>
+          <span>Export Data</span>
+        </button>
+        <button class="action-btn" id="getInsightsBtn">
+          <i class="fas fa-lightbulb"></i>
+          <span>Get Insights</span>
+        </button>
+      </div>
+      
+      <!-- Navigation -->
+      <div class="admin-actions">
+        <h3 class="section-title">Navigation</h3>
+        <a href="{% url 'admin_dashboard' %}" class="action-btn">
+          <i class="fas fa-arrow-left"></i>
+          <span>Back to Admin</span>
+        </a>
+        <a href="#" class="action-btn active">
+            <i class="fas fa-chart-bar"></i>
+            <span>WhatsApp Analytics</span>
+        </a>
+      </div>
+    </div>
+  </aside>
+
+  <!-- Main Content -->
+  <main class="main-content">
+    <!-- Page Header -->
+    <div class="page-header">
+      <div class="header-content">
+        <div class="header-text">
+          <h1 class="page-title">
+            <i class="fas fa-chart-bar"></i>
+            WhatsApp Read Analytics
+          </h1>
+          <p class="page-subtitle">Track message delivery, read rates, and engagement patterns</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- WhatsApp Analytics Card -->
+    <div class="advance-sale-card">
+      <div class="card-header">
+        <h2 class="card-title">
+          <i class="fas fa-align-center"></i>
+          Read Analytics Dashboard
+        </h2>
+        <p class="card-subtitle">Real-time monitoring of WhatsApp message performance</p>
+      </div>
+      
+      <div class="card-content">
+        <!-- Filters and Controls -->
+        <div class="filters-section">
+          <div class="filter-row">
+            <div class="filter-group">
+              <label for="dateFilterAnalytics">Time Period:</label>
+              <select id="dateFilterAnalytics" class="form-select">
+                <option value="today" {% if date_filter == 'today' %}selected{% endif %}>Today</option>
+                <option value="yesterday" {% if date_filter == 'yesterday' %}selected{% endif %}>Yesterday</option>
+                <option value="7d" {% if date_filter == '7d' %}selected{% endif %}>Last 7 Days</option>
+                <option value="30d" {% if date_filter == '30d' %}selected{% endif %}>Last 30 Days</option>
+                <option value="90d" {% if date_filter == '90d' %}selected{% endif %}>Last 90 Days</option>
+              </select>
+            </div>
+            <div class="filter-group">
+              <label for="mppFilterAnalytics">Filter by MPP:</label>
+              <select id="mppFilterAnalytics" class="form-select">
+                <option value="">All MPPs</option>
+                {% for mpp in available_mpps %}
+                <option value="{{ mpp }}" {% if mpp_filter == mpp %}selected{% endif %}>{{ mpp }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="filter-group">
+              <label for="statusFilterAnalytics">Filter by Status:</label>
+              <select id="statusFilterAnalytics" class="form-select">
+                <option value="">All Statuses</option>
+                <option value="READ" {% if status_filter == 'READ' %}selected{% endif %}>Read</option>
+                <option value="DELIVERED" {% if status_filter == 'DELIVERED' %}selected{% endif %}>Delivered</option>
+                <option value="SENT" {% if status_filter == 'SENT' %}selected{% endif %}>Sent</option>
+                <option value="FAILED" {% if status_filter == 'FAILED' %}selected{% endif %}>Failed</option>
+                <option value="NOT_REGISTERED" {% if status_filter == 'NOT_REGISTERED' %}selected{% endif %}>Not Registered</option>
+              </select>
+            </div>
+          </div>
+          <div class="filter-row">
+            <div class="filter-group">
+              <label for="searchInputAnalytics">Search:</label>
+              <input type="text" id="searchInputAnalytics" class="form-control" 
+                     placeholder="Search mobile numbers, MPP names, messages...">
+            </div>
+            <!-- Change this line in the template -->
+            <div class="filter-group">
+                <label for="itemsPerPageAnalytics">Items per page:</label>
+                <select id="itemsPerPageAnalytics" class="form-select">
+                    <option value="10" {% if page_size == 10 %}selected{% endif %}>10</option>
+                    <option value="25" {% if page_size == 25 %}selected{% endif %}>25</option>
+                    <option value="50" {% if page_size == 50 %}selected{% endif %}>50</option>
+                    <option value="100" {% if page_size == 100 %}selected{% endif %}>100</option>
+                    <option value="1000" {% if page_size == 1000 %}selected{% endif %}>1000</option>
+                </select>
+            </div>
+            <div class="action-buttons">
+              <button class="btn btn-primary" id="applyFiltersBtn">
+                <i class="fas fa-filter"></i>
+                Apply Filters
+              </button>
+              <button class="btn btn-secondary" id="sendTestMessageBtn">
+                <i class="fas fa-paper-plane"></i>
+                Send Test Message
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Stats Summary -->
+        <div class="stats-summary-section" id="statsSummarySection">
+          <div class="stats-summary">
+            <div class="stat-summary-item">
+              <div class="stat-summary-icon">
+                <i class="fas fa-paper-plane"></i>
+              </div>
+              <div class="stat-summary-details">
+                <span class="stat-summary-value" id="totalMessagesCount">{{ total_messages }}</span>
+                <span class="stat-summary-label">Total Messages</span>
+              </div>
+            </div>
+            <div class="stat-summary-item">
+              <div class="stat-summary-icon">
+                <i class="fas fa-check-circle"></i>
+              </div>
+              <div class="stat-summary-details">
+                <span class="stat-summary-value" id="deliveredMessagesCount">{{ delivered_messages }}</span>
+                <span class="stat-summary-label">Delivered</span>
+              </div>
+            </div>
+            <div class="stat-summary-item">
+              <div class="stat-summary-icon">
+                <i class="fas fa-eye"></i>
+              </div>
+              <div class="stat-summary-details">
+                <span class="stat-summary-value" id="readMessagesCount">{{ read_messages }}</span>
+                <span class="stat-summary-label">Read</span>
+              </div>
+            </div>
+            <div class="stat-summary-item">
+              <div class="stat-summary-icon">
+                <i class="fas fa-chart-line"></i>
+              </div>
+              <div class="stat-summary-details">
+                <span class="stat-summary-value" id="readRatePercent">{{ read_rate }}%</span>
+                <span class="stat-summary-label">Read Rate</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Charts Section -->
+        <div class="charts-section" id="chartsSection">
+          <div class="chart-row">
+            <!-- Read by Hour Chart -->
+            <div class="chart-card">
+              <div class="chart-header">
+                <h3><i class="fas fa-clock"></i> Read by Hour of Day</h3>
+                <p>Best times to send messages</p>
+              </div>
+              <div class="chart-container">
+                <canvas id="hourChart" height="250"></canvas>
+              </div>
+            </div>
+            
+            <!-- Status Distribution Chart -->
+            <div class="chart-card">
+              <div class="chart-header">
+                <h3><i class="fas fa-chart-pie"></i> Status Distribution</h3>
+                <p>Message delivery outcomes</p>
+              </div>
+              <div class="chart-container">
+                <canvas id="statusChart" height="250"></canvas>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Top Readers & Never Read -->
+        <div class="insights-section" id="insightsSection">
+          <div class="insight-column">
+            <div class="insight-card">
+              <div class="insight-header">
+                <h3><i class="fas fa-trophy"></i> Top 10 Readers</h3>
+                <p>Most engaged MPPs</p>
+              </div>
+              <div class="insight-content" id="topReadersContent">
+                <table class="insight-table">
+                  <thead>
+                    <tr>
+                      <th>MPP Name</th>
+                      <th>Reads</th>
+                      <th>Avg Time</th>
+                      <th>Last Read</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {% for reader in top_mpps %}
+                    <tr>
+                      <td>
+                        <a href="{% url 'whatsapp_message_detail' %}?mpp={{ reader.mpp_name|urlencode }}" 
+                           class="mpp-link">
+                          {{ reader.mpp_name }}
+                        </a>
+                      </td>
+                      <td class="text-center">{{ reader.read_count }}</td>
+                      <td class="text-center">
+                        {% if reader.avg_time_to_read %}
+                          {{ reader.avg_time_to_read|floatformat:1 }} min
+                        {% else %}
+                          N/A
+                        {% endif %}
+                      </td>
+                      <td class="text-center">
+                        {{ reader.last_read|date:"H:i" }}
+                      </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                      <td colspan="4" class="text-center text-muted py-3">
+                        No data available
+                      </td>
+                    </tr>
+                    {% endfor %}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+          
+          <div class="insight-column">
+            <div class="insight-card">
+              <div class="insight-header">
+                <h3><i class="fas fa-exclamation-triangle"></i> Never Read (24h+)</h3>
+                <p>Need follow-up</p>
+              </div>
+              <div class="insight-content" id="neverReadContent">
+                <table class="insight-table">
+                  <thead>
+                    <tr>
+                      <th>Mobile</th>
+                      <th>MPP</th>
+                      <th>Delivered</th>
+                      <th>Action</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {% for item in never_read %}
+                    <tr>
+                      <td>
+                        <a href="{% url 'whatsapp_message_detail' %}?mobile={{ item.mobile_number }}" 
+                           class="mobile-link">
+                          {{ item.mobile_number }}
+                        </a>
+                      </td>
+                      <td>{{ item.mpp_name|default:"Unknown" }}</td>
+                      <td class="text-center">
+                        {{ item.delivered_at|timesince }} ago
+                      </td>
+                      <td class="text-center">
+                        <button onclick="callNumber('{{ item.mobile_number }}')" 
+                                class="btn-action btn-call">
+                          <i class="fas fa-phone"></i>
+                        </button>
+                      </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                      <td colspan="4" class="text-center text-success py-3">
+                        <i class="fas fa-check-circle"></i> All messages have been read!
+                      </td>
+                    </tr>
+                    {% endfor %}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Messages Table -->
+        <div class="table-section">
+          <div class="table-header">
+            <h3><i class="fas fa-list"></i> Recent Messages</h3>
+            <div class="table-actions">
+              <span class="text-muted" id="tableInfo">Showing {{ page_obj.start_index }}-{{ page_obj.end_index }} of {{ total_messages }}</span>
+            </div>
+          </div>
+          
+          <div class="table-responsive">
+            <table class="whatsapp-messages-table">
+              <thead>
+                <tr>
+                  <th>Time</th>
+                  <th>Mobile</th>
+                  <th>MPP</th>
+                  <th>Message</th>
+                  <th>Status</th>
+                  <th>Sent</th>
+                  <th>Read</th>
+                  <th>Time to Read</th>
+                </tr>
+              </thead>
+              <tbody id="messagesTableBody">
+                {% for msg in page_obj %}
+                <tr>
+                  <td>{{ msg.created_at|date:"H:i" }}</td>
+                  <td class="mobile-cell">{{ msg.mobile_number }}</td>
+                  <td>
+                    {% if msg.mpp_name %}
+                    <a href="{% url 'whatsapp_message_detail' %}?mpp={{ msg.mpp_name|urlencode }}" 
+                       class="mpp-link">
+                      {{ msg.mpp_name }}
+                    </a>
+                    {% else %}
+                    <span class="text-muted">-</span>
+                    {% endif %}
+                  </td>
+                  <td class="message-cell" title="{{ msg.message }}">
+                    {{ msg.message|truncatechars:50 }}
+                  </td>
+                  <td>
+                    {% with status_class=msg.status|lower|cut:" "|cut:"_" %}
+                    <span class="status-badge status-{{ status_class }}">
+                      {{ msg.status }}
+                    </span>
+                    {% endwith %}
+                  </td>
+                  <td>
+                    {% if msg.sent_at %}
+                      {{ msg.sent_at|date:"H:i" }}
+                    {% else %}
+                      <span class="text-muted">-</span>
+                    {% endif %}
+                  </td>
+                  <td>
+                    {% if msg.read_at %}
+                      <span class="text-success">{{ msg.read_at|date:"H:i" }}</span>
+                    {% else %}
+                      <span class="text-muted">-</span>
+                    {% endif %}
+                  </td>
+                  <td>
+                    {% if msg.sent_at and msg.read_at %}
+                      {% with time_diff=msg.read_at|timeuntil:msg.sent_at %}
+                        {% if "minute" in time_diff %}
+                          {{ time_diff }}
+                        {% elif "second" in time_diff %}
+                          {{ time_diff }}
+                        {% else %}
+                          {{ time_diff }}
+                        {% endif %}
+                      {% endwith %}
+                    {% else %}
+                      <span class="text-muted">-</span>
+                    {% endif %}
+                  </td>
+                </tr>
+                {% empty %}
+                <tr>
+                  <td colspan="8" class="text-center py-4 text-muted">
+                    <i class="fas fa-inbox fa-2x mb-2"></i><br>
+                    No messages found
+                  </td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+          
+          <!-- Pagination -->
+          {% if page_obj.paginator.num_pages > 1 %}
+          <div class="pagination-container" id="paginationContainer">
+            <div class="pagination-info">
+              Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}
+            </div>
+            <div class="pagination-controls">
+              {% if page_obj.has_previous %}
+              <button class="btn-pagination" onclick="loadAnalyticsData({{ page_obj.previous_page_number }})">
+                <i class="fas fa-chevron-left"></i>
+              </button>
+              {% else %}
+              <span class="btn-pagination disabled">
+                <i class="fas fa-chevron-left"></i>
+              </span>
+              {% endif %}
+              
+              {% for num in page_obj.paginator.page_range %}
+                {% if page_obj.number == num %}
+                <span class="btn-pagination active">{{ num }}</span>
+                {% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %}
+                <button class="btn-pagination" onclick="loadAnalyticsData({{ num }})">{{ num }}</button>
+                {% endif %}
+              {% endfor %}
+              
+              {% if page_obj.has_next %}
+              <button class="btn-pagination" onclick="loadAnalyticsData({{ page_obj.next_page_number }})">
+                <i class="fas fa-chevron-right"></i>
+              </button>
+              {% else %}
+              <span class="btn-pagination disabled">
+                <i class="fas fa-chevron-right"></i>
+              </span>
+              {% endif %}
+            </div>
+          </div>
+          {% endif %}
+        </div>
+      </div>
+      
+      <div class="card-footer">
+        <div class="footer-info">
+          <h5>Analytics Dashboard Features:</h5>
+          <ul>
+            <li><i class="fas fa-chart-line"></i> <strong>Real-time Analytics:</strong> Live updates on message delivery and read rates</li>
+            <li><i class="fas fa-clock"></i> <strong>Time Analysis:</strong> Identify best times to send messages for maximum engagement</li>
+            <li><i class="fas fa-trophy"></i> <strong>Top Performers:</strong> See which MPPs are most responsive</li>
+            <li><i class="fas fa-exclamation-triangle"></i> <strong>Issue Detection:</strong> Automatically flag messages that need follow-up</li>
+            <li><i class="fas fa-download"></i> <strong>Data Export:</strong> Export analytics data for reporting</li>
+            <li><i class="fas fa-lightbulb"></i> <strong>Smart Insights:</strong> Get AI-powered recommendations to improve engagement</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<!-- Modal Container -->
+<div id="modalContainer"></div>
+
+<!-- Test Message Modal -->
+<div class="modal fade" id="testMessageModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title"><i class="fas fa-paper-plane"></i> Send Test WhatsApp Message</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <div class="form-group mb-3">
+          <label for="testMobileNumber" class="form-label">Mobile Number:</label>
+          <input type="text" id="testMobileNumber" class="form-control" 
+                 placeholder="Enter mobile number (e.g., 9876543210)" 
+                 pattern="[0-9]{10}">
+          <div class="form-text">Enter 10-digit mobile number without country code</div>
+        </div>
+        <div class="form-group mb-3">
+          <label for="testMessage" class="form-label">Message:</label>
+          <textarea id="testMessage" class="form-control" rows="3" 
+                    placeholder="Enter test message...">Test message from WhatsApp Analytics Dashboard</textarea>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-primary" id="sendTestNowBtn">
+          <i class="fas fa-paper-plane"></i> Send Test Message
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Insights Modal -->
+<div class="modal fade" id="insightsModal" tabindex="-1">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title"><i class="fas fa-lightbulb"></i> WhatsApp Insights & Recommendations</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <div id="insightsContent">
+          <!-- Will be loaded dynamically -->
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+        <button type="button" class="btn btn-primary" onclick="window.print()">
+          <i class="fas fa-print"></i> Print Insights
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<style>
+  /* CSS Variables */
+  :root {
+    --primary-dark: #313647;
+    --primary-light: #435663;
+    --accent-green: #A3B087;
+    --accent-red: #EA5B6F;
+    --accent-yellow: #FFF8D4;
+    --text-dark: #2c3e50;
+    --text-light: #7f8c8d;
+    --bg-light: #f8f9fa;
+    --border-color: #e9ecef;
+    --success: #28a745;
+    --warning: #ffc107;
+    --danger: #dc3545;
+    --info: #17a2b8;
+  }
+
+  /* Base Styles */
+  * {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+  }
+
+  body {
+    font-family: 'Lexend', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    color: var(--text-dark);
+    background: white;
+  }
+
+  /* WhatsApp Analytics Specific Styles */
+  .charts-section {
+    margin: 2rem 0;
+  }
+  
+  .chart-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1.5rem;
+    margin-bottom: 2rem;
+  }
+  
+  @media (max-width: 992px) {
+    .chart-row {
+      grid-template-columns: 1fr;
+    }
+  }
+  
+  .chart-card {
+    background: white;
+    border-radius: 12px;
+    padding: 1.5rem;
+    border: 1px solid rgba(163, 176, 135, 0.2);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+  }
+  
+  .chart-header {
+    margin-bottom: 1.5rem;
+  }
+  
+  .chart-header h3 {
+    font-size: 1.1rem;
+    color: var(--text-dark);
+    margin-bottom: 0.25rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+  
+  .chart-header p {
+    color: var(--text-light);
+    font-size: 0.9rem;
+    margin: 0;
+  }
+  
+  .chart-container {
+    height: 250px;
+    position: relative;
+  }
+  
+  .insights-section {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1.5rem;
+    margin: 2rem 0;
+  }
+  
+  @media (max-width: 768px) {
+    .insights-section {
+      grid-template-columns: 1fr;
+    }
+  }
+  
+  .insight-card {
+    background: white;
+    border-radius: 12px;
+    overflow: hidden;
+    border: 1px solid rgba(163, 176, 135, 0.2);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+  }
+  
+  .insight-header {
+    background: rgba(163, 176, 135, 0.1);
+    padding: 1rem 1.5rem;
+    border-bottom: 1px solid rgba(163, 176, 135, 0.2);
+  }
+  
+  .insight-header h3 {
+    font-size: 1rem;
+    color: var(--text-dark);
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+  
+  .insight-header p {
+    color: var(--text-light);
+    font-size: 0.85rem;
+    margin: 0.25rem 0 0;
+  }
+  
+  .insight-content {
+    padding: 1rem;
+    max-height: 300px;
+    overflow-y: auto;
+  }
+  
+  .insight-table {
+    width: 100%;
+    border-collapse: collapse;
+  }
+  
+  .insight-table th {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--text-dark);
+    padding: 0.75rem;
+    text-align: left;
+    border-bottom: 2px solid rgba(163, 176, 135, 0.2);
+    background: rgba(163, 176, 135, 0.05);
+  }
+  
+  .insight-table td {
+    font-size: 0.85rem;
+    padding: 0.75rem;
+    border-bottom: 1px solid rgba(163, 176, 135, 0.1);
+  }
+  
+  .insight-table tbody tr:hover {
+    background: rgba(163, 176, 135, 0.05);
+  }
+  
+  .mpp-link, .mobile-link {
+    color: var(--accent-green);
+    text-decoration: none;
+    font-weight: 500;
+  }
+  
+  .mpp-link:hover, .mobile-link:hover {
+    color: var(--primary-dark);
+    text-decoration: underline;
+  }
+  
+  .btn-action {
+    width: 32px;
+    height: 32px;
+    border-radius: 6px;
+    border: none;
+    background: var(--accent-green);
+    color: white;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.3s ease;
+  }
+  
+  .btn-action:hover {
+    background: #8a9975;
+    transform: scale(1.1);
+  }
+  
+  .btn-call {
+    background: var(--success);
+  }
+  
+  .btn-call:hover {
+    background: #218838;
+  }
+  
+  .table-section {
+    margin-top: 2rem;
+  }
+  
+  .table-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1rem;
+  }
+  
+  .table-header h3 {
+    font-size: 1.1rem;
+    color: var(--text-dark);
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+  
+  .whatsapp-messages-table {
+    width: 100%;
+    border-collapse: collapse;
+    background: white;
+    border-radius: 8px;
+    overflow: hidden;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+  }
+  
+  .whatsapp-messages-table thead {
+    background: var(--primary-dark);
+  }
+  
+  .whatsapp-messages-table th {
+    color: white;
+    background-color: var(--primary-dark);
+    font-weight: 600;
+    padding: 1rem;
+    text-align: left;
+    font-size: 0.9rem;
+    border-bottom: 2px solid var(--accent-green);
+  }
+  
+  .whatsapp-messages-table td {
+    padding: 0.875rem 1rem;
+    border-bottom: 1px solid rgba(163, 176, 135, 0.1);
+    font-size: 0.9rem;
+  }
+  
+  .whatsapp-messages-table tbody tr:hover {
+    background: rgba(163, 176, 135, 0.05);
+  }
+  
+  .mobile-cell {
+    font-family: 'Courier New', monospace;
+    font-weight: 500;
+  }
+  
+  .message-cell {
+    max-width: 200px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  
+  .status-badge {
+    display: inline-block;
+    padding: 0.25rem 0.5rem;
+    border-radius: 12px;
+    font-size: 0.75rem;
+    font-weight: 600;
+  }
+  
+  .status-read {
+    background: rgba(40, 167, 69, 0.1);
+    color: var(--success);
+    border: 1px solid rgba(40, 167, 69, 0.2);
+  }
+  
+  .status-delivered {
+    background: rgba(0, 123, 255, 0.1);
+    color: #007bff;
+    border: 1px solid rgba(0, 123, 255, 0.2);
+  }
+  
+  .status-sent {
+    background: rgba(255, 193, 7, 0.1);
+    color: var(--warning);
+    border: 1px solid rgba(255, 193, 7, 0.2);
+  }
+  
+  .status-failed, .status-not_registered {
+    background: rgba(220, 53, 69, 0.1);
+    color: var(--danger);
+    border: 1px solid rgba(220, 53, 69, 0.2);
+  }
+  
+  /* Recent Active Section */
+  .recent-active-section {
+    margin: 2rem 0;
+    background: white;
+    border-radius: 12px;
+    padding: 1.5rem;
+    border: 1px solid rgba(163, 176, 135, 0.2);
+  }
+  
+  .reactive-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    gap: 1rem;
+    margin-top: 1rem;
+  }
+  
+  .reactive-card {
+    background: rgba(163, 176, 135, 0.05);
+    border: 1px solid rgba(163, 176, 135, 0.2);
+    border-radius: 8px;
+    padding: 1rem;
+    transition: all 0.3s ease;
+  }
+  
+  .reactive-card:hover {
+    background: rgba(163, 176, 135, 0.1);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(163, 176, 135, 0.1);
+  }
+  
+  .reactive-card h4 {
+    font-size: 0.9rem;
+    color: var(--text-dark);
+    margin: 0 0 0.25rem;
+  }
+  
+  .reactive-card p {
+    font-size: 0.85rem;
+    color: var(--text-light);
+    margin: 0 0 0.5rem;
+  }
+  
+  .reactive-time {
+    font-size: 0.75rem;
+    color: var(--accent-green);
+    font-weight: 500;
+  }
+  
+  /* Text utilities */
+  .text-center {
+    text-align: center;
+  }
+
+  .text-muted {
+    color: var(--text-light) !important;
+  }
+
+  .text-success {
+    color: var(--success) !important;
+  }
+
+  .text-danger {
+    color: var(--danger) !important;
+  }
+
+  /* Layout */
+  .layout-container {
+    display: flex;
+    min-height: calc(100vh - 90px);
+    background: white;
+    align-items: stretch;
+    position: relative;
+  }
+
+  /* Sidebar */
+  .sidebar {
+    width: 320px;
+    background: var(--primary-dark);
+    color: white;
+    padding: 2rem 1.5rem;
+    box-shadow: 2px 0 20px rgba(0, 0, 0, 0.1);
+    border-radius: 0 20px 20px 0;
+    position: sticky;
+    top: 90px;
+    height: auto;
+    min-height: calc(100vh - 90px);
+    overflow-y: auto;
+    flex-shrink: 0;
+    margin-top: 40px;
+    margin-left: 10px;
+  }
+
+  .sidebar-content {
+    display: flex;
+    flex-direction: column;
+    gap: 2rem;
+    height: 100%;
+  }
+
+  .user-welcome {
+    text-align: center;
+    padding-bottom: 1.5rem;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  }
+
+  .welcome-title {
+    font-size: 1.5rem;
+    font-weight: 600;
+    margin-bottom: 0.5rem;
+    color: var(--accent-green);
+  }
+
+  .wave-emoji {
+    display: inline-block;
+    animation: wave 1.5s ease-in-out infinite;
+  }
+
+  @keyframes wave {
+    0%, 100% { transform: rotate(0deg); }
+    25% { transform: rotate(15deg); }
+    75% { transform: rotate(-10deg); }
+  }
+
+  .user-name {
+    font-size: 1.1rem;
+    color: var(--accent-yellow);
+    font-weight: 500;
+    margin-bottom: 1rem;
+  }
+
+  .user-details {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    align-items: center;
+  }
+
+  .detail-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.4rem 0.8rem;
+    background: rgba(163, 176, 135, 0.1);
+    border-radius: 20px;
+    font-size: 0.85rem;
+    color: rgba(255, 255, 255, 0.9);
+  }
+
+  .detail-badge i {
+    color: var(--accent-green);
+  }
+
+  /* Stats Section in Sidebar */
+  .stats-section {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 1rem;
+    padding-bottom: 1.5rem;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  }
+
+  .stat-card {
+    background: rgba(163, 176, 135, 0.1);
+    padding: 1rem;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    border: 1px solid rgba(163, 176, 135, 0.2);
+  }
+
+  .stat-icon {
+    width: 48px;
+    height: 48px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.5rem;
+  }
+
+  .inventory-icon {
+    background: rgba(163, 176, 135, 0.2);
+    color: var(--accent-green);
+  }
+
+  .stat-info {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .stat-value {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: white;
+  }
+
+  .stat-label {
+    font-size: 0.75rem;
+    color: rgba(255, 255, 255, 0.7);
+  }
+
+  /* Quick Actions */
+  .quick-actions, .admin-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+
+  .section-title {
+    font-size: 1.1rem;
+    color: var(--accent-yellow);
+    margin-bottom: 0.5rem;
+    font-weight: 500;
+  }
+
+  .action-btn {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.875rem 1rem;
+    background: rgba(163, 176, 135, 0.1);
+    color: var(--accent-yellow);
+    text-decoration: none;
+    border-radius: 10px;
+    transition: all 0.3s ease;
+    border: 1px solid rgba(163, 176, 135, 0.2);
+    position: relative;
+    border: none;
+    width: 100%;
+    text-align: left;
+    cursor: pointer;
+  }
+
+  .action-btn:hover {
+    background: rgba(163, 176, 135, 0.2);
+    color: white;
+    transform: translateX(5px);
+    text-decoration: none;
+  }
+
+  .action-btn i {
+    color: var(--accent-green);
+    font-size: 1.1rem;
+  }
+
+  .action-btn span {
+    flex: 1;
+  }
+
+  .action-btn.active {
+    background: rgba(163, 176, 135, 0.3);
+    border-color: var(--accent-green);
+  }
+
+  /* Main Content */
+  .main-content {
+    flex: 1;
+    background: #ffffff;
+    padding: 2rem;
+    overflow-y: auto;
+    min-height: calc(100vh - 90px);
+    display: flex;
+    flex-direction: column;
+    gap: 2rem;
+    position: relative;
+  }
+
+  /* Page Header */
+  .page-header {
+    margin-bottom: 0;
+    background: linear-gradient(135deg, var(--accent-green) 0%, #8a9975 100%);
+    border-radius: 20px;
+    padding: 1.5rem 2rem;
+    box-shadow: 0 8px 32px rgba(163, 176, 135, 0.2);
+    border: 2px solid black;
+  }
+
+  .header-content {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+  }
+
+  .header-text {
+    text-align: center;
+  }
+
+  .page-title {
+    font-size: 2rem;
+    font-weight: 700;
+    color: var(--primary-dark);
+    margin-bottom: 0.5rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.75rem;
+  }
+
+  .page-title i {
+    font-size: 1.75rem;
+  }
+
+  .page-subtitle {
+    font-size: 1rem;
+    color: var(--primary-dark);
+    font-weight: 400;
+  }
+
+  /* Advance Sale Card - Rename to generic card */
+  .advance-sale-card {
+    background: white;
+    border-radius: 16px;
+    border: 2px solid black;
+    overflow: hidden;
+    box-shadow: 0 8px 32px rgba(163, 176, 135, 0.2);
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .card-header {
+    background: var(--primary-dark);
+    color: white;
+    padding: 1.5rem 2rem;
+    border-bottom: 2px solid var(--accent-green);
+  }
+
+  .card-title {
+    font-size: 1.5rem;
+    font-weight: 600;
+    margin-bottom: 0.5rem;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+  }
+
+  .card-title i {
+    color: var(--accent-yellow);
+  }
+
+  .card-subtitle {
+    color: rgba(255, 255, 255, 0.8);
+    font-size: 0.95rem;
+  }
+
+  .card-content {
+    flex: 1;
+    padding: 2rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+  }
+
+  /* Filters Section */
+  .filters-section {
+    background: rgba(163, 176, 135, 0.05);
+    padding: 1.5rem;
+    border-radius: 12px;
+    border: 1px solid rgba(163, 176, 135, 0.2);
+  }
+
+  .filter-row {
+    display: flex;
+    gap: 1rem;
+    margin-bottom: 1rem;
+  }
+
+  .filter-row:last-child {
+    margin-bottom: 0;
+  }
+
+  .filter-group {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
+  .filter-group label {
+    font-weight: 600;
+    color: var(--text-dark);
+    font-size: 0.9rem;
+  }
+
+  .form-select, .form-control {
+    padding: 0.75rem;
+    border: 2px solid var(--border-color);
+    border-radius: 8px;
+    font-size: 0.9rem;
+    transition: all 0.3s ease;
+    font-family: 'Lexend', sans-serif;
+    background: white;
+  }
+
+  .form-select:focus, .form-control:focus {
+    outline: none;
+    border-color: var(--accent-green);
+    box-shadow: 0 0 0 3px rgba(163, 176, 135, 0.1);
+  }
+
+  .action-buttons {
+    display: flex;
+    gap: 1rem;
+    align-items: flex-end;
+  }
+
+  .btn {
+    padding: 0.75rem 1.5rem;
+    border: none;
+    border-radius: 8px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    white-space: nowrap;
+    font-family: 'Lexend', sans-serif;
+  }
+
+  .btn-primary {
+    background: var(--primary-dark);
+    color: white;
+  }
+
+  .btn-primary:hover {
+    background: var(--primary-light);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(49, 54, 71, 0.3);
+  }
+
+  .btn-secondary {
+    background: var(--accent-green);
+    color: white;
+  }
+
+  .btn-secondary:hover {
+    background: #8a9975;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(138, 153, 117, 0.3);
+  }
+
+  /* Stats Summary Section */
+  .stats-summary-section {
+    margin-bottom: 1.5rem;
+    padding: 1.5rem;
+    background: rgba(255, 255, 255, 0.95);
+    border-radius: 12px;
+    border: 1px solid rgba(163, 176, 135, 0.2);
+  }
+
+  .stats-summary {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1rem;
+  }
+
+  .stat-summary-item {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 1rem;
+    background: rgba(163, 176, 135, 0.1);
+    border-radius: 8px;
+    border: 1px solid rgba(163, 176, 135, 0.2);
+  }
+
+  .stat-summary-icon {
+    width: 48px;
+    height: 48px;
+    border-radius: 10px;
+    background: var(--accent-green);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-size: 1.2rem;
+  }
+
+  .stat-summary-details {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .stat-summary-value {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: var(--text-dark);
+  }
+
+  .stat-summary-label {
+    font-size: 0.85rem;
+    color: var(--text-light);
+  }
+
+  /* Table Section */
+  .table-section {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .table-responsive {
+    overflow-x: auto;
+    flex: 1;
+    border: 1px solid rgba(163, 176, 135, 0.2);
+    border-radius: 8px;
+    background: white;
+  }
+
+  /* Pagination */
+  .pagination-container {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1.5rem;
+    background: white;
+    border-top: 1px solid rgba(163, 176, 135, 0.2);
+  }
+
+  .pagination-info {
+    color: var(--text-light);
+    font-size: 0.9rem;
+  }
+
+  .pagination-controls {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+  }
+
+  .btn-pagination {
+    width: 40px;
+    height: 40px;
+    border-radius: 8px;
+    border: 1px solid var(--border-color);
+    background: white;
+    color: var(--text-dark);
+    cursor: pointer;
+    transition: all 0.3s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-decoration: none;
+  }
+
+  .btn-pagination:hover:not(:disabled):not(.disabled) {
+    background: var(--accent-green);
+    color: white;
+    border-color: var(--accent-green);
+  }
+
+  .btn-pagination:disabled, .btn-pagination.disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  .btn-pagination.active {
+    background: var(--accent-green);
+    color: white;
+    border-color: var(--accent-green);
+  }
+
+  /* Card Footer */
+  .card-footer {
+    padding: 1.5rem 2rem;
+    background: rgba(163, 176, 135, 0.05);
+    border-top: 1px solid rgba(163, 176, 135, 0.2);
+  }
+
+  .footer-info h5 {
+    color: var(--text-dark);
+    margin-bottom: 1rem;
+    font-size: 1rem;
+  }
+
+  .footer-info ul {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 0.75rem;
+  }
+
+  .footer-info li {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.5rem;
+    font-size: 0.9rem;
+    color: var(--text-light);
+  }
+
+  .footer-info li i {
+    color: var(--accent-green);
+    margin-top: 0.25rem;
+  }
+
+  .footer-info strong {
+    color: var(--text-dark);
+  }
+
+  /* Loading States */
+  .loading-spinner-large {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 3rem;
+  }
+  
+  .loading-spinner-large i {
+    font-size: 3rem;
+    color: var(--accent-green);
+    margin-bottom: 1rem;
+    animation: spin 1s linear infinite;
+  }
+  
+  @keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+  }
+  
+  /* Toast Notifications */
+  .alert-toast {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    z-index: 9999;
+    min-width: 300px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    animation: slideInRight 0.3s ease;
+  }
+  
+  @keyframes slideInRight {
+    from {
+      transform: translateX(100%);
+      opacity: 0;
+    }
+    to {
+      transform: translateX(0);
+      opacity: 1;
+    }
+  }
+  
+  /* Modal Customization */
+  .modal-content {
+    border-radius: 16px !important;
+    border: 2px solid var(--primary-dark) !important;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2) !important;
+  }
+  
+  .modal-header {
+    background: var(--primary-dark);
+    color: white;
+    border-bottom: 2px solid var(--accent-green);
+    border-radius: 14px 14px 0 0 !important;
+    padding: 1.5rem !important;
+  }
+  
+  .modal-title {
+    color: white !important;
+    font-weight: 600 !important;
+  }
+  
+  .modal-title i {
+    color: var(--accent-yellow);
+  }
+  
+  .modal-body {
+    padding: 1.5rem !important;
+    background: #f8f9fa !important;
+  }
+  
+  .modal-footer {
+    background: #f8f9fa !important;
+    border-top: 1px solid rgba(163, 176, 135, 0.2) !important;
+    border-radius: 0 0 14px 14px !important;
+    padding: 1rem 1.5rem !important;
+  }
+
+  /* Responsive Design */
+  @media (max-width: 1200px) {
+    .layout-container {
+      flex-direction: column;
+    }
+    
+    .sidebar {
+      width: 100%;
+      margin: 0;
+      border-radius: 0;
+      position: relative;
+      top: 0;
+      min-height: auto;
+    }
+
+    .stats-section {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  @media (max-width: 992px) {
+    .insights-section {
+      grid-template-columns: 1fr;
+    }
+    
+    .stats-grid {
+      grid-template-columns: 1fr 1fr;
+    }
+  }
+
+  @media (max-width: 768px) {
+    .main-content {
+      padding: 1rem;
+    }
+
+    .page-header {
+      padding: 1.5rem;
+      border: 2px solid black;
+    }
+
+    .page-title {
+      font-size: 1.5rem;
+    }
+
+    .card-content {
+      padding: 1rem;
+    }
+
+    .stats-grid {
+      grid-template-columns: 1fr;
+    }
+
+    .footer-info ul {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  @media (max-width: 576px) {
+    .sidebar {
+      padding: 1rem;
+    }
+    
+    .welcome-title {
+      font-size: 1.25rem;
+    }
+    
+    .card-header {
+      padding: 1rem;
+    }
+    
+    .card-title {
+      font-size: 1.25rem;
+    }
+    
+    .whatsapp-messages-table th,
+    .whatsapp-messages-table td {
+      padding: 0.5rem;
+      font-size: 0.8rem;
+    }
+  }
+</style>
+
+<!-- LOAD JQUERY, BOOTSTRAP, CHART.JS AND OTHER DEPENDENCIES -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+
+<script>
+// Global variables
+let hourChart = null;
+let statusChart = null;
+let refreshInterval = null;
+let currentPage = 1;
+let currentFilters = {};
+
+$(document).ready(function() {
+  // Initialize tooltips
+  $('[data-bs-toggle="tooltip"]').tooltip();
+  
+  // Initialize charts with server-side data
+  initializeCharts();
+  
+  // Initialize status badges
+  initializeStatusBadges();
+  
+  // Set up auto-refresh every 30 seconds
+  refreshInterval = setInterval(loadRealTimeData, 30000);
+  
+  // Event Listeners - Updated for AJAX
+  $('#refreshAnalyticsBtn').on('click', function() {
+    loadAllData();
+    showToast('Data refreshed successfully', 'success');
+  });
+  
+  $('#exportAnalyticsBtn').on('click', exportAnalyticsData);
+  
+  $('#getInsightsBtn').on('click', getInsights);
+  
+  // Apply filters button - AJAX version
+  $('#applyFiltersBtn').on('click', function() {
+    currentPage = 1;
+    loadAllData();
+  });
+  
+  $('#sendTestMessageBtn').on('click', function() {
+    $('#testMessageModal').modal('show');
+  });
+  
+  $('#sendTestNowBtn').on('click', sendTestMessage);
+  
+  // Search input with debounce - AJAX version
+  $('#searchInputAnalytics').on('input', debounce(function() {
+    currentPage = 1;
+    loadAllData();
+  }, 500));
+  
+  // Filter changes - AJAX version
+  $('#dateFilterAnalytics, #mppFilterAnalytics, #statusFilterAnalytics, #itemsPerPageAnalytics').on('change', function() {
+    currentPage = 1;
+    loadAllData();
+  });
+  
+  // Load initial real-time data
+  loadRealTimeData();
+  
+  // Clean up interval on page unload
+  $(window).on('beforeunload', function() {
+    if (refreshInterval) {
+      clearInterval(refreshInterval);
+    }
+  });
+});
+
+// Initialize charts with server-side data
+function initializeCharts() {
+  // Read by Hour Chart
+  const hourCtx = document.getElementById('hourChart').getContext('2d');
+  const hourData = {{ read_by_hour|safe }};
+  
+  // Prepare hour data
+  const hours = Array.from({length: 24}, (_, i) => i);
+  const hourCounts = hours.map(hour => {
+    const found = hourData.find(item => item.hour === hour);
+    return found ? found.count : 0;
+  });
+  
+  hourChart = new Chart(hourCtx, {
+    type: 'bar',
+    data: {
+      labels: hours.map(h => h + ':00'),
+      datasets: [{
+        label: 'Messages Read',
+        data: hourCounts,
+        backgroundColor: 'rgba(163, 176, 135, 0.7)',
+        borderColor: 'rgb(163, 176, 135)',
+        borderWidth: 1,
+        borderRadius: 4,
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: {
+          display: false
+        },
+        tooltip: {
+          callbacks: {
+            label: function(context) {
+              return `${context.parsed.y} messages read`;
+            }
+          }
+        }
+      },
+      scales: {
+        y: {
+          beginAtZero: true,
+          title: {
+            display: true,
+            text: 'Messages Read',
+            color: 'var(--text-dark)'
+          },
+          grid: {
+            color: 'rgba(0, 0, 0, 0.05)'
+          }
+        },
+        x: {
+          title: {
+            display: true,
+            text: 'Hour of Day',
+            color: 'var(--text-dark)'
+          },
+          grid: {
+            display: false
+          }
+        }
+      }
+    }
+  });
+  
+  // Status Distribution Chart
+  const statusCtx = document.getElementById('statusChart').getContext('2d');
+  const statusData = {{ status_distribution|safe }};
+  
+  const statusLabels = statusData.map(item => {
+    const status = item.status;
+    const count = item.count;
+    return `${status} (${count})`;
+  });
+  
+  const statusCounts = statusData.map(item => item.count);
+  
+  const statusColors = {
+    'READ': 'rgba(40, 167, 69, 0.7)',
+    'DELIVERED': 'rgba(0, 123, 255, 0.7)',
+    'SENT': 'rgba(255, 193, 7, 0.7)',
+    'FAILED': 'rgba(220, 53, 69, 0.7)',
+    'NOT_REGISTERED': 'rgba(108, 117, 125, 0.7)',
+    'PENDING': 'rgba(111, 66, 193, 0.7)'
+  };
+  
+  const backgroundColors = statusData.map(item => statusColors[item.status] || 'rgba(0, 0, 0, 0.1)');
+  
+  statusChart = new Chart(statusCtx, {
+    type: 'doughnut',
+    data: {
+      labels: statusLabels,
+      datasets: [{
+        data: statusCounts,
+        backgroundColor: backgroundColors,
+        borderWidth: 1,
+        borderColor: 'white'
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: {
+          position: 'right',
+          labels: {
+            boxWidth: 12,
+            padding: 15,
+            font: {
+              size: 11
+            }
+          }
+        },
+        tooltip: {
+          callbacks: {
+            label: function(context) {
+              const total = context.dataset.data.reduce((a, b) => a + b, 0);
+              const percentage = Math.round((context.parsed / total) * 100);
+              return `${context.label}: ${context.parsed} (${percentage}%)`;
+            }
+          }
+        }
+      },
+      cutout: '60%'
+    }
+  });
+}
+
+function initializeStatusBadges() {
+  // Add appropriate classes to status badges based on their text
+  $('.status-badge').each(function() {
+    const text = $(this).text().toLowerCase();
+    let statusClass = 'status-';
+    
+    if (text.includes('delivered')) {
+      statusClass += 'delivered';
+    } else if (text.includes('read')) {
+      statusClass += 'read';
+    } else if (text.includes('failed') || text.includes('error')) {
+      statusClass += 'failed';
+    } else if (text.includes('sent')) {
+      statusClass += 'sent';
+    } else if (text.includes('queued')) {
+      statusClass += 'queued';
+    } else if (text.includes('not_registered')) {
+      statusClass += 'not_registered';
+    } else {
+      statusClass += text.replace(/[^a-z0-9]/g, '-');
+    }
+    
+    $(this).addClass(statusClass);
+  });
+}
+
+// Main AJAX function to load all data
+function loadAllData() {
+  // Show loading state
+  showLoadingState(true);
+  
+  // Get current filters
+  const filters = {
+    date_filter: $('#dateFilterAnalytics').val(),
+    mpp: $('#mppFilterAnalytics').val(),
+    status: $('#statusFilterAnalytics').val(),
+    search: $('#searchInputAnalytics').val(),
+    page: currentPage,
+    page_size: $('#itemsPerPageAnalytics').val()
+  };
+  
+  // Save current filters
+  currentFilters = filters;
+  
+  // Load data via AJAX
+  axios.get('{% url "whatsapp_analytics_data_api" %}', { params: filters })
+    .then(response => {
+      const data = response.data;
+      
+      if (data.success) {
+        // Update stats summary
+        updateStatsSummary(data.stats);
+        
+        // Update charts
+        updateCharts(data.chart_data);
+        
+        // Update insights
+        updateInsights(data.insights);
+        
+        // Update messages table
+        updateMessagesTable(data.messages, data.stats);
+        
+        // Update pagination
+        updatePagination(data);
+        
+        // Update table info
+        $('#tableInfo').text(`Showing ${data.start_index || 0}-${data.end_index || 0} of ${data.total_count || 0} messages`);
+        
+        // Re-initialize status badges
+        setTimeout(initializeStatusBadges, 100);
+      } else {
+        showToast('Error loading data: ' + (data.message || 'Unknown error'), 'error');
+      }
+      
+      showLoadingState(false);
+    })
+    .catch(error => {
+      console.error('Error loading data:', error);
+      showToast('Error loading data: ' + error.message, 'error');
+      showLoadingState(false);
+    });
+}
+
+function loadRealTimeData() {
+  const dateFilter = $('#dateFilterAnalytics').val();
+  
+  axios.get(`{% url 'whatsapp_analytics_api' %}?date_filter=${dateFilter}`)
+    .then(response => {
+      const data = response.data;
+      
+      // Update today's reads in sidebar
+      $('#todayReads').text(data.today_reads);
+      
+      // Update recently active section
+      updateRecentlyActive(data.recent_active);
+      
+    })
+    .catch(error => {
+      console.error('Error loading real-time data:', error);
+    });
+}
+
+function updateStatsSummary(stats) {
+  $('#totalMessagesCount').text(stats.total_messages || '0');
+  $('#deliveredMessagesCount').text(stats.delivered_messages || '0');
+  $('#readMessagesCount').text(stats.read_messages || '0');
+  $('#readRatePercent').text((stats.read_rate || '0') + '%');
+}
+
+function updateCharts(chartData) {
+  if (!chartData) return;
+  
+  // Update hour chart
+  if (chartData.read_by_hour && hourChart) {
+    const hourData = chartData.read_by_hour;
+    const hours = Array.from({length: 24}, (_, i) => i);
+    const hourCounts = hours.map(hour => {
+      const found = hourData.find(item => item.hour === hour);
+      return found ? found.count : 0;
+    });
+    
+    hourChart.data.datasets[0].data = hourCounts;
+    hourChart.update();
+  }
+  
+  // Update status chart
+  if (chartData.status_distribution && statusChart) {
+    const statusData = chartData.status_distribution;
+    const statusLabels = statusData.map(item => `${item.status} (${item.count})`);
+    const statusCounts = statusData.map(item => item.count);
+    
+    // Update status colors
+    const statusColors = {
+      'READ': 'rgba(40, 167, 69, 0.7)',
+      'DELIVERED': 'rgba(0, 123, 255, 0.7)',
+      'SENT': 'rgba(255, 193, 7, 0.7)',
+      'FAILED': 'rgba(220, 53, 69, 0.7)',
+      'NOT_REGISTERED': 'rgba(108, 117, 125, 0.7)',
+      'PENDING': 'rgba(111, 66, 193, 0.7)'
+    };
+    
+    const backgroundColors = statusData.map(item => statusColors[item.status] || 'rgba(0, 0, 0, 0.1)');
+    
+    statusChart.data.labels = statusLabels;
+    statusChart.data.datasets[0].data = statusCounts;
+    statusChart.data.datasets[0].backgroundColor = backgroundColors;
+    statusChart.update();
+  }
+}
+
+function updateInsights(insights) {
+  if (!insights) return;
+  
+  // Update top readers
+  let topReadersHtml = '';
+  if (insights.top_mpps && insights.top_mpps.length > 0) {
+    insights.top_mpps.forEach(reader => {
+      topReadersHtml += `
+        <tr>
+          <td>
+            <a href="{% url 'whatsapp_message_detail' %}?mpp=${encodeURIComponent(reader.mpp_name)}" 
+               class="mpp-link">
+              ${escapeHtml(reader.mpp_name)}
+            </a>
+          </td>
+          <td class="text-center">${reader.read_count}</td>
+          <td class="text-center">
+            ${reader.avg_time_to_read ? parseFloat(reader.avg_time_to_read).toFixed(1) + ' min' : 'N/A'}
+          </td>
+          <td class="text-center">
+            ${reader.last_read ? new Date(reader.last_read).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : 'N/A'}
+          </td>
+        </tr>
+      `;
+    });
+  } else {
+    topReadersHtml = `
+      <tr>
+        <td colspan="4" class="text-center text-muted py-3">
+          No data available
+        </td>
+      </tr>
+    `;
+  }
+  $('#topReadersContent').html(`
+    <table class="insight-table">
+      <thead>
+        <tr>
+          <th>MPP Name</th>
+          <th>Reads</th>
+          <th>Avg Time</th>
+          <th>Last Read</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${topReadersHtml}
+      </tbody>
+    </table>
+  `);
+  
+  // Update never read
+  let neverReadHtml = '';
+  if (insights.never_read && insights.never_read.length > 0) {
+    insights.never_read.forEach(item => {
+      neverReadHtml += `
+        <tr>
+          <td>
+            <a href="{% url 'whatsapp_message_detail' %}?mobile=${item.mobile_number}" 
+               class="mobile-link">
+              ${item.mobile_number}
+            </a>
+          </td>
+          <td>${escapeHtml(item.mpp_name || 'Unknown')}</td>
+          <td class="text-center">
+            ${item.delivered_at ? formatTimeAgo(item.delivered_at) : 'N/A'}
+          </td>
+          <td class="text-center">
+            <button onclick="callNumber('${item.mobile_number}')" 
+                    class="btn-action btn-call">
+              <i class="fas fa-phone"></i>
+            </button>
+          </td>
+        </tr>
+      `;
+    });
+  } else {
+    neverReadHtml = `
+      <tr>
+        <td colspan="4" class="text-center text-success py-3">
+          <i class="fas fa-check-circle"></i> All messages have been read!
+        </td>
+      </tr>
+    `;
+  }
+  $('#neverReadContent').html(`
+    <table class="insight-table">
+      <thead>
+        <tr>
+          <th>Mobile</th>
+          <th>MPP</th>
+          <th>Delivered</th>
+          <th>Action</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${neverReadHtml}
+      </tbody>
+    </table>
+  `);
+}
+
+function updateMessagesTable(messages, stats) {
+  const tableBody = $('#messagesTableBody');
+  
+  if (!messages || messages.length === 0) {
+    tableBody.html(`
+      <tr>
+        <td colspan="8" class="text-center py-4 text-muted">
+          <i class="fas fa-inbox fa-2x mb-2"></i><br>
+          No messages found
+        </td>
+      </tr>
+    `);
+    return;
+  }
+  
+  let html = '';
+  messages.forEach(msg => {
+    const statusClass = getStatusClass(msg.status);
+    
+    html += `
+      <tr>
+        <td>${formatTime(msg.created_at)}</td>
+        <td class="mobile-cell">${escapeHtml(msg.mobile_number)}</td>
+        <td>
+          ${msg.mpp_name ? `
+          <a href="{% url 'whatsapp_message_detail' %}?mpp=${encodeURIComponent(msg.mpp_name)}" 
+             class="mpp-link">
+            ${escapeHtml(msg.mpp_name)}
+          </a>
+          ` : '<span class="text-muted">-</span>'}
+        </td>
+        <td class="message-cell" title="${escapeHtml(msg.message)}">
+          ${escapeHtml(truncateText(msg.message, 50))}
+        </td>
+        <td>
+          <span class="status-badge status-${statusClass}">
+            ${msg.status}
+          </span>
+        </td>
+        <td>
+          ${msg.sent_at ? formatTime(msg.sent_at) : '<span class="text-muted">-</span>'}
+        </td>
+        <td>
+          ${msg.read_at ? `<span class="text-success">${formatTime(msg.read_at)}</span>` : '<span class="text-muted">-</span>'}
+        </td>
+        <td>
+          ${msg.sent_at && msg.read_at ? calculateTimeDiff(msg.sent_at, msg.read_at) : '<span class="text-muted">-</span>'}
+        </td>
+      </tr>
+    `;
+  });
+  
+  tableBody.html(html);
+}
+
+function updatePagination(data) {
+  const totalPages = data.total_pages || 1;
+  
+  if (totalPages <= 1) {
+    $('#paginationContainer').hide();
+    return;
+  }
+  
+  $('#paginationContainer').show();
+  
+  // Update pagination info
+  $('.pagination-info').text(`Page ${currentPage} of ${totalPages}`);
+  
+  // Update pagination controls
+  let paginationHtml = '';
+  
+  // Previous button
+  if (currentPage > 1) {
+    paginationHtml += `
+      <button class="btn-pagination" onclick="goToPage(${currentPage - 1})">
+        <i class="fas fa-chevron-left"></i>
+      </button>
+    `;
+  } else {
+    paginationHtml += `
+      <span class="btn-pagination disabled">
+        <i class="fas fa-chevron-left"></i>
+      </span>
+    `;
+  }
+  
+  // Page numbers
+  const visiblePages = 5;
+  let startPage = Math.max(1, currentPage - Math.floor(visiblePages / 2));
+  let endPage = Math.min(totalPages, startPage + visiblePages - 1);
+  
+  // Adjust if we're near the end
+  if (endPage - startPage + 1 < visiblePages) {
+    startPage = Math.max(1, endPage - visiblePages + 1);
+  }
+  
+  // First page
+  if (startPage > 1) {
+    paginationHtml += `
+      <button class="btn-pagination" onclick="goToPage(1)">1</button>
+      ${startPage > 2 ? '<span class="mx-1">...</span>' : ''}
+    `;
+  }
+  
+  // Page numbers
+  for (let i = startPage; i <= endPage; i++) {
+    if (i === currentPage) {
+      paginationHtml += `
+        <span class="btn-pagination active">${i}</span>
+      `;
+    } else {
+      paginationHtml += `
+        <button class="btn-pagination" onclick="goToPage(${i})">${i}</button>
+      `;
+    }
+  }
+  
+  // Last page
+  if (endPage < totalPages) {
+    paginationHtml += `
+      ${endPage < totalPages - 1 ? '<span class="mx-1">...</span>' : ''}
+      <button class="btn-pagination" onclick="goToPage(${totalPages})">${totalPages}</button>
+    `;
+  }
+  
+  // Next button
+  if (currentPage < totalPages) {
+    paginationHtml += `
+      <button class="btn-pagination" onclick="goToPage(${currentPage + 1})">
+        <i class="fas fa-chevron-right"></i>
+      </button>
+    `;
+  } else {
+    paginationHtml += `
+      <span class="btn-pagination disabled">
+        <i class="fas fa-chevron-right"></i>
+      </span>
+    `;
+  }
+  
+  $('.pagination-controls').html(paginationHtml);
+}
+
+function goToPage(page) {
+  currentPage = page;
+  loadAllData();
+  
+  // Scroll to table section
+  $('html, body').animate({
+    scrollTop: $('.table-section').offset().top - 100
+  }, 300);
+}
+
+function updateRecentlyActive(recentActive) {
+  const container = $('.recent-active-section');
+  if (!container.length && recentActive && recentActive.length > 0) {
+    // Create section if it doesn't exist
+    const insightsSection = $('.insights-section');
+    if (insightsSection.length) {
+      insightsSection.before(`
+        <div class="recent-active-section">
+          <div class="section-header">
+            <h3><i class="fas fa-bolt"></i> Recently Active (Last Hour)</h3>
+            <p>MPPs who read messages recently</p>
+          </div>
+          <div class="reactive-grid" id="recentActiveGrid"></div>
+        </div>
+      `);
+    }
+  }
+  
+  const grid = $('#recentActiveGrid');
+  if (!grid.length) return;
+  
+  if (!recentActive || recentActive.length === 0) {
+    grid.html(`
+      <div class="col-12 text-center py-4 text-muted">
+        <i class="fas fa-inbox fa-2x mb-2"></i><br>
+        No recent activity
+      </div>
+    `);
+    return;
+  }
+  
+  let html = '';
+  recentActive.forEach(mpp => {
+    html += `
+      <div class="reactive-card">
+        <h4 title="${mpp.mpp_name}">${truncateText(mpp.mpp_name, 20)}</h4>
+        <p class="mobile-number">${mpp.mobile_number}</p>
+        <div class="reactive-time">
+          <i class="fas fa-clock me-1"></i>${mpp.time_ago}
+        </div>
+        <div class="reactive-count">
+          <small>${mpp.read_count} read${mpp.read_count !== 1 ? 's' : ''}</small>
+        </div>
+      </div>
+    `;
+  });
+  
+  grid.html(html);
+}
+
+function exportAnalyticsData() {
+  const dateFilter = $('#dateFilterAnalytics').val();
+  const mppFilter = $('#mppFilterAnalytics').val();
+  const statusFilter = $('#statusFilterAnalytics').val();
+  const search = $('#searchInputAnalytics').val();
+  const pageSize = $('#itemsPerPageAnalytics').val();  // Add this
+
+  
+  let url = `{% url 'whatsapp_export_data' %}?date_filter=${dateFilter}`;
+  
+  if (mppFilter) url += `&mpp=${encodeURIComponent(mppFilter)}`;
+  if (statusFilter) url += `&status=${statusFilter}`;
+  if (search) url += `&search=${encodeURIComponent(search)}`;
+  if (pageSize && pageSize !== '10') url += `&page_size=${pageSize}`;  // Add this
+  
+  // Open in new tab for download
+  window.open(url, '_blank');
+}
+
+function getInsights() {
+  const dateFilter = $('#dateFilterAnalytics').val();
+  
+  $('#insightsModal').modal('show');
+  
+  // Show loading in modal
+  $('#insightsContent').html(`
+    <div class="loading-spinner-large">
+      <i class="fas fa-spinner fa-spin"></i>
+      <p>Analyzing data and generating insights...</p>
+    </div>
+  `);
+  
+  axios.get(`{% url 'whatsapp_get_insights' %}?date_filter=${dateFilter}`)
+    .then(response => {
+      const data = response.data;
+      
+      if (data.success) {
+        let html = `
+          <div class="insights-summary">
+            <div class="insight-card-large mb-4">
+              <div class="insight-header-large">
+                <h4><i class="fas fa-chart-line"></i> Performance Summary</h4>
+              </div>
+              <div class="insight-body-large">
+                <div class="row">
+                  <div class="col-md-6">
+                    <div class="insight-stat">
+                      <span class="insight-stat-value">${data.insights.overall_read_rate}%</span>
+                      <span class="insight-stat-label">Overall Read Rate</span>
+                    </div>
+                  </div>
+                  <div class="col-md-6">
+                    <div class="insight-stat">
+                      <span class="insight-stat-value">${data.insights.avg_read_time_minutes} min</span>
+                      <span class="insight-stat-label">Average Read Time</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            
+            <div class="insight-card-large mb-4">
+              <div class="insight-header-large">
+                <h4><i class="fas fa-clock"></i> Best Sending Times</h4>
+              </div>
+              <div class="insight-body-large">
+                <ul class="insight-list">
+        `;
+        
+        data.insights.best_sending_hours.forEach(hour => {
+          html += `<li><i class="fas fa-check-circle text-success"></i> ${hour}</li>`;
+        });
+        
+        html += `
+                </ul>
+              </div>
+            </div>
+            
+            <div class="insight-card-large mb-4">
+              <div class="insight-header-large">
+                <h4><i class="fas fa-lightbulb"></i> Recommendations</h4>
+              </div>
+              <div class="insight-body-large">
+                <ul class="insight-list">
+        `;
+        
+        data.insights.recommendations.forEach(rec => {
+          html += `<li><i class="fas fa-bullseye"></i> ${rec}</li>`;
+        });
+        
+        html += `
+                </ul>
+              </div>
+            </div>
+        `;
+        
+        if (data.problematic_mpps && data.problematic_mpps.length > 0) {
+          html += `
+            <div class="insight-card-large">
+              <div class="insight-header-large">
+                <h4><i class="fas fa-exclamation-triangle"></i> MPPs Needing Follow-up (${data.problematic_mpps.length})</h4>
+              </div>
+              <div class="insight-body-large">
+                <div class="table-responsive">
+                  <table class="table table-sm">
+                    <thead>
+                      <tr>
+                        <th>MPP Name</th>
+                        <th>Mobile</th>
+                        <th>Unread Messages</th>
+                        <th>Last Delivered</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+          `;
+          
+          data.problematic_mpps.forEach(mpp => {
+            const lastDelivered = new Date(mpp.last_delivered).toLocaleDateString();
+            html += `
+              <tr>
+                <td>${mpp.mpp_name || 'Unknown'}</td>
+                <td>${mpp.mobile_number}</td>
+                <td>${mpp.count}</td>
+                <td>${lastDelivered}</td>
+              </tr>
+            `;
+          });
+          
+          html += `
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          `;
+        }
+        
+        $('#insightsContent').html(html);
+      }
+    })
+    .catch(error => {
+      console.error('Insights error:', error);
+      $('#insightsContent').html(`
+        <div class="alert alert-danger">
+          <i class="fas fa-exclamation-triangle"></i> Failed to load insights: ${error.message}
+        </div>
+      `);
+    });
+}
+
+function sendTestMessage() {
+  const mobileNumber = $('#testMobileNumber').val().trim();
+  const message = $('#testMessage').val().trim();
+  
+  if (!mobileNumber || !/^\d{10}$/.test(mobileNumber)) {
+    showToast('Please enter a valid 10-digit mobile number', 'error');
+    return;
+  }
+  
+  if (!message) {
+    showToast('Please enter a message', 'error');
+    return;
+  }
+  
+  $('#sendTestNowBtn').prop('disabled', true).html('<i class="fas fa-spinner fa-spin"></i> Sending...');
+  
+  axios.post('{% url "whatsapp_send_test_message" %}', {
+    mobile_number: mobileNumber,
+    message: message
+  }, {
+    headers: {
+      'X-CSRFToken': getCookie('csrftoken'),
+      'Content-Type': 'application/json'
+    }
+  })
+  .then(response => {
+    $('#sendTestNowBtn').prop('disabled', false).html('<i class="fas fa-paper-plane"></i> Send Test Message');
+    
+    if (response.data.success) {
+      showToast('Test message sent successfully!', 'success');
+      $('#testMessageModal').modal('hide');
+      $('#testMobileNumber').val('');
+      
+      // Refresh data after a short delay
+      setTimeout(loadAllData, 2000);
+    } else {
+      showToast('Failed to send message: ' + response.data.message, 'error');
+    }
+  })
+  .catch(error => {
+    $('#sendTestNowBtn').prop('disabled', false).html('<i class="fas fa-paper-plane"></i> Send Test Message');
+    console.error('Send test message error:', error);
+    showToast('Error sending message: ' + error.message, 'error');
+  });
+}
+
+// Utility Functions
+function getStatusClass(status) {
+  if (!status) return '';
+  status = status.toLowerCase();
+  
+  if (status.includes('delivered')) return 'delivered';
+  if (status.includes('read')) return 'read';
+  if (status.includes('failed') || status.includes('error')) return 'failed';
+  if (status.includes('sent')) return 'sent';
+  if (status.includes('not_registered')) return 'not_registered';
+  return status.replace(/[^a-z0-9]/g, '-');
+}
+
+function formatTime(dateTimeString) {
+  if (!dateTimeString) return '-';
+  try {
+    const date = new Date(dateTimeString);
+    if (isNaN(date.getTime())) return '-';
+    return date.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+  } catch (e) {
+    return '-';
+  }
+}
+
+function formatTimeAgo(dateTimeString) {
+  if (!dateTimeString) return '-';
+  try {
+    const date = new Date(dateTimeString);
+    if (isNaN(date.getTime())) return '-';
+    
+    const now = new Date();
+    const diffMs = now - date;
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMins / 60);
+    const diffDays = Math.floor(diffHours / 24);
+    
+    if (diffDays > 0) return `${diffDays}d ago`;
+    if (diffHours > 0) return `${diffHours}h ago`;
+    if (diffMins > 0) return `${diffMins}m ago`;
+    return 'Just now';
+  } catch (e) {
+    return '-';
+  }
+}
+
+function calculateTimeDiff(startTime, endTime) {
+  try {
+    const start = new Date(startTime);
+    const end = new Date(endTime);
+    
+    if (isNaN(start.getTime()) || isNaN(end.getTime())) return '-';
+    
+    const diffMs = end - start;
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMins / 60);
+    
+    if (diffHours > 0) {
+      return `${diffHours}h ${diffMins % 60}m`;
+    } else if (diffMins > 0) {
+      return `${diffMins}m`;
+    } else {
+      const diffSecs = Math.floor(diffMs / 1000);
+      return `${diffSecs}s`;
+    }
+  } catch (e) {
+    return '-';
+  }
+}
+
+function showLoadingState(show) {
+  if (show) {
+    // Add loading overlay
+    if (!$('#loadingOverlay').length) {
+      $('body').append(`
+        <div id="loadingOverlay" style="
+          position: fixed;
+          top: 0;
+          left: 0;
+          width: 100%;
+          height: 100%;
+          background: rgba(255,255,255,0.8);
+          z-index: 9998;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+        ">
+          <div class="loading-spinner-large">
+            <i class="fas fa-spinner fa-spin"></i>
+            <p>Loading data...</p>
+          </div>
+        </div>
+      `);
+    }
+  } else {
+    $('#loadingOverlay').remove();
+  }
+}
+
+function truncateText(text, maxLength) {
+  if (!text) return '';
+  if (text.length <= maxLength) return text;
+  return text.substring(0, maxLength) + '...';
+}
+
+function escapeHtml(text) {
+  if (!text) return '';
+  const div = document.createElement('div');
+  div.textContent = text;
+  return div.innerHTML;
+}
+
+function showToast(message, type = 'info') {
+  $('.alert-toast').remove();
+  
+  const icon = type === 'success' ? 'check-circle' : 
+               type === 'error' ? 'exclamation-triangle' : 
+               type === 'warning' ? 'exclamation-circle' : 'info-circle';
+  
+  const bgColor = type === 'success' ? 'success' : 
+                  type === 'error' ? 'danger' : 
+                  type === 'warning' ? 'warning' : 'info';
+  
+  const toast = $(`
+    <div class="alert alert-${bgColor} alert-dismissible fade show alert-toast" role="alert">
+      <div class="d-flex align-items-center">
+        <i class="fas fa-${icon} me-2"></i>
+        <span>${message}</span>
+      </div>
+      <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>
+  `);
+  
+  $('body').append(toast);
+  
+  // Auto remove after 5 seconds
+  setTimeout(() => {
+    toast.alert('close');
+  }, 5000);
+}
+
+function callNumber(phoneNumber) {
+  if (confirm(`Call ${phoneNumber} for follow-up?`)) {
+    window.location.href = `tel:${phoneNumber}`;
+  }
+}
+
+function debounce(func, wait) {
+  let timeout;
+  return function executedFunction(...args) {
+    const later = () => {
+      clearTimeout(timeout);
+      func(...args);
+    };
+    clearTimeout(timeout);
+    timeout = setTimeout(later, wait);
+  };
+}
+
+function getCookie(name) {
+  let cookieValue = null;
+  if (document.cookie && document.cookie !== '') {
+    const cookies = document.cookie.split(';');
+    for (let i = 0; i < cookies.length; i++) {
+      const cookie = cookies[i].trim();
+      if (cookie.substring(0, name.length + 1) === (name + '=')) {
+        cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+        break;
+      }
+    }
+  }
+  return cookieValue;
+}
+
+console.log("✅ WhatsApp Analytics Dashboard initialized successfully");
+</script>
+
+{% endblock %}

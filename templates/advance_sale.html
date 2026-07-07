@@ -1,0 +1,2361 @@
+{% extends "base.html" %}
+{% block content %}
+
+<div class="layout-container">
+  <!-- Sidebar -->
+  <aside class="sidebar">
+    <div class="sidebar-content">
+      <!-- User Welcome Section -->
+      <div class="user-welcome">
+        <div class="welcome-header">
+          <h1 class="welcome-title">
+            Hello!
+            <span class="shake-emoji">👋</span>
+          </h1>
+          <p class="user-name">{{request.user.first_name}} {{request.user.last_name}}</p>
+        </div>
+      </div>
+
+      <!-- Quick Actions -->
+      <div class="quick-actions">
+        <a href="{% url 'view-requests' %}" class="action-btn" style="text-decoration: none;">
+          <i class="fas fa-pencil-square"></i>
+          View Your Indents
+        </a>
+
+        <a href="{% url 'view_inventory' %}" class="action-btn" style="text-decoration: none;">
+          <i class="fas fa-cube"></i>
+          View Inventory
+        </a>
+        
+        <a href="{% url 'dispatch_notifications' %}" class="action-btn" style="text-decoration: none;">
+          <i class="fas fa-bell"></i>
+          Dispatch Notifications
+        </a>
+        <a href="{% url 'export_excel_view' %}" class="action-btn" style="text-decoration: none;">
+          <i class="fas fa-download"></i>
+          Download Excel
+        </a>
+        <a href="{% url 'view_others_inventory' %}" class="action-btn" style="text-decoration: none;">
+          <i class="fas fa-window-restore"></i>
+          View Other's Inventory
+        </a>
+
+        <a href="{% url 'view_advance_sales' %}" class="action-btn" style="text-decoration: none;">
+          <i class="fas fa-cash-register"></i>
+          View Dispatch Sheet (Advance Sale)
+        </a>
+      </div>
+
+      <!-- Information Section -->
+      <div class="info-section">
+        <h3 class="info-title">Quick Info</h3>
+        <div class="info-item">
+          <i class="fas fa-user"></i>
+          <span>Employee Code: {{ request.user.employee_code }}</span>
+        </div>
+        <div class="info-item">
+          <i class="fas fa-building"></i>
+          <span>Department: {{ request.user.department }}</span>
+        </div>
+        <div class="info-item">
+          <i class="fas fa-map-marker-alt"></i>
+          <span>Location: {{ request.user.location }}</span>
+        </div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- Main Content -->
+  <main class="main-content">
+    <!-- Form Header -->
+    <div class="form-header">
+      <h2 class="form-title">
+        <i class="fas fa-cash-register"></i>
+        Create Advanced Sale
+      </h2>
+      <p class="form-subtitle">Select MPP and products (SAP-mapped or INDENT-based) from your location inventory</p>
+    </div>
+
+    {% if error_message %}
+      <div class="alert alert-danger" role="alert">
+        <i class="fas fa-exclamation-triangle"></i>
+        {{ error_message }}
+      </div>
+    {% endif %}
+
+    <!-- Sales Form -->
+    <div class="form-container">
+      <form method="post" id="salesForm" class="sales-form">
+        {% csrf_token %}
+        
+        <!-- General Information -->
+        <div class="form-section">
+          <h3 class="section-title">
+            <i class="fas fa-info-circle"></i>
+            General Information
+          </h3>
+          <div class="info-grid">
+            <div class="info-field">
+              <label class="field-label">Department</label>
+              <input 
+                type="text" 
+                class="form-control" 
+                name="department" 
+                value="{{ request.user.department }}" 
+                readonly 
+                required 
+              />
+            </div>
+            <div class="info-field">
+              <label class="field-label">Employee Name</label>
+              <input 
+                type="text" 
+                class="form-control" 
+                name="employee_name" 
+                value="{{ request.user.first_name }} {{ request.user.last_name }}" 
+                readonly 
+                required 
+              />
+            </div>
+            <div class="info-field">
+              <label class="field-label">Employee Code</label>
+              <input 
+                type="text" 
+                class="form-control" 
+                name="employee_code" 
+                value="{{ request.user.employee_code }}" 
+                readonly 
+                required 
+              />
+            </div>
+            <div class="info-field">
+              <label class="field-label">Location</label>
+              <input 
+                type="text" 
+                class="form-control" 
+                name="location" 
+                value="{{ request.user.location }}" 
+                readonly 
+                required 
+              />
+            </div>
+          </div>
+        </div>
+
+        <!-- MPP Selection Section -->
+        <div class="form-section">
+          <h3 class="section-title">
+            <i class="fas fa-users"></i>
+            MPP Selection
+          </h3>
+          
+          <div class="mpp-selection-container" id="mppSelectionContainer">
+            <!-- Month and Cycle Display -->
+            <div class="current-month-cycle">
+              <div style="display: flex; justify-content: space-between; align-items: center;">
+                <div>
+                  <strong>Current Month:</strong> <span id="currentMonth"></span>
+                </div>
+                <div>
+                  <!-- Update this section to show SAP cycle number -->
+                  <strong>Current Active Cycle:</strong> 
+                  <span id="currentCycle"></span>
+                  {% if current_cycle and current_cycle.sap_number %}
+                    <span id="currentSapCycle" style="margin-left: 0.5rem; color: #A3B087; font-weight: 600;"></span>
+                  {% endif %}
+                </div>
+              </div>
+            </div>
+            
+            <div class="mpp-filters">
+              <div class="filter-group">
+                <label class="filter-label">Search MPP</label>
+                <input type="text" class="form-control" id="mppSearch" placeholder="Search by MPP name, T-code, or code">
+              </div>
+            </div>
+            
+            <div class="mpp-list-container">
+              <div class="mpp-list-header">
+                <h4>Select MPP</h4>
+                <span id="selectedMppCount">0 MPPs selected</span>
+              </div>
+              <div class="mpp-list" id="mppList">
+                <div class="mpp-item" style="justify-content: center; color: #6c757d;">
+                  Loading MPPs...
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- SAP Mapped Product Selection Section -->
+        <div class="form-section">
+          <h3 class="section-title">
+            <i class="fas fa-boxes"></i>
+            Products (SAP-mapped &amp; INDENT)
+          </h3>
+          
+          <div class="selected-mpp-section" id="selectedMppSection" style="display: none;">
+            <h4 class="subsection-title">Selected MPP: <span id="currentMppName"></span></h4>
+            
+            <div class="product-info-banner">
+              <div class="banner-content">
+                <i class="fas fa-info-circle"></i>
+                <span>Showing products available at your location (SAP-mapped &amp; INDENT-based): <strong>{{ request.user.location }}</strong></span>
+              </div>
+            </div>
+            
+            <div class="product-selection-container">
+              <div class="product-filters">
+                <div class="filter-group">
+                  <label class="filter-label">Search SAP Product</label>
+                  <input type="text" class="form-control" id="materialSearch" placeholder="Search by product name or SAP code">
+                </div>
+                <div class="filter-group">
+                  <label class="filter-label">Filter by Stock</label>
+                  <select class="form-control" id="stockFilter">
+                    <option value="all">All Products</option>
+                    <option value="in_stock">In Stock Only</option>
+                    <option value="out_of_stock">Out of Stock</option>
+                  </select>
+                </div>
+              </div>
+              
+              <div class="table-container">
+                <table class="product-table" id="productTable">
+                  <thead>
+                    <tr>
+                      <th>Select</th>
+                      <th>SAP Product Name</th>
+                      <th>SAP Code</th>
+                      <th>Indent Product Name</th>
+                      <th>Available Stock</th>
+                      <th>UOM</th>
+                      <th>Price</th>
+                      <th>Quantity</th>
+                      <th>Total</th>
+                    </tr>
+                  </thead>
+                  <tbody id="productTableBody">
+                    <tr>
+                      <td colspan="9" style="text-align: center; color: #6c757d;">
+                        Select an MPP first to view SAP mapped products
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+                
+                <div class="table-actions">
+                  <button type="button" id="addSelectedProducts" class="btn-add">
+                    <i class="fas fa-plus"></i>
+                    Add Selected SAP Products to Sale
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+          
+          <!-- Sale Summary -->
+          <div class="sale-summary-section" id="saleSummarySection" style="display: none;">
+            <h4 class="subsection-title">Sale Summary - SAP Mapped Products</h4>
+            
+            <div class="summary-container">
+              <div class="summary-header">
+                <h5>MPP: <span id="summaryMppName"></span></h5>
+                <button type="button" class="btn-edit-mpp" id="editMppSelection">
+                  <i class="fas fa-edit"></i>
+                  Change MPP
+                </button>
+              </div>
+              
+              <table class="summary-table" id="summaryTable">
+                <thead>
+                  <tr>
+                    <th>SAP Product Name</th>
+                    <th>SAP Code</th>
+                    <th>Quantity</th>
+                    <th>UOM</th>
+                    <th>Price</th>
+                    <th>Total</th>
+                    <th>Action</th>
+                  </tr>
+                </thead>
+                <tbody id="summaryTableBody">
+                  <!-- Summary rows will be populated dynamically -->
+                </tbody>
+                <tfoot>
+                  <tr>
+                    <td colspan="5" class="total-label">Grand Total</td>
+                    <td class="total-amount" id="grandTotal">₹0.00</td>
+                    <td></td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- Submit Section -->
+        <div class="submit-section">
+          <button type="submit" class="btn-submit" id="submitSaleBtn" disabled>
+            <i class="fas fa-paper-plane"></i>
+            Process Sale
+          </button>
+          <div class="loader" id="loader">
+            <div class="spinner"></div>
+            <span>Processing SAP Sale...</span>
+          </div>
+        </div>
+      </form>
+    </div>
+  </main>
+</div>
+
+<!-- Success Modal -->
+<div class="modal fade" id="successModal" tabindex="-1" aria-labelledby="successModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="successModalLabel">
+          <i class="fas fa-check-circle text-success me-2"></i>
+          SAP Sale Processed Successfully
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body" id="successModalContent">
+        <!-- Success message will be dynamically injected here -->
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+        <a href="#" class="btn btn-primary" id="downloadPdfBtn" target="_blank">
+          <i class="fas fa-download me-2"></i>
+          Download Receipt For Sahayak
+        </a>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Cycle Selection Modal -->
+<div class="modal fade" id="cycleSelectionModal" tabindex="-1" aria-labelledby="cycleSelectionModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="cycleSelectionModalLabel">
+          <i class="fas fa-calendar-alt me-2"></i>
+          Select Sales Cycle
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <div class="alert alert-info">
+          <i class="fas fa-info-circle me-2"></i>
+          Current cycle is automatically selected based on today's date. You can manually select a different cycle if needed.
+        </div>
+        <div class="cycle-list">
+          <table class="table table-hover">
+            <thead>
+              <tr>
+                <th>Cycle Name</th>
+                <th>Date Range</th>
+                <th>Status</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+            <tbody id="cycleSelectionBody">
+              <!-- Cycles will be populated here -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+        <button type="button" class="btn btn-primary" id="confirmCycleSelection">
+          Confirm Selection
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Include Select2 for Dropdowns -->
+<link href="https://cdnjs.cloudflare.com/ajax/libs/select2/4.0.13/css/select2.min.css" rel="stylesheet"/>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/select2/4.0.13/js/select2.min.js"></script>
+
+<style>
+  .layout-container {
+    display: flex;
+    min-height: calc(100vh - 90px);
+    background: white;
+    font-family: 'Lexend', sans-serif;
+    align-items: stretch;
+  }
+
+  .sidebar {
+    width: 320px;
+    background: #313647;
+    color: white;
+    padding: 2rem 1.5rem;
+    box-shadow: 2px 0 10px rgba(0, 0, 0, 0.1);
+    border-radius: 0 20px 20px 0;
+    position: sticky;
+    top: 90px;
+    height: auto;
+    min-height: calc(100vh - 90px);
+    overflow-y: auto;
+    flex-shrink: 0;
+    margin-top: 40px;
+    margin-left: 10px;
+  }
+
+  .sidebar-content {
+    display: flex;
+    flex-direction: column;
+    gap: 2rem;
+    height: 100%;
+  }
+
+  .user-welcome {
+    text-align: center;
+    padding-bottom: 1.5rem;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  }
+
+  .welcome-header h1 {
+    font-size: 1.5rem;
+    font-weight: 600;
+    margin-bottom: 0.5rem;
+    color: #A3B087;
+  }
+
+  .user-name {
+    font-size: 1.1rem;
+    color: #FFF8D4;
+    font-weight: 500;
+  }
+
+  .quick-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+
+  .action-btn {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.75rem 1rem;
+    background: rgba(163, 176, 135, 0.1);
+    color: #FFF8D4;
+    text-decoration: none;
+    border-radius: 8px;
+    transition: all 0.3s ease;
+    border: 1px solid rgba(163, 176, 135, 0.2);
+  }
+
+  .action-btn:hover {
+    background: rgba(163, 176, 135, 0.2);
+    color: white;
+    transform: translateX(5px);
+  }
+
+  .action-btn i {
+    color: #A3B087;
+  }
+
+  .info-section {
+    padding-top: 1rem;
+    flex-grow: 1;
+  }
+
+  .info-title {
+    font-size: 1.1rem;
+    color: #FFF8D4;
+    margin-bottom: 1rem;
+    font-weight: 500;
+  }
+
+  .info-item {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.5rem 0;
+    color: rgba(255, 255, 255, 0.9);
+    font-size: 0.9rem;
+  }
+
+  .info-item i {
+    color: #A3B087;
+    width: 16px;
+  }
+
+  .main-content {
+    flex: 1;
+    background: #ffffff;
+    padding: 2rem;
+    overflow-y: auto;
+    min-height: calc(100vh - 90px);
+    display: flex;
+    flex-direction: column;
+  }
+
+  .form-header {
+    text-align: center;
+    margin-bottom: 2rem;
+    color: #313647;
+    background-color: #A3B087;
+    border-radius: 16px;
+    border: 2px solid black;
+    padding: 20px;
+  }
+
+  .form-title {
+    font-size: 2rem;
+    font-weight: 700;
+    margin-bottom: 0.5rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.75rem;
+  }
+
+  .form-subtitle {
+    font-size: 1rem;
+    color: #435663;
+    font-weight: 400;
+  }
+
+  .form-container {
+    background: #A3B087;
+    border-radius: 16px;
+    border: 2px solid black;
+    padding: 2rem;
+    box-shadow: 0 8px 32px rgba(49, 54, 71, 0.1);
+    flex-grow: 1;
+  }
+
+  .form-section {
+    margin-bottom: 2rem;
+    padding-bottom: 1.5rem;
+    border-bottom: 1px solid #e9ecef;
+  }
+
+  .section-title {
+    font-size: 1.3rem;
+    font-weight: 600;
+    color: #313647;
+    margin-bottom: 1.5rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  .section-title i {
+    color: #293b02;
+  }
+
+  .subsection-title {
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: #435663;
+    margin-bottom: 1rem;
+  }
+
+  .info-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 1rem;
+  }
+
+  .info-field {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .field-label {
+    font-weight: 500;
+    color: #435663;
+    margin-bottom: 0.5rem;
+    font-size: 0.9rem;
+  }
+
+  .mpp-selection-container {
+    background: white;
+    border-radius: 12px;
+    padding: 1.5rem;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  }
+
+  .mpp-filters {
+    display: flex;
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+    flex-wrap: wrap;
+  }
+
+  .filter-group {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-width: 200px;
+  }
+
+  .filter-label {
+    font-weight: 500;
+    color: #435663;
+    margin-bottom: 0.5rem;
+    font-size: 0.9rem;
+  }
+
+  /* T-code badge styling */
+  .t-code-badge {
+    background: rgba(163, 176, 135, 0.2);
+    color: #435663;
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.8rem;
+    font-weight: 500;
+    border: 1px solid rgba(163, 176, 135, 0.3);
+  }
+
+  .mpp-details {
+    display: flex;
+    gap: 1rem;
+    font-size: 0.85rem;
+    color: #6c757d;
+    align-items: center;
+    flex-wrap: wrap;
+  }
+
+  /* SAP Product Info Banner */
+  .product-info-banner {
+    background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%);
+    border: 1px solid #90caf9;
+    border-radius: 8px;
+    padding: 1rem;
+    margin-bottom: 1.5rem;
+  }
+
+  .banner-content {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    color: #1565c0;
+    font-weight: 500;
+  }
+
+  .banner-content i {
+    font-size: 1.2rem;
+  }
+
+  /* Fixed Modal Backdrop Styling */
+  .modal-backdrop {
+    background: linear-gradient(135deg, rgba(49, 54, 71, 0.8) 0%, rgba(67, 86, 99, 0.9) 100%) !important;
+    backdrop-filter: blur(8px);
+    opacity: 1 !important;
+  }
+
+  .modal-backdrop.show {
+    opacity: 1 !important;
+  }
+
+  .modal {
+    backdrop-filter: blur(10px);
+  }
+
+  .modal-content {
+    border-radius: 16px;
+    border: 3px solid #A3B087;
+    box-shadow: 0 20px 60px rgba(49, 54, 71, 0.4);
+    background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%);
+    overflow: hidden;
+  }
+
+  .modal-header {
+    background: linear-gradient(135deg, #A3B087 0%, #8a9975 100%);
+    border-bottom: 3px solid #313647;
+    padding: 1.5rem 2rem;
+  }
+
+  .modal-title {
+    color: #313647;
+    font-weight: 700;
+    font-size: 1.3rem;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+  }
+
+  .modal-body {
+    padding: 2rem;
+    background: white;
+  }
+
+  .modal-footer {
+    border-top: 1px solid #e9ecef;
+    padding: 1.5rem 2rem;
+    background: #f8f9fa;
+  }
+
+  .btn-close {
+    opacity: 0.7;
+    transition: all 0.3s ease;
+  }
+
+  .btn-close:hover {
+    opacity: 1;
+    transform: rotate(90deg);
+  }
+
+  /* Custom button styles for modal */
+  .modal .btn-secondary {
+    background: #6c757d;
+    border: none;
+    border-radius: 8px;
+    padding: 0.75rem 1.5rem;
+    font-weight: 500;
+    transition: all 0.3s ease;
+  }
+
+  .modal .btn-secondary:hover {
+    background: #5a6268;
+    transform: translateY(-2px);
+  }
+
+  .modal .btn-primary {
+    background: linear-gradient(135deg, #313647 0%, #435663 100%);
+    border: none;
+    border-radius: 8px;
+    padding: 0.75rem 1.5rem;
+    font-weight: 500;
+    transition: all 0.3s ease;
+  }
+
+  .modal .btn-primary:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 15px rgba(49, 54, 71, 0.3);
+  }
+
+  /* Success message styling */
+  .success-icon {
+    font-size: 4rem;
+    color: #28a745;
+    margin-bottom: 1rem;
+    animation: bounceIn 0.6s ease-out;
+  }
+
+  @keyframes bounceIn {
+    0% {
+      opacity: 0;
+      transform: scale(0.3);
+    }
+    50% {
+      opacity: 1;
+      transform: scale(1.05);
+    }
+    70% {
+      transform: scale(0.9);
+    }
+    100% {
+      opacity: 1;
+      transform: scale(1);
+    }
+  }
+
+  .success-details {
+    background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+    border-radius: 12px;
+    padding: 1.5rem;
+    border-left: 4px solid #A3B087;
+    margin: 1rem 0;
+  }
+
+  .success-details p {
+    margin: 0.5rem 0;
+    color: #313647;
+    font-weight: 500;
+  }
+
+  .status-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 1rem;
+    border-radius: 20px;
+    font-size: 0.9rem;
+    font-weight: 500;
+    margin: 0.25rem 0;
+  }
+
+  .status-success {
+    background: rgba(40, 167, 69, 0.1);
+    color: #28a745;
+    border: 1px solid rgba(40, 167, 69, 0.2);
+  }
+
+  .status-info {
+    background: rgba(23, 162, 184, 0.1);
+    color: #17a2b8;
+    border: 1px solid rgba(23, 162, 184, 0.2);
+  }
+
+  .status-secondary {
+    background: rgba(108, 117, 125, 0.1);
+    color: #6c757d;
+    border: 1px solid rgba(108, 117, 125, 0.2);
+  }
+
+  .mpp-list-container {
+    border: 1px solid #e9ecef;
+    border-radius: 8px;
+    overflow: hidden;
+  }
+
+  .mpp-list-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1rem;
+    background: #f8f9fa;
+    border-bottom: 1px solid #e9ecef;
+  }
+
+  .mpp-list-header h4 {
+    margin: 0;
+    color: #313647;
+    font-size: 1rem;
+  }
+
+  #selectedMppCount {
+    font-size: 0.9rem;
+    color: #435663;
+    font-weight: 500;
+  }
+
+  .mpp-list {
+    max-height: 300px;
+    overflow-y: auto;
+  }
+
+  .mpp-item {
+    display: flex;
+    align-items: center;
+    padding: 1rem;
+    border-bottom: 1px solid #e9ecef;
+    cursor: pointer;
+    transition: background 0.2s ease;
+  }
+
+  .mpp-item:hover {
+    background: #f8f9fa;
+  }
+
+  .mpp-item.selected {
+    background: rgba(163, 176, 135, 0.1);
+    border-left: 4px solid #A3B087;
+  }
+
+  .mpp-item:last-child {
+    border-bottom: none;
+  }
+
+  .mpp-checkbox {
+    margin-right: 1rem;
+  }
+
+  .mpp-info {
+    flex: 1;
+  }
+
+  .mpp-name {
+    font-weight: 500;
+    color: #313647;
+    margin-bottom: 0.25rem;
+  }
+
+  .selected-mpp-section,
+  .sale-summary-section {
+    background: white;
+    border-radius: 12px;
+    padding: 1.5rem;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    margin-bottom: 1.5rem;
+  }
+
+  .product-filters {
+    display: flex;
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+    flex-wrap: wrap;
+  }
+
+  .summary-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1rem;
+  }
+
+  .btn-edit-mpp {
+    background: #435663;
+    color: white;
+    border: none;
+    border-radius: 6px;
+    padding: 0.5rem 1rem;
+    cursor: pointer;
+    font-size: 0.9rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    transition: all 0.3s ease;
+  }
+
+  .btn-edit-mpp:hover {
+    background: #313647;
+  }
+
+  .table-container {
+    overflow-x: auto;
+  }
+
+  .product-table, .summary-table {
+    width: 100%;
+    border-collapse: collapse;
+    background: white;
+    border-radius: 8px;
+    overflow: hidden;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  }
+
+  .product-table th, .summary-table th {
+    background: #313647;
+    color: white;
+    padding: 1rem;
+    font-weight: 500;
+    text-align: left;
+    font-size: 0.9rem;
+    border-bottom: none;
+  }
+
+  .product-table td, .summary-table td {
+    padding: 1rem;
+    border-bottom: 1px solid #e9ecef;
+    vertical-align: middle;
+  }
+
+  .product-table tr:last-child td, .summary-table tr:last-child td {
+    border-bottom: none;
+  }
+
+  .product-table tr:hover, .summary-table tr:hover {
+    background: #f8f9fa;
+  }
+
+  .summary-table tfoot {
+    background: #f8f9fa;
+    font-weight: 600;
+  }
+
+  .total-label {
+    text-align: right;
+    font-weight: 600;
+    color: #313647;
+  }
+
+  .total-amount {
+    font-weight: 600;
+    color: #435663;
+  }
+
+  .form-control, .form-select {
+    border: 2px solid #e9ecef;
+    border-radius: 8px;
+    padding: 0.75rem;
+    font-size: 0.9rem;
+    transition: all 0.3s ease;
+    font-family: 'Lexend', sans-serif;
+  }
+
+  .form-control:focus, .form-select:focus {
+    outline: none;
+    border-color: #A3B087;
+    box-shadow: 0 0 0 3px rgba(163, 176, 135, 0.1);
+  }
+
+  .btn-remove {
+    background: #EA5B6F;
+    color: white;
+    border: none;
+    border-radius: 6px;
+    padding: 0.5rem;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .btn-remove:hover {
+    background: #D94A5E;
+    transform: scale(1.05);
+  }
+
+  .table-actions {
+    text-align: center;
+    margin-top: 1.5rem;
+  }
+
+  .btn-add {
+    background: #435663;
+    color: white;
+    border: none;
+    border-radius: 8px;
+    padding: 0.75rem 1.5rem;
+    cursor: pointer;
+    font-weight: 500;
+    transition: all 0.3s ease;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  .btn-add:hover {
+    background: #313647;
+    transform: translateY(-2px);
+  }
+
+  .submit-section {
+    text-align: center;
+    padding-top: 1.5rem;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1rem;
+  }
+
+  .btn-submit {
+    background: linear-gradient(135deg, #435663 0%, #313647 100%);
+    color: white;
+    border: none;
+    border-radius: 12px;
+    padding: 1rem 2.5rem;
+    font-size: 1.1rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.75rem;
+    box-shadow: 0 4px 15px rgba(49, 54, 71, 0.3);
+  }
+
+  .btn-submit:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(49, 54, 71, 0.4);
+  }
+
+  .btn-submit:disabled {
+    opacity: 0.7;
+    cursor: not-allowed;
+    transform: none;
+  }
+
+  .loader {
+    display: none;
+    align-items: center;
+    gap: 0.75rem;
+    color: #435663;
+    font-weight: 500;
+  }
+
+  .spinner {
+    width: 20px;
+    height: 20px;
+    border: 2px solid #A3B087;
+    border-top: 2px solid transparent;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+  }
+
+  @keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+  }
+
+  .alert {
+    border-radius: 12px;
+    border: none;
+    padding: 1.25rem 1.5rem;
+    margin-bottom: 1rem;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  }
+
+  .alert-danger {
+    background: linear-gradient(135deg, rgba(234, 91, 111, 0.1) 0%, rgba(234, 91, 111, 0.05) 100%);
+    color: #EA5B6F;
+    border-left: 4px solid #EA5B6F;
+  }
+
+  @keyframes hand-shake {
+    0% { transform: rotate(0deg); }
+    25% { transform: rotate(15deg); }
+    50% { transform: rotate(-10deg); }
+    75% { transform: rotate(15deg); }
+    100% { transform: rotate(0deg); }
+  }
+
+  .shake-emoji {
+    animation: hand-shake 1.5s ease-in-out infinite;
+    display: inline-block;
+  }
+
+  .current-month-cycle {
+    background: linear-gradient(135deg, #435663 0%, #313647 100%);
+    color: white;
+    padding: 1rem;
+    border-radius: 8px;
+    margin-bottom: 1rem;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    position: relative;
+  }
+
+  .current-month-cycle strong {
+    color: #A3B087;
+  }
+
+  #changeCycleBtn {
+    border-color: rgba(255, 255, 255, 0.5);
+    color: rgba(255, 255, 255, 0.9);
+    font-size: 0.8rem;
+    padding: 0.25rem 0.5rem;
+    transition: all 0.3s ease;
+  }
+
+  #changeCycleBtn:hover {
+    background-color: rgba(255, 255, 255, 0.1);
+    border-color: rgba(255, 255, 255, 0.8);
+    color: white;
+    transform: translateY(-1px);
+  }
+
+  /* SAP specific styles */
+  .sap-code {
+    background: rgba(33, 150, 243, 0.1);
+    color: #1976d2;
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.8rem;
+    font-weight: 500;
+    border: 1px solid rgba(33, 150, 243, 0.2);
+  }
+
+  .sap-mapped-badge {
+    background: rgba(76, 175, 80, 0.1);
+    color: #2e7d32;
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.7rem;
+    font-weight: 500;
+    border: 1px solid rgba(76, 175, 80, 0.2);
+  }
+
+  .no-sap-badge {
+    background: rgba(163, 176, 135, 0.18);
+    color: #5a6b3b;
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.7rem;
+    font-weight: 600;
+    border: 1px solid rgba(163, 176, 135, 0.35);
+  }
+
+  .stock-cell {
+    font-weight: 500;
+  }
+
+  .stock-in {
+    color: #28a745;
+  }
+
+  .stock-out {
+    color: #dc3545;
+  }
+
+  /* Cycle selection styles */
+  .cycle-list {
+    max-height: 400px;
+    overflow-y: auto;
+  }
+
+  .cycle-list table {
+    margin-bottom: 0;
+  }
+
+  .cycle-list .table-active {
+    background-color: rgba(163, 176, 135, 0.1);
+  }
+
+  .badge {
+    font-size: 0.75em;
+  }
+
+  .modal-lg {
+    max-width: 800px;
+  }
+
+  .select-cycle {
+    transition: all 0.3s ease;
+  }
+
+  .select-cycle:hover {
+    transform: scale(1.05);
+  }
+
+  @media (max-width: 1024px) {
+    .layout-container {
+      flex-direction: column;
+    }
+    
+    .sidebar {
+      width: 100%;
+      padding: 1.5rem;
+      margin-top: 0;
+      margin-left: 0;
+    }
+    
+    .main-content {
+      padding: 1.5rem;
+    }
+    
+    .info-grid {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  @media (max-width: 768px) {
+    .product-table, .summary-table {
+      font-size: 0.8rem;
+    }
+    
+    .product-table th, .product-table td,
+    .summary-table th, .summary-table td {
+      padding: 0.5rem;
+    }
+    
+    .form-container {
+      padding: 1rem;
+    }
+    
+    .form-title {
+      font-size: 1.5rem;
+    }
+    
+    .mpp-filters, .product-filters {
+      flex-direction: column;
+    }
+    
+    .filter-group {
+      min-width: 100%;
+    }
+
+    .modal-content {
+      margin: 1rem;
+    }
+
+    .modal-header,
+    .modal-body,
+    .modal-footer {
+      padding: 1rem;
+    }
+
+    .current-month-cycle {
+      padding: 0.75rem;
+    }
+    
+    .current-month-cycle > div {
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+    
+    #changeCycleBtn {
+      width: 100%;
+      margin-top: 0.5rem;
+    }
+  }
+
+  .select2-container--default .select2-selection--single {
+    border: 2px solid #e9ecef;
+    border-radius: 8px;
+    height: auto;
+    padding: 0.75rem;
+  }
+
+  .select2-container--default .select2-selection--single:focus {
+    border-color: #A3B087;
+    outline: none;
+  }
+
+  .select2-container--default .select2-selection--single .select2-selection__arrow {
+    height: 100%;
+  }
+
+  /* Polling progress styles */
+  .polling-progress {
+    display: inline-block;
+    background: #e9ecef;
+    border-radius: 10px;
+    height: 6px;
+    width: 200px;
+    margin-left: 10px;
+    overflow: hidden;
+  }
+
+  .polling-progress-bar {
+    height: 100%;
+    background: linear-gradient(90deg, #28a745, #20c997);
+    width: 0%;
+    transition: width 0.3s ease;
+  }
+</style>
+
+<script>
+  $(document).ready(function () {
+    console.log("=== ADVANCE SALE PAGE LOADED ===");
+    console.log("User Location:", "{{ request.user.location }}");
+
+    // Current state
+    let currentState = {
+      selectedBmcMcc: null,
+      selectedMpp: null,
+      selectedProducts: [],
+      productQuantities: {},
+      availableProducts: [],
+      currentCycle: null,
+      availableCycles: [],
+      userLocation: "{{ request.user.location }}"
+    };
+
+    // Helper function to show success toast
+    function showSuccess(message) {
+      // Remove any existing success alerts
+      $('.alert-success').remove();
+      
+      const successAlert = $(`
+        <div class="alert alert-success alert-dismissible fade show" role="alert" 
+             style="position: fixed; top: 100px; right: 20px; z-index: 9999; min-width: 300px;">
+          <i class="fas fa-check-circle me-2"></i>
+          <strong>Success!</strong> ${message}
+          <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+      `);
+      
+      $('body').append(successAlert);
+      
+      // Auto-remove after 5 seconds
+      setTimeout(() => {
+        successAlert.alert('close');
+      }, 5000);
+    }
+
+    // Helper function to show info toast
+    function showInfo(message) {
+      const infoAlert = $(`
+        <div class="alert alert-info alert-dismissible fade show" role="alert" 
+             style="position: fixed; top: 100px; right: 20px; z-index: 9999; min-width: 300px;">
+          <i class="fas fa-info-circle me-2"></i>
+          <strong>Info:</strong> ${message}
+          <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+      `);
+      
+      $('body').append(infoAlert);
+      
+      setTimeout(() => {
+        infoAlert.alert('close');
+      }, 5000);
+    }
+
+    // Function to show success message in modal
+    function showSuccessMessage(result) {
+      const successMessage = `
+        <div style="text-align: center;">
+          <div class="success-icon" style="font-size: 4rem; color: #28a745; margin-bottom: 1rem;">
+            <i class="fas fa-check-circle"></i>
+          </div>
+          <h4 style="color: #313647; margin-bottom: 1.5rem; font-weight: 700;">
+            SAP Sale Processed Successfully!
+          </h4>
+          <div class="success-details" style="background: #f8f9fa; border-radius: 12px; padding: 1.5rem; margin: 1rem 0;">
+            <p><strong>Transaction ID:</strong> ${result.transaction_id}</p>
+            <p><strong>Status:</strong> <span style="color: #28a745; font-weight: bold;">✅ Completed</span></p>
+            <p><strong>PDF Receipt:</strong> <span id="pdfStatusMessage">Generating in background...</span></p>
+            <p><strong>Notifications:</strong> <span style="color: #17a2b8; font-weight: bold;">Queued for delivery</span></p>
+          </div>
+          <div id="downloadSection" style="display: none; margin-top: 1rem;">
+            <a href="#" class="btn btn-primary" id="autoDownloadBtn" target="_blank">
+              <i class="fas fa-download me-2"></i>Download Receipt
+            </a>
+          </div>
+          <div class="alert alert-info mt-3">
+            <i class="fas fa-info-circle me-2"></i>
+            SMS and WhatsApp notifications are being sent in the background.
+            This does not affect your sale confirmation.
+          </div>
+        </div>
+      `;
+      
+      $("#successModalContent").html(successMessage);
+      $("#successModal").modal('show');
+    }
+
+    // Function to start PDF polling
+    function startPdfPolling(saleId, downloadUrl) {
+      console.log(`🔄 Starting PDF polling for sale: ${saleId}`);
+      
+      const maxAttempts = 30; // 30 attempts max (about 60 seconds)
+      const delay = 2000; // 2 seconds between attempts
+      let attempts = 0;
+      
+      const pollInterval = setInterval(async () => {
+        attempts++;
+        
+        if (attempts > maxAttempts) {
+          clearInterval(pollInterval);
+          $("#pdfStatusMessage").html('PDF generation taking longer than expected. <a href="' + downloadUrl + '" target="_blank">Try downloading manually</a>');
+          return;
+        }
+        
+        try {
+          const response = await fetch(`/check-pdf-status/${saleId}/`);
+          const status = await response.json();
+          
+          console.log(`📊 Poll attempt ${attempts}:`, status);
+          
+          if (status.pdf_generated) {
+            clearInterval(pollInterval);
+            
+            // Update UI
+            $("#pdfStatusMessage").html('<span style="color: #28a745;">✅ Ready!</span>');
+            $("#downloadSection").show();
+            $("#autoDownloadBtn").attr("href", downloadUrl);
+            
+            // Auto-download after 1 second
+            setTimeout(() => {
+              window.open(downloadUrl, '_blank');
+            }, 1000);
+            
+            console.log("✅ PDF is ready, triggering download");
+          } else {
+            const percent = Math.min(100, (attempts / maxAttempts) * 100);
+            $("#pdfStatusMessage").html(`Generating... (${attempts}/${maxAttempts})`);
+          }
+          
+        } catch (error) {
+          console.error("Polling error:", error);
+        }
+      }, delay);
+    }
+
+    // Load available cycles from finance department
+    function loadAvailableCycles() {
+      console.log("=== LOADING FINANCE CYCLES ===");
+      
+      $.ajax({
+        url: "{% url 'get_available_cycles' %}",
+        method: "GET",
+        success: function (response) {
+          console.log("✅ Finance cycles loaded successfully:", response);
+          
+          if (response.success && response.cycles && response.cycles.length > 0) {
+            currentState.availableCycles = response.cycles;
+            console.log(`📅 Loaded ${response.cycles.length} cycles from finance department`);
+            
+            // Set current cycle based on today's date
+            setCurrentCycleFromFinanceData();
+          } else {
+            console.warn("⚠️ No finance cycles found, using fallback calculation");
+            setFallbackCycle();
+          }
+        },
+        error: function (xhr, status, error) {
+          console.error("❌ Error loading finance cycles:", error);
+          console.warn("⚠️ Using fallback cycle calculation");
+          setFallbackCycle();
+        }
+      });
+    }
+
+    // Set current cycle based on finance department data
+    function setCurrentCycleFromFinanceData() {
+      const today = new Date();
+      const todayStr = today.toISOString().split('T')[0];
+      
+      console.log("🔍 Looking for current cycle for date:", todayStr);
+      
+      // Find the ACTIVE cycle set by Finance Department
+      const activeCycle = currentState.availableCycles.find(cycle => cycle.is_active === true);
+      
+      if (activeCycle) {
+        currentState.currentCycle = activeCycle;
+        console.log("✅ Active cycle set from finance data:", activeCycle);
+        console.log("   - Cycle ID:", activeCycle.id);
+        console.log("   - Cycle Name:", activeCycle.name);
+        console.log("   - Is Active:", activeCycle.is_active);
+        updateCycleDisplay(activeCycle);
+        loadMppList();
+      } else {
+        console.warn("⚠️ No active finance cycle found, using fallback");
+        setFallbackCycle();
+      }
+    }
+
+    // Fallback cycle calculation (original logic)
+    function setFallbackCycle() {
+      const now = new Date();
+      const currentDate = now.getDate();
+      
+      let cycleNumber = '';
+      
+      if (currentDate <= 10) {
+        cycleNumber = '1';
+      } else if (currentDate <= 20) {
+        cycleNumber = '2';
+      } else {
+        cycleNumber = '3';
+      }
+      
+      currentState.currentCycle = {
+        cycle_number: cycleNumber,
+        name: `Cycle ${cycleNumber}`,
+        is_fallback: true
+      };
+      
+      console.log("🔄 Using fallback cycle:", currentState.currentCycle);
+      updateCycleDisplay(currentState.currentCycle);
+      
+      // Load MPPs after cycle is set
+      loadMppList();
+    }
+
+    // Update cycle display in the UI
+    function updateCycleDisplay(cycle) {
+      console.log("📊 Updating cycle display:", cycle);
+      
+      if (cycle) {
+        const monthNames = ["January", "February", "March", "April", "May", "June",
+          "July", "August", "September", "October", "November", "December"
+        ];
+        const currentMonth = monthNames[new Date().getMonth()];
+        const currentYear = new Date().getFullYear();
+        
+        $('#currentMonth').text(`${currentMonth} ${currentYear}`);
+        
+        // Build cycle display with SAP number if available
+        let cycleDisplay = cycle.name || `Cycle ${cycle.cycle_number}`;
+        
+        // Add date range if available
+        if (cycle.date_range) {
+          cycleDisplay += ` ${cycle.date_range}`;
+        }
+        
+        // Add SAP cycle number if available
+        if (cycle.sap_number) {
+          cycleDisplay += ` <span style="color: #A3B087; font-weight: 600;">(SAP Cycle Number: ${cycle.sap_number})</span>`;
+        }
+        
+        $('#currentCycle').html(cycleDisplay);
+        
+        // Add fallback warning if using fallback cycle
+        if (cycle.is_fallback) {
+          if (!$('.fallback-warning').length) {
+            $('.current-month-cycle').append(`
+              <div class="fallback-warning" style="margin-top: 0.5rem; font-size: 0.8rem; color: #ffc107;">
+                <i class="fas fa-exclamation-triangle me-1"></i>
+                Using default cycle - Finance cycles not available
+              </div>
+            `);
+          }
+        } else {
+          $('.fallback-warning').remove();
+        }
+      }
+    }
+
+    // Show cycle selection modal
+    function showCycleSelectionModal() {
+      if (currentState.availableCycles.length === 0) {
+        alert("No cycles available. Please contact finance department.");
+        return;
+      }
+      
+      const cycleSelectionBody = $("#cycleSelectionBody");
+      cycleSelectionBody.empty();
+      
+      currentState.availableCycles.forEach(cycle => {
+        const isCurrent = currentState.currentCycle && currentState.currentCycle.id === cycle.id;
+        const statusBadge = isCurrent ? 
+          '<span class="badge bg-success">Current</span>' : 
+          '<span class="badge bg-secondary">Available</span>';
+        
+        const startDay = new Date(cycle.start_date).getDate();
+        const endDay = new Date(cycle.end_date).getDate();
+        const dateRangeDisplay = `(${startDay} to ${endDay})`;
+        
+        const cycleRow = $(`
+          <tr class="${isCurrent ? 'table-active' : ''}">
+            <td>${cycle.name}</td>
+            <td>${dateRangeDisplay}</td>
+            <td>${statusBadge}</td>
+            <td>
+              ${!isCurrent ? `
+                <button type="button" class="btn btn-sm btn-outline-primary select-cycle" data-cycle-id="${cycle.id}">
+                  Select
+                </button>
+              ` : '<span class="text-success">Selected</span>'}
+            </td>
+          </tr>
+        `);
+        cycleSelectionBody.append(cycleRow);
+      });
+      
+      // Store selected cycle for confirmation
+      let selectedCycle = null;
+      
+      // Handle cycle selection
+      $('.select-cycle').on('click', function() {
+        const cycleId = $(this).data('cycle-id');
+        selectedCycle = currentState.availableCycles.find(c => c.id === cycleId);
+        
+        // Update UI
+        $('.select-cycle').removeClass('btn-primary').addClass('btn-outline-primary').text('Select');
+        $(this).removeClass('btn-outline-primary').addClass('btn-primary').text('Selected');
+      });
+      
+      // Handle confirmation
+      $('#confirmCycleSelection').off('click').on('click', function() {
+        if (selectedCycle) {
+          // Ensure the selected cycle has an ID
+          if (!selectedCycle.id) {
+            alert("Invalid cycle selected. Please try again.");
+            return;
+          }
+          
+          currentState.currentCycle = selectedCycle;
+          console.log("✅ Cycle manually changed to:", selectedCycle);
+          console.log("   - Cycle ID:", selectedCycle.id);
+          console.log("   - Cycle Name:", selectedCycle.name);
+          
+          updateCycleDisplay(selectedCycle);
+          $('#cycleSelectionModal').modal('hide');
+          
+          // Reload MPPs with new cycle
+          if (currentState.selectedBmcMcc) {
+            loadMppsForBmcMcc(currentState.selectedBmcMcc);
+          }
+        } else {
+          alert("Please select a cycle first.");
+        }
+      });
+      
+      $('#cycleSelectionModal').modal('show');
+    }
+
+    // Load MPP list automatically based on user location and current cycle
+    function loadMppList() {
+      console.log("=== LOADING MPP LIST ===");
+      console.log("User Location:", currentState.userLocation);
+      console.log("Current Cycle:", currentState.currentCycle);
+      
+      if (!currentState.currentCycle) {
+        console.error("❌ No cycle available");
+        $("#mppList").html('<div class="mpp-item" style="justify-content: center; color: #dc3545;">No active cycle found. Please contact finance department.</div>');
+        return;
+      }
+      
+      // First, get BMC/MCC for the user's location
+      $.ajax({
+        url: "{% url 'get_bmc_mcc_list' %}",
+        method: "GET",
+        success: function (response) {
+          console.log("✅ BMC/MCC list loaded successfully:", response);
+          
+          if (!response || response.length === 0) {
+            console.error("❌ No BMC/MCC data received");
+            $("#mppList").html('<div class="mpp-item" style="justify-content: center; color: #dc3545;">No BMC/MCC data available</div>');
+            return;
+          }
+          
+          // Filter BMC/MCC by user location
+          const userLocation = currentState.userLocation.toLowerCase();
+          console.log("Filtering BMC/MCC for location:", userLocation);
+          
+          const filteredBmcMcc = response.filter(bmc => {
+            const bmcName = bmc.name ? bmc.name.toLowerCase() : '';
+            const matches = bmcName.includes(userLocation);
+            console.log(`BMC/MCC: ${bmc.name}, matches location: ${matches}`);
+            return matches;
+          });
+          
+          console.log("Filtered BMC/MCC:", filteredBmcMcc);
+          
+          if (filteredBmcMcc.length === 0) {
+            console.warn("⚠️ No BMC/MCC found for location:", userLocation);
+            $("#mppList").html('<div class="mpp-item" style="justify-content: center; color: #dc3545;">No BMC/MCC found for your location: ' + currentState.userLocation + '</div>');
+            return;
+          }
+          
+          // Use the first BMC/MCC for the location
+          currentState.selectedBmcMcc = filteredBmcMcc[0].id;
+          console.log("✅ Auto-selected BMC/MCC:", filteredBmcMcc[0].name, "ID:", currentState.selectedBmcMcc);
+          
+          // Now load MPPs for this BMC/MCC and current cycle
+          loadMppsForBmcMcc(currentState.selectedBmcMcc);
+        },
+        error: function (xhr, status, error) {
+          console.error("❌ Error loading BMC/MCC list:", error);
+          $("#mppList").html('<div class="mpp-item" style="justify-content: center; color: #dc3545;">Error loading BMC/MCC data. Please try again.</div>');
+        }
+      });
+    }
+
+    // Load MPPs for specific BMC/MCC with T-code display
+    function loadMppsForBmcMcc(bmcMccId) {
+      console.log("=== LOADING MPPs FOR BMC/MCC ===");
+      console.log("BMC/MCC ID:", bmcMccId);
+      console.log("Current Cycle:", currentState.currentCycle);
+      
+      if (!currentState.currentCycle) {
+        console.error("❌ No cycle available for loading MPPs");
+        return;
+      }
+      
+      const searchTerm = $("#mppSearch").val();
+      console.log("Search Term:", searchTerm);
+      
+      // Use the cycle number from current cycle
+      const cycleNumber = currentState.currentCycle.cycle_number;
+      
+      console.log("Using cycle number:", cycleNumber);
+      
+      $.ajax({
+        url: "{% url 'get_mpp_with_code' %}",
+        method: "GET",
+        data: {
+          bmc_or_mcc_id: bmcMccId,
+          cycle: cycleNumber,
+          search: searchTerm || ''
+        },
+        success: function (response) {
+          console.log("✅ MPP list loaded successfully:", response);
+          
+          if (!response || response.length === 0) {
+            console.warn("⚠️ No MPPs found for current cycle");
+            $("#mppList").html('<div class="mpp-item" style="justify-content: center; color: #6c757d;">No MPPs found for ' + (currentState.currentCycle.name || `Cycle ${currentState.currentCycle.cycle_number}`) + '</div>');
+            return;
+          }
+          
+          const mppList = $("#mppList");
+          mppList.empty();
+          
+          console.log(`📋 Displaying ${response.length} MPPs`);
+          
+          response.forEach((mpp, index) => {
+            const isSelected = currentState.selectedMpp && currentState.selectedMpp.id === mpp.id;
+            
+            // Store the original MPP data in data attributes for later use
+            const displayName = mpp.mpp_transaction_code 
+              ? `${mpp.name_with_code} - ${mpp.mpp_transaction_code}`
+              : mpp.name_with_code;
+            
+            const mppItem = $(`
+              <div class="mpp-item ${isSelected ? 'selected' : ''}" 
+                   data-mpp-id="${mpp.id}" 
+                   data-mpp-name="${mpp.name_with_code}" 
+                   data-t-code="${mpp.mpp_transaction_code || ''}">
+                <div class="mpp-checkbox">
+                  <input type="radio" name="mppSelection" ${isSelected ? 'checked' : ''} value="${mpp.id}">
+                </div>
+                <div class="mpp-info">
+                  <div class="mpp-name">${displayName}</div>
+                  <div class="mpp-details">
+                    <span>Cycle: ${currentState.currentCycle.name}</span>
+                    ${mpp.mpp_transaction_code ? `<span class="t-code-badge">mpp_tr_code: ${mpp.mpp_transaction_code}</span>` : ''}
+                  </div>
+                </div>
+              </div>
+            `);
+            mppList.append(mppItem);
+          });
+          
+          updateSelectedMppCount();
+          console.log("✅ MPP list populated successfully");
+          
+        },
+        error: function (xhr, status, error) {
+          console.error("❌ Error loading MPP list:", error);
+          $("#mppList").html('<div class="mpp-item" style="justify-content: center; color: #dc3545;">Error loading MPPs. Please try again.</div>');
+        }
+      });
+    }
+
+    // Update selected MPP count
+    function updateSelectedMppCount() {
+      const selectedCount = currentState.selectedMpp ? 1 : 0;
+      $("#selectedMppCount").text(`${selectedCount} MPP${selectedCount !== 1 ? 's' : ''} selected`);
+    }
+
+    // Load SAP mapped products with inventory data for the current user's location
+    function loadProducts() {
+      console.log("=== LOADING SAP MAPPED PRODUCTS ===");
+      
+      const materialSearch = $("#materialSearch").val();
+      const stockFilter = $("#stockFilter").val();
+      
+      // Show loading state
+      $("#productTableBody").html('<tr><td colspan="9" style="text-align: center; color: #6c757d;"><div class="spinner"></div> Loading SAP mapped products...</td></tr>');
+      
+      $.ajax({
+        url: "{% url 'get_products_with_inventory' %}",
+        method: "GET",
+        data: {
+          material: materialSearch,
+          location: currentState.userLocation
+        },
+        success: function (response) {
+          console.log("✅ SAP mapped products with inventory loaded successfully:", response);
+          
+          if (!response || response.length === 0) {
+            $("#productTableBody").html('<tr><td colspan="9" style="text-align: center; color: #6c757d;">No products available for your location</td></tr>');
+            return;
+          }
+          
+          // Filtering logic
+          let filteredProducts = response;
+
+          // Apply material search filter
+          if (materialSearch) {
+            filteredProducts = filteredProducts.filter(product => {
+              const nameMatch = product.name && product.name.toLowerCase().includes(materialSearch.toLowerCase());
+              const materialMatch = product.material && product.material.toLowerCase().includes(materialSearch.toLowerCase());
+              const sapCodeMatch = product.sap_mapping && product.sap_mapping.sap_product_code && product.sap_mapping.sap_product_code.toLowerCase().includes(materialSearch.toLowerCase());
+              const sapNameMatch = product.sap_mapping && product.sap_mapping.sap_product_name && product.sap_mapping.sap_product_name.toLowerCase().includes(materialSearch.toLowerCase());
+              return nameMatch || materialMatch || sapCodeMatch || sapNameMatch;
+            });
+          }
+
+          // Apply stock filter
+          if (stockFilter === 'in_stock') {
+            filteredProducts = filteredProducts.filter(product => product.available_stock > 0);
+          } else if (stockFilter === 'out_of_stock') {
+            filteredProducts = filteredProducts.filter(product => product.available_stock === 0);
+          }
+
+          currentState.availableProducts = filteredProducts.map(product => ({
+            ...product,
+            uom: product.uom || 'PCS'
+          }));
+          
+          if (currentState.availableProducts.length === 0) {
+            $("#productTableBody").html('<tr><td colspan="9" style="text-align: center; color: #6c757d; padding: 2rem;">No products available for your location matching the current filters.</td></tr>');
+            return;
+          }
+          
+          initializeProductTable();
+        },
+        error: function (xhr, status, error) {
+          console.error("❌ Error loading SAP mapped products:", error);
+          $("#productTableBody").html('<tr><td colspan="9" style="text-align: center; color: #dc3545;">Error loading SAP mapped products. Please try again.</td></tr>');
+        }
+      });
+    }
+
+    // Initialize product table with SAP mapped products
+    function initializeProductTable() {
+      console.log("=== INITIALIZING SAP PRODUCT TABLE ===");
+      
+      const productTableBody = $("#productTableBody");
+      productTableBody.empty();
+      
+      if (currentState.availableProducts.length === 0) {
+        productTableBody.html('<tr><td colspan="9" style="text-align: center; color: #6c757d;">No SAP mapped products found matching your criteria</td></tr>');
+        return;
+      }
+      
+      currentState.availableProducts.forEach((product, index) => {
+        const isSelected = currentState.selectedProducts.some(p => p.id === product.id);
+        const availableStock = product.available_stock || 0;
+        const currentQuantity = currentState.productQuantities[product.id] || 1;
+        const sapCode = product.sap_mapping ? product.sap_mapping.sap_product_code : 'N/A';
+        const sapName = product.sap_mapping ? product.sap_mapping.sap_product_name : product.name;
+        const hasSapMapping = product.sap_mapping && product.sap_mapping.has_mapping;
+        
+        const stockClass = availableStock > 0 ? 'stock-in' : 'stock-out';
+        const stockStatus = availableStock > 0 ? `${availableStock}` : '0 <span style="color: #dc3545; font-size: 0.8rem;">(Out of Stock)</span>';
+        
+        const productRow = $(`
+          <tr data-product-id="${product.id}" class="${hasSapMapping ? 'sap-mapped-row' : 'no-sap-mapping-row'}">
+            <td>
+              <input type="checkbox" class="product-checkbox" ${isSelected ? 'checked' : ''} ${availableStock === 0 ? 'disabled' : ''}>
+            </td>
+            <td>
+              <div>${sapName}</div>
+            </td>
+            <td>
+              <span class="sap-code">${sapCode}</span>
+              ${hasSapMapping ? '<span class="sap-mapped-badge">SAP Mapped</span>' : '<span class="no-sap-badge">INDENT</span>'}
+            </td>
+            <td>${product.material || 'N/A'}</td>
+            <td class="stock-cell ${stockClass}" data-stock="${availableStock}">
+              ${stockStatus}
+            </td>
+            <td>${product.uom}</td>
+            <td>₹${parseFloat(product.price).toFixed(2)}</td>
+            <td>
+              <input type="number" class="form-control quantity-input" min="1" max="${availableStock}" 
+                     value="${currentQuantity}" 
+                     ${isSelected && availableStock > 0 ? '' : 'disabled'}>
+            </td>
+            <td class="product-total">₹${(currentQuantity * parseFloat(product.price)).toFixed(2)}</td>
+          </tr>
+        `);
+        productTableBody.append(productRow);
+      });
+    }
+
+    // Update product totals
+    function updateProductTotals() {
+      $(".quantity-input").each(function() {
+        const productId = $(this).closest("tr").data("product-id");
+        const quantity = parseInt($(this).val()) || 0;
+        const product = currentState.availableProducts.find(p => p.id === productId);
+        
+        if (product) {
+          const total = quantity * parseFloat(product.price);
+          $(this).closest("tr").find(".product-total").text(`₹${total.toFixed(2)}`);
+          currentState.productQuantities[productId] = quantity;
+        }
+      });
+    }
+
+    // Update sale summary
+    function updateSaleSummary() {
+      const summaryTableBody = $("#summaryTableBody");
+      summaryTableBody.empty();
+      
+      let grandTotal = 0;
+      
+      currentState.selectedProducts.forEach(product => {
+        const quantity = currentState.productQuantities[product.id] || 1;
+        const total = quantity * parseFloat(product.price);
+        grandTotal += total;
+        const sapCode = product.sap_mapping ? product.sap_mapping.sap_product_code : 'N/A';
+        const sapName = product.sap_mapping ? product.sap_mapping.sap_product_name : product.name;
+        const hasSapMapping = product.sap_mapping && product.sap_mapping.has_mapping;
+        
+        const summaryRow = $(`
+          <tr data-product-id="${product.id}" class="${hasSapMapping ? 'sap-mapped-summary' : 'no-sap-summary'}">
+            <td>${sapName}</td>
+            <td>
+              <span class="sap-code">${sapCode}</span>
+              ${hasSapMapping ? '<span class="sap-mapped-badge">SAP Mapped</span>' : '<span class="no-sap-badge">INDENT</span>'}
+            </td>
+            <td>${quantity}</td>
+            <td>${product.uom}</td>
+            <td>₹${parseFloat(product.price).toFixed(2)}</td>
+            <td>₹${total.toFixed(2)}</td>
+            <td>
+              <button type="button" class="btn-remove remove-product">
+                <i class="fas fa-trash"></i>
+              </button>
+            </td>
+          </tr>
+        `);
+        summaryTableBody.append(summaryRow);
+      });
+      
+      $("#grandTotal").text(`₹${grandTotal.toFixed(2)}`);
+      $("#submitSaleBtn").prop("disabled", currentState.selectedProducts.length === 0);
+    }
+
+    // ========== EVENT HANDLERS ==========
+
+    // MPP selection
+    $("#mppList").on("change", 'input[name="mppSelection"]', function() {
+      const mppId = parseInt($(this).val());
+      const mppItem = $(this).closest(".mpp-item");
+      
+      // Get MPP data from data attributes
+      const mppName = mppItem.data('mpp-name');
+      const tCode = mppItem.data('t-code');
+      const displayName = mppItem.find(".mpp-name").text().trim();
+      
+      // Create MPP data object from DOM data
+      const mppData = {
+        id: mppId,
+        name_with_code: mppName,
+        mpp_transaction_code: tCode || null,
+        display_name: displayName
+      };
+      
+      // Set the selected MPP
+      currentState.selectedMpp = mppData;
+      
+      // Update UI
+      $(".mpp-item").removeClass("selected");
+      mppItem.addClass("selected");
+      updateSelectedMppCount();
+      
+      // Show product selection section
+      $("#currentMppName").text(displayName);
+      $("#summaryMppName").text(displayName);
+      $("#selectedMppSection").show();
+      
+      // Reset product selection when MPP changes
+      currentState.selectedProducts = [];
+      currentState.productQuantities = {};
+      
+      // Load SAP mapped products with inventory data
+      loadProducts();
+    });
+
+    // MPP search
+    $("#mppSearch").on("input", function() {
+      const searchTerm = $(this).val();
+      if (currentState.selectedBmcMcc) {
+        loadMppsForBmcMcc(currentState.selectedBmcMcc);
+      }
+    });
+
+    // Material search for SAP products
+    $("#materialSearch").on("input", function() {
+      if (currentState.selectedMpp) {
+        loadProducts();
+      }
+    });
+
+    // Stock filter for SAP products
+    $("#stockFilter").on("change", function() {
+      if (currentState.selectedMpp) {
+        loadProducts();
+      }
+    });
+
+    // SAP Product selection
+    $("#productTableBody").on("change", ".product-checkbox", function() {
+      const productId = $(this).closest("tr").data("product-id");
+      const isChecked = $(this).is(":checked");
+      const availableStock = parseInt($(this).closest("tr").find(".stock-cell").data("stock")) || 0;
+      
+      // Enable/disable quantity input
+      $(this).closest("tr").find(".quantity-input").prop("disabled", !isChecked || availableStock === 0);
+      
+      if (isChecked && availableStock > 0) {
+        // Add to selected products
+        const product = currentState.availableProducts.find(p => p.id === productId);
+        if (product && !currentState.selectedProducts.some(p => p.id === productId)) {
+          currentState.selectedProducts.push(product);
+          // Set default quantity to 1 if not already set
+          if (!currentState.productQuantities[productId]) {
+            currentState.productQuantities[productId] = 1;
+          }
+        }
+      } else {
+        // Remove from selected products
+        currentState.selectedProducts = currentState.selectedProducts.filter(p => p.id !== productId);
+        delete currentState.productQuantities[productId];
+      }
+    });
+
+    // Quantity change for SAP products
+    $("#productTableBody").on("input", ".quantity-input", function() {
+      const productId = $(this).closest("tr").data("product-id");
+      const quantity = parseInt($(this).val()) || 0;
+      const maxStock = parseInt($(this).attr("max"));
+      
+      // Validate quantity
+      if (quantity < 1) {
+        $(this).val(1);
+        currentState.productQuantities[productId] = 1;
+      } else if (quantity > maxStock) {
+        $(this).val(maxStock);
+        currentState.productQuantities[productId] = maxStock;
+      } else {
+        currentState.productQuantities[productId] = quantity;
+      }
+      
+      updateProductTotals();
+    });
+
+    // Add selected SAP products to sale
+    $("#addSelectedProducts").on("click", function() {
+      // Validate that we have selected products
+      if (currentState.selectedProducts.length === 0) {
+        alert("Please select at least one SAP mapped product before adding to sale.");
+        return;
+      }
+      
+      // Validate that all selected SAP products have valid quantities
+      let allValid = true;
+      
+      currentState.selectedProducts.forEach(product => {
+        const quantity = currentState.productQuantities[product.id] || 1;
+        const availableStock = product.available_stock || 0;
+        
+        if (quantity < 1) {
+          allValid = false;
+          alert(`Invalid quantity for SAP product ${product.name}. Please enter a value of at least 1.`);
+          return false;
+        } else if (quantity > availableStock) {
+          allValid = false;
+          alert(`Insufficient stock for SAP product ${product.name}. Available: ${availableStock}, Requested: ${quantity}`);
+          return false;
+        }
+      });
+      
+      if (!allValid) {
+        return;
+      }
+      
+      // Update sale summary
+      updateSaleSummary();
+      
+      // Show sale summary section
+      $("#saleSummarySection").show();
+      
+      // Scroll to summary
+      $('html, body').animate({
+        scrollTop: $("#saleSummarySection").offset().top - 100
+      }, 500);
+    });
+
+    // Remove SAP product from sale
+    $("#summaryTableBody").on("click", ".remove-product", function() {
+      const productId = $(this).closest("tr").data("product-id");
+      
+      // Remove from selected products
+      currentState.selectedProducts = currentState.selectedProducts.filter(p => p.id !== productId);
+      delete currentState.productQuantities[productId];
+      
+      // Update UI in product table
+      $(`#productTableBody tr[data-product-id="${productId}"] .product-checkbox`).prop("checked", false);
+      $(`#productTableBody tr[data-product-id="${productId}"] .quantity-input`).prop("disabled", true);
+      
+      updateSaleSummary();
+      
+      // Hide summary if no products
+      if (currentState.selectedProducts.length === 0) {
+        $("#saleSummarySection").hide();
+      }
+    });
+
+    // Edit MPP selection
+    $("#editMppSelection").on("click", function() {
+      // Reset product selection
+      currentState.selectedProducts = [];
+      currentState.productQuantities = {};
+      
+      // Update UI
+      $(".product-checkbox").prop("checked", false);
+      $(".quantity-input").prop("disabled", true);
+      $("#saleSummarySection").hide();
+      $("#selectedMppSection").hide();
+      
+      // Scroll to MPP selection
+      $('html, body').animate({
+        scrollTop: $(".mpp-selection-container").offset().top - 100
+      }, 500);
+    });
+
+    // ========== UPDATED FORM SUBMISSION WITH POLLING ==========
+
+    // Idempotency key: one unique key per logical sale. It is REUSED on retries
+    // (so a re-submit after a network error can never create a second record) and
+    // only regenerated after a confirmed success. See IdempotencyMiddleware.
+    function newIdempotencyKey() {
+      if (window.crypto && crypto.randomUUID) return crypto.randomUUID();
+      return 'idem-' + Date.now() + '-' + Math.random().toString(16).slice(2) +
+             '-' + Math.random().toString(16).slice(2);
+    }
+    let currentIdempotencyKey = newIdempotencyKey();
+
+    $("#salesForm").on("submit", function(event) {
+      event.preventDefault();
+      
+      const submitButton = $("#submitSaleBtn");
+      const loader = $("#loader");
+      
+      // Validate form
+      if (!currentState.selectedMpp) {
+        alert("Please select an MPP.");
+        return false;
+      }
+      
+      if (currentState.selectedProducts.length === 0) {
+        alert("Please add at least one SAP mapped product to the sale.");
+        return false;
+      }
+      
+      // CRITICAL CHECK: Ensure we have a valid cycle with ID
+      if (!currentState.currentCycle || !currentState.currentCycle.id) {
+        alert("No active cycle available. Please contact Finance Department to activate a cycle.");
+        console.error("❌ Current cycle is missing or has no ID:", currentState.currentCycle);
+        return false;
+      }
+      
+      console.log("📤 Submitting with cycle:", currentState.currentCycle);
+      console.log("   - Cycle ID:", currentState.currentCycle.id);
+      console.log("   - Cycle Name:", currentState.currentCycle.name);
+      
+      // Validate stock availability before submission
+      let stockValid = true;
+      currentState.selectedProducts.forEach(product => {
+        const quantity = currentState.productQuantities[product.id] || 1;
+        const availableStock = product.available_stock || 0;
+        
+        if (quantity > availableStock) {
+          stockValid = false;
+          alert(`Insufficient stock for SAP product ${product.name}. Available: ${availableStock}, Requested: ${quantity}`);
+        }
+      });
+      
+      if (!stockValid) {
+        return false;
+      }
+      
+      // Prepare request data
+      const requestData = {
+        bmc_or_mcc: currentState.selectedBmcMcc,
+        mpp_with_code: currentState.selectedMpp.id,
+        cycle_id: currentState.currentCycle.id,
+        items: currentState.selectedProducts.map(product => ({
+          uom: product.uom || 'PCS',
+          stockItem: product.name,
+          quantity: currentState.productQuantities[product.id] || 1,
+          sap_product_code: product.sap_mapping ? product.sap_mapping.sap_product_code : null,
+          sap_product_name: product.sap_mapping ? product.sap_mapping.sap_product_name : product.name
+        }))
+      };
+      
+      console.log("📦 Request Data:", requestData);
+      
+      // Show loader
+      submitButton.prop("disabled", true);
+      loader.show();
+      
+      // Submit with Fetch API - NEW POLLING VERSION
+      fetch("{% url 'advance-sale' %}", {
+        method: "POST",
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRFToken': '{{ csrf_token }}',
+          'X-Idempotency-Key': currentIdempotencyKey
+        },
+        body: JSON.stringify(requestData)
+      })
+      .then(response => {
+        if (!response.ok) {
+          return response.json().then(errorData => {
+            throw new Error(errorData.error || 'Submission failed');
+          });
+        }
+        return response.json();
+      })
+      .then(result => {
+        console.log("✅ Server response:", result);
+        
+        if (result.success) {
+          // Show immediate success message
+          showSuccessMessage(result);
+
+          // Sale is confirmed committed: start a fresh idempotency key so the
+          // NEXT sale is a distinct operation. (On error we deliberately keep the
+          // same key so a retry of THIS sale is de-duplicated by the server.)
+          currentIdempotencyKey = newIdempotencyKey();
+
+          // If PDF is generating, start polling
+          if (result.pdf_status === 'generating' && result.advance_sale_id) {
+            startPdfPolling(result.advance_sale_id, result.download_url);
+          }
+          
+          // Reset form after 1 second
+          setTimeout(() => {
+            resetForm();
+            loader.hide();
+            submitButton.prop("disabled", false);
+          }, 1000);
+        } else {
+          throw new Error(result.message || 'Submission failed');
+        }
+      })
+      .catch(error => {
+        console.error("❌ Submission error:", error);
+        
+        const errorAlert = `
+          <div class="alert alert-danger alert-dismissible fade show" role="alert">
+            <i class="fas fa-exclamation-triangle me-2"></i>
+            <strong>Error:</strong> ${error.message}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+          </div>
+        `;
+        
+        $(".form-container").prepend(errorAlert);
+        
+        $('html, body').animate({
+          scrollTop: $(".alert-danger").offset().top - 100
+        }, 500);
+        
+        loader.hide();
+        submitButton.prop("disabled", false);
+      });
+    });
+
+    // Reset form function
+    function resetForm() {
+      currentState = {
+        selectedBmcMcc: null,
+        selectedMpp: null,
+        selectedProducts: [],
+        productQuantities: {},
+        availableProducts: [],
+        currentCycle: currentState.currentCycle,
+        availableCycles: currentState.availableCycles,
+        userLocation: "{{ request.user.location }}"
+      };
+      
+      // Reset UI
+      $("#selectedMppSection").hide();
+      $("#saleSummarySection").hide();
+      $('input[name="mppSelection"]').prop("checked", false);
+      $(".mpp-item").removeClass("selected");
+      $(".product-checkbox").prop("checked", false);
+      $(".quantity-input").prop("disabled", true).val(1);
+      $("#mppSearch").val('');
+      $("#materialSearch").val('');
+      $("#stockFilter").val('all');
+      updateSelectedMppCount();
+      $("#submitSaleBtn").prop("disabled", true);
+      
+      // Reload MPPs
+      loadMppList();
+    }
+
+    // Cycle change button handler
+    $("#changeCycleBtn").on("click", function() {
+      showCycleSelectionModal();
+    });
+
+    // ========== INITIAL SETUP ==========
+    
+    console.log("🚀 Starting SAP sale setup...");
+    
+    // Load cycles first
+    loadAvailableCycles();
+  });
+</script>
+
+{% endblock %}

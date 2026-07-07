@@ -1,0 +1,1228 @@
+<!-- templates/whatsapp_analytics/message_detail.html -->
+{% extends "base.html" %}
+{% block content %}
+
+<div class="layout-container">
+  <!-- Sidebar -->
+  <aside class="sidebar">
+    <div class="sidebar-content">
+      <!-- User Welcome Section -->
+      <div class="user-welcome">
+        <div class="welcome-header">
+          <h1 class="welcome-title">
+            Welcome!
+            <span class="wave-emoji">👋</span>
+          </h1>
+          <p class="user-name">{{request.user.first_name}} {{request.user.last_name}}</p>
+          <div class="user-details">
+            <span class="detail-badge">
+              <i class="fas fa-id-badge"></i>
+              {{ request.user.employee_code }}
+            </span>
+            <span class="detail-badge">
+              <i class="fas fa-building"></i>
+              {{ request.user.department }}
+            </span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Quick Actions -->
+      <div class="quick-actions">
+        <h3 class="section-title">Quick Actions</h3>
+        <button class="action-btn" onclick="window.history.back()">
+          <i class="fas fa-arrow-left"></i>
+          <span>Back to Analytics</span>
+        </button>
+        <button class="action-btn" id="exportMessagesBtn">
+          <i class="fas fa-download"></i>
+          <span>Export Messages</span>
+        </button>
+        <button class="action-btn" onclick="location.reload()">
+          <i class="fas fa-sync-alt"></i>
+          <span>Refresh Data</span>
+        </button>
+      </div>
+      
+      <!-- Stats Summary -->
+      <div class="stats-section">
+        <div class="stat-card">
+          <div class="stat-icon inventory-icon">
+            <i class="fab fa-whatsapp"></i>
+          </div>
+          <div class="stat-info">
+            <span class="stat-value">{{ total_count }}</span>
+            <span class="stat-label">Total Messages</span>
+          </div>
+        </div>
+        
+        {% if stats %}
+        <div class="stat-card">
+          <div class="stat-icon inventory-icon">
+            <i class="fas fa-eye"></i>
+          </div>
+          <div class="stat-info">
+            <span class="stat-value">{{ stats.read }}</span>
+            <span class="stat-label">Read</span>
+          </div>
+        </div>
+        
+        <div class="stat-card">
+          <div class="stat-icon inventory-icon">
+            <i class="fas fa-check-circle"></i>
+          </div>
+          <div class="stat-info">
+            <span class="stat-value">{{ stats.delivered }}</span>
+            <span class="stat-label">Delivered</span>
+          </div>
+        </div>
+        
+        {% if stats.avg_time_to_read %}
+        <div class="stat-card">
+          <div class="stat-icon inventory-icon">
+            <i class="fas fa-clock"></i>
+          </div>
+          <div class="stat-info">
+            <span class="stat-value">{{ stats.avg_time_to_read|floatformat:1 }}</span>
+            <span class="stat-label">Avg Read Time (min)</span>
+          </div>
+        </div>
+        {% endif %}
+        {% endif %}
+      </div>
+    </div>
+  </aside>
+
+  <!-- Main Content -->
+  <main class="main-content">
+    <!-- Page Header -->
+    <div class="page-header">
+      <div class="header-content">
+        <div class="header-text">
+          <h1 class="page-title">
+            <i class="fab fa-whatsapp"></i>
+            {% if mpp_name %}
+              WhatsApp Messages - {{ mpp_name }}
+            {% elif mobile_number %}
+              WhatsApp Messages - {{ mobile_number }}
+            {% else %}
+              WhatsApp Message Details
+            {% endif %}
+          </h1>
+          <p class="page-subtitle">View detailed message history and engagement patterns</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Message Details Card -->
+    <div class="advance-sale-card">
+      <div class="card-header">
+        <h2 class="card-title">
+          <i class="fas fa-list"></i>
+          Message History
+          {% if mpp_name %}
+          - {{ mpp_name }}
+          {% elif mobile_number %}
+          - {{ mobile_number }}
+          {% endif %}
+        </h2>
+        <p class="card-subtitle">
+          Showing {{ total_count }} message{% if total_count != 1 %}s{% endif %}
+          {% if stats %}
+          • Read: {{ stats.read }} • Delivered: {{ stats.delivered }} • Failed: {{ stats.failed }}
+          {% if stats.avg_time_to_read %}• Avg Read Time: {{ stats.avg_time_to_read|floatformat:1 }} min{% endif %}
+          {% endif %}
+        </p>
+      </div>
+      
+      <div class="card-content">
+        <!-- Messages Table -->
+        <div class="table-section">
+          <div class="table-responsive">
+            <table class="whatsapp-messages-table">
+              <thead>
+                <tr>
+                  <th>Date & Time</th>
+                  <th>Message</th>
+                  <th>Status</th>
+                  <th>Sent</th>
+                  <th>Delivered</th>
+                  <th>Read</th>
+                  <th>Time to Read</th>
+                  <th>Unique Code</th>
+                  <th>Error</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for msg in messages %}
+                <tr>
+                  <td>
+                    <div class="datetime-cell">
+                      <div class="date">{{ msg.created_at|date:"d M" }}</div>
+                      <div class="time">{{ msg.created_at|date:"H:i" }}</div>
+                    </div>
+                  </td>
+                  <td class="message-cell">
+                    <div class="message-preview" title="{{ msg.message }}">
+                      {{ msg.message|truncatechars:80 }}
+                    </div>
+                    {% if msg.template_name %}
+                    <div class="template-info">
+                      <small class="text-muted">Template: {{ msg.template_name }}</small>
+                    </div>
+                    {% endif %}
+                  </td>
+                  <td>
+                    {% with status_class=msg.status|lower|cut:" "|cut:"_" %}
+                    <span class="status-badge status-{{ status_class }}">
+                      {{ msg.status }}
+                    </span>
+                    {% endwith %}
+                  </td>
+                  <td>
+                    {% if msg.sent_at %}
+                    <div class="datetime-cell">
+                      <div class="time">{{ msg.sent_at|date:"H:i" }}</div>
+                      <div class="date">{{ msg.sent_at|date:"d M" }}</div>
+                    </div>
+                    {% else %}
+                    <span class="text-muted">-</span>
+                    {% endif %}
+                  </td>
+                  <td>
+                    {% if msg.delivered_at %}
+                    <div class="datetime-cell">
+                      <div class="time">{{ msg.delivered_at|date:"H:i" }}</div>
+                      <div class="date">{{ msg.delivered_at|date:"d M" }}</div>
+                    </div>
+                    {% else %}
+                    <span class="text-muted">-</span>
+                    {% endif %}
+                  </td>
+                  <td>
+                    {% if msg.read_at %}
+                    <div class="datetime-cell text-success">
+                      <div class="time">{{ msg.read_at|date:"H:i" }}</div>
+                      <div class="date">{{ msg.read_at|date:"d M" }}</div>
+                    </div>
+                    {% else %}
+                    <span class="text-muted">-</span>
+                    {% endif %}
+                  </td>
+                  <td>
+                    {% if msg.sent_at and msg.read_at %}
+                      {% with time_diff=msg.read_at|timeuntil:msg.sent_at %}
+                        {% if "minute" in time_diff %}
+                          <span class="text-success">{{ time_diff }}</span>
+                        {% elif "second" in time_diff %}
+                          <span class="text-success">{{ time_diff }}</span>
+                        {% else %}
+                          <span class="text-success">{{ time_diff }}</span>
+                        {% endif %}
+                      {% endwith %}
+                    {% else %}
+                      <span class="text-muted">-</span>
+                    {% endif %}
+                  </td>
+                  <td>
+                    {% if msg.unique_code %}
+                    <span class="unique-code-cell">{{ msg.unique_code }}</span>
+                    {% else %}
+                    <span class="text-muted">-</span>
+                    {% endif %}
+                  </td>
+                  <td>
+                    {% if msg.error_message %}
+                    <span class="error-message" title="{{ msg.error_message }}">
+                      <i class="fas fa-exclamation-circle text-danger"></i>
+                    </span>
+                    {% else %}
+                    <span class="text-muted">-</span>
+                    {% endif %}
+                  </td>
+                </tr>
+                {% empty %}
+                <tr>
+                  <td colspan="9" class="text-center py-4 text-muted">
+                    <i class="fas fa-inbox fa-2x mb-2"></i><br>
+                    No messages found
+                  </td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+        
+        {% if total_count > 0 %}
+        <div class="insights-section">
+          <div class="insight-card">
+            <div class="insight-header">
+              <h3><i class="fas fa-chart-bar"></i> Message Statistics</h3>
+            </div>
+            <div class="insight-content">
+              <div class="stats-grid">
+                <div class="stat-item">
+                  <div class="stat-value">{{ total_count }}</div>
+                  <div class="stat-label">Total Messages</div>
+                </div>
+                <div class="stat-item">
+                  <div class="stat-value">{{ stats.read|default:"0" }}</div>
+                  <div class="stat-label">Read</div>
+                </div>
+                <div class="stat-item">
+                  <div class="stat-value">{{ stats.delivered|default:"0" }}</div>
+                  <div class="stat-label">Delivered</div>
+                </div>
+                <div class="stat-item">
+                  <div class="stat-value">{{ stats.failed|default:"0" }}</div>
+                  <div class="stat-label">Failed</div>
+                </div>
+              </div>
+              
+              {% if stats.read > 0 %}
+              <div class="read-rate mt-3">
+                <div class="progress">
+                  <div class="progress-bar bg-success" 
+                       style="width: {% widthratio stats.read total_count 100 %}%"></div>
+                </div>
+                <div class="text-center mt-1">
+                  <small class="text-muted">
+                    Read Rate: {% widthratio stats.read total_count 100 %}%
+                  </small>
+                </div>
+              </div>
+              {% endif %}
+            </div>
+          </div>
+          
+          <div class="insight-card">
+            <div class="insight-header">
+              <h3><i class="fas fa-clock"></i> Reading Patterns</h3>
+            </div>
+            <div class="insight-content">
+              {% if stats.avg_time_to_read %}
+              <div class="time-insight">
+                <div class="insight-item">
+                  <i class="fas fa-stopwatch"></i>
+                  <div>
+                    <div class="insight-title">Average Read Time</div>
+                    <div class="insight-value">{{ stats.avg_time_to_read|floatformat:1 }} minutes</div>
+                  </div>
+                </div>
+                
+                <div class="insight-item">
+                  <i class="fas fa-history"></i>
+                  <div>
+                    <div class="insight-title">Message History</div>
+                    <div class="insight-value">{{ total_count }} messages total</div>
+                  </div>
+                </div>
+                
+                {% with first_message=messages|last %}
+                <div class="insight-item">
+                  <i class="fas fa-calendar"></i>
+                  <div>
+                    <div class="insight-title">First Message</div>
+                    <div class="insight-value">{{ first_message.created_at|date:"d M Y" }}</div>
+                  </div>
+                </div>
+                {% endwith %}
+                
+                {% with last_message=messages|first %}
+                <div class="insight-item">
+                  <i class="fas fa-calendar-check"></i>
+                  <div>
+                    <div class="insight-title">Last Message</div>
+                    <div class="insight-value">{{ last_message.created_at|date:"d M Y" }}</div>
+                  </div>
+                </div>
+                {% endwith %}
+              </div>
+              {% else %}
+              <div class="text-center py-3 text-muted">
+                <i class="fas fa-chart-pie fa-2x mb-2"></i><br>
+                Not enough data for patterns
+              </div>
+              {% endif %}
+            </div>
+          </div>
+        </div>
+        {% endif %}
+      </div>
+      
+      <div class="card-footer">
+        <div class="footer-info">
+          <h5>Message Detail View:</h5>
+          <ul>
+            <li><i class="fas fa-search"></i> <strong>Detailed View:</strong> See complete message history and timestamps</li>
+            <li><i class="fas fa-chart-bar"></i> <strong>Message Statistics:</strong> View read rates, delivery rates, and failure rates</li>
+            <li><i class="fas fa-clock"></i> <strong>Time Analysis:</strong> See how quickly messages are read after delivery</li>
+            <li><i class="fas fa-history"></i> <strong>Historical Data:</strong> Track engagement patterns over time</li>
+            <li><i class="fas fa-exclamation-triangle"></i> <strong>Error Tracking:</strong> Identify and troubleshoot failed messages</li>
+            <li><i class="fas fa-download"></i> <strong>Export Data:</strong> Export message history for analysis</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<style>
+  /* CSS Variables */
+  :root {
+    --primary-dark: #313647;
+    --primary-light: #435663;
+    --accent-green: #A3B087;
+    --accent-red: #EA5B6F;
+    --accent-yellow: #FFF8D4;
+    --text-dark: #2c3e50;
+    --text-light: #7f8c8d;
+    --bg-light: #f8f9fa;
+    --border-color: #e9ecef;
+    --success: #28a745;
+    --warning: #ffc107;
+    --danger: #dc3545;
+    --info: #17a2b8;
+  }
+
+  /* Base Styles */
+  * {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+  }
+
+  body {
+    font-family: 'Lexend', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    color: var(--text-dark);
+    background: white;
+  }
+
+  /* WhatsApp specific styles */
+  .whatsapp-messages-table {
+    width: 100%;
+    border-collapse: collapse;
+    min-width: 1200px;
+  }
+
+  .whatsapp-messages-table thead {
+    background: var(--primary-dark);
+    position: sticky;
+    top: 0;
+    z-index: 10;
+  }
+
+  .whatsapp-messages-table th {
+    color: white;
+    padding: 1rem;
+    font-weight: 600;
+    text-align: left;
+    font-size: 0.9rem;
+    white-space: nowrap;
+    border-bottom: 2px solid var(--accent-green);
+  }
+
+  .whatsapp-messages-table td {
+    padding: 1rem;
+    border-bottom: 1px solid rgba(163, 176, 135, 0.1);
+    vertical-align: middle;
+    font-size: 0.9rem;
+  }
+
+  .whatsapp-messages-table tbody tr {
+    transition: all 0.3s ease;
+  }
+
+  .whatsapp-messages-table tbody tr:hover {
+    background: rgba(163, 176, 135, 0.05);
+  }
+
+  /* Status badges */
+  .status-badge {
+    display: inline-block;
+    padding: 0.25rem 0.5rem;
+    border-radius: 12px;
+    font-size: 0.75rem;
+    font-weight: 600;
+  }
+
+  .status-delivered {
+    background: rgba(76, 175, 80, 0.1);
+    color: var(--success);
+    border: 1px solid rgba(76, 175, 80, 0.2);
+  }
+
+  .status-read {
+    background: rgba(33, 150, 243, 0.1);
+    color: var(--info);
+    border: 1px solid rgba(33, 150, 243, 0.2);
+  }
+
+  .status-failed {
+    background: rgba(220, 53, 69, 0.1);
+    color: var(--danger);
+    border: 1px solid rgba(220, 53, 69, 0.2);
+  }
+
+  .status-sent {
+    background: rgba(255, 193, 7, 0.1);
+    color: var(--warning);
+    border: 1px solid rgba(255, 193, 7, 0.2);
+  }
+
+  .status-queued {
+    background: rgba(108, 117, 125, 0.1);
+    color: #6c757d;
+    border: 1px solid rgba(108, 117, 125, 0.2);
+  }
+
+  /* Custom styles for WhatsApp template */
+  .datetime-cell {
+    font-size: 0.85rem;
+  }
+  
+  .datetime-cell .date {
+    color: var(--text-light);
+    font-size: 0.75rem;
+  }
+  
+  .datetime-cell .time {
+    font-weight: 500;
+  }
+  
+  .message-cell {
+    max-width: 250px;
+  }
+  
+  .message-preview {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  
+  .template-info {
+    margin-top: 0.25rem;
+  }
+  
+  .unique-code-cell {
+    font-family: 'Courier New', monospace;
+    font-size: 0.85rem;
+    background: rgba(163, 176, 135, 0.1);
+    padding: 0.125rem 0.375rem;
+    border-radius: 4px;
+    border: 1px solid rgba(163, 176, 135, 0.2);
+  }
+  
+  .error-message {
+    cursor: help;
+  }
+  
+  /* Insights section */
+  .insights-section {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1.5rem;
+    margin-top: 1.5rem;
+  }
+
+  .insight-card {
+    background: rgba(163, 176, 135, 0.05);
+    border: 1px solid rgba(163, 176, 135, 0.2);
+    border-radius: 12px;
+    padding: 1.5rem;
+  }
+
+  .insight-header {
+    margin-bottom: 1rem;
+    border-bottom: 1px solid rgba(163, 176, 135, 0.2);
+    padding-bottom: 0.75rem;
+  }
+
+  .insight-header h3 {
+    color: var(--primary-dark);
+    font-size: 1.1rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  .insight-header i {
+    color: var(--accent-green);
+  }
+
+  .insight-content {
+    padding: 0.5rem 0;
+  }
+
+  .stats-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+  }
+  
+  .stat-item {
+    text-align: center;
+    padding: 0.75rem;
+    background: rgba(163, 176, 135, 0.05);
+    border-radius: 8px;
+    border: 1px solid rgba(163, 176, 135, 0.1);
+  }
+  
+  .stat-item .stat-value {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: var(--text-dark);
+  }
+  
+  .stat-item .stat-label {
+    font-size: 0.85rem;
+    color: var(--text-light);
+  }
+  
+  .time-insight {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+  }
+  
+  .insight-item {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 0.75rem;
+    background: rgba(163, 176, 135, 0.05);
+    border-radius: 8px;
+    border: 1px solid rgba(163, 176, 135, 0.1);
+  }
+  
+  .insight-item i {
+    font-size: 1.25rem;
+    color: var(--accent-green);
+    width: 30px;
+    text-align: center;
+  }
+  
+  .insight-title {
+    font-size: 0.85rem;
+    color: var(--text-light);
+  }
+  
+  .insight-value {
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--text-dark);
+  }
+  
+  .progress {
+    background-color: rgba(163, 176, 135, 0.1);
+    border-radius: 4px;
+    height: 8px;
+  }
+  
+  .progress-bar {
+    border-radius: 4px;
+  }
+
+  /* Text utilities */
+  .text-center {
+    text-align: center;
+  }
+
+  .text-muted {
+    color: var(--text-light) !important;
+  }
+
+  .text-success {
+    color: var(--success) !important;
+  }
+
+  .text-danger {
+    color: var(--danger) !important;
+  }
+
+  .mt-1 { margin-top: 0.25rem; }
+  .mt-2 { margin-top: 0.5rem; }
+  .mt-3 { margin-top: 1rem; }
+  .mt-4 { margin-top: 1.5rem; }
+  .mt-5 { margin-top: 2rem; }
+
+  .py-3 { padding-top: 1rem; padding-bottom: 1rem; }
+  .py-4 { padding-top: 1.5rem; padding-bottom: 1.5rem; }
+
+  /* Layout */
+  .layout-container {
+    display: flex;
+    min-height: calc(100vh - 90px);
+    background: white;
+    align-items: stretch;
+    position: relative;
+  }
+
+  /* Sidebar */
+  .sidebar {
+    width: 320px;
+    background: var(--primary-dark);
+    color: white;
+    padding: 2rem 1.5rem;
+    box-shadow: 2px 0 20px rgba(0, 0, 0, 0.1);
+    border-radius: 0 20px 20px 0;
+    position: sticky;
+    top: 90px;
+    height: auto;
+    min-height: calc(100vh - 90px);
+    overflow-y: auto;
+    flex-shrink: 0;
+    margin-top: 40px;
+    margin-left: 10px;
+  }
+
+  .sidebar-content {
+    display: flex;
+    flex-direction: column;
+    gap: 2rem;
+    height: 100%;
+  }
+
+  .user-welcome {
+    text-align: center;
+    padding-bottom: 1.5rem;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  }
+
+  .welcome-title {
+    font-size: 1.5rem;
+    font-weight: 600;
+    margin-bottom: 0.5rem;
+    color: var(--accent-green);
+  }
+
+  .wave-emoji {
+    display: inline-block;
+    animation: wave 1.5s ease-in-out infinite;
+  }
+
+  @keyframes wave {
+    0%, 100% { transform: rotate(0deg); }
+    25% { transform: rotate(15deg); }
+    75% { transform: rotate(-10deg); }
+  }
+
+  .user-name {
+    font-size: 1.1rem;
+    color: var(--accent-yellow);
+    font-weight: 500;
+    margin-bottom: 1rem;
+  }
+
+  .user-details {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    align-items: center;
+  }
+
+  .detail-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.4rem 0.8rem;
+    background: rgba(163, 176, 135, 0.1);
+    border-radius: 20px;
+    font-size: 0.85rem;
+    color: rgba(255, 255, 255, 0.9);
+  }
+
+  .detail-badge i {
+    color: var(--accent-green);
+  }
+
+  /* Stats Section in Sidebar */
+  .stats-section {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 1rem;
+    padding-bottom: 1.5rem;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  }
+
+  .stat-card {
+    background: rgba(163, 176, 135, 0.1);
+    padding: 1rem;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    border: 1px solid rgba(163, 176, 135, 0.2);
+  }
+
+  .stat-icon {
+    width: 48px;
+    height: 48px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.5rem;
+  }
+
+  .inventory-icon {
+    background: rgba(163, 176, 135, 0.2);
+    color: var(--accent-green);
+  }
+
+  .stat-info {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .stat-value {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: white;
+  }
+
+  .stat-label {
+    font-size: 0.75rem;
+    color: rgba(255, 255, 255, 0.7);
+  }
+
+  /* Quick Actions */
+  .quick-actions, .admin-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+
+  .section-title {
+    font-size: 1.1rem;
+    color: var(--accent-yellow);
+    margin-bottom: 0.5rem;
+    font-weight: 500;
+  }
+
+  .action-btn {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.875rem 1rem;
+    background: rgba(163, 176, 135, 0.1);
+    color: var(--accent-yellow);
+    text-decoration: none;
+    border-radius: 10px;
+    transition: all 0.3s ease;
+    border: 1px solid rgba(163, 176, 135, 0.2);
+    position: relative;
+    border: none;
+    width: 100%;
+    text-align: left;
+    cursor: pointer;
+  }
+
+  .action-btn:hover {
+    background: rgba(163, 176, 135, 0.2);
+    color: white;
+    transform: translateX(5px);
+    text-decoration: none;
+  }
+
+  .action-btn i {
+    color: var(--accent-green);
+    font-size: 1.1rem;
+  }
+
+  .action-btn span {
+    flex: 1;
+  }
+
+  .action-btn.active {
+    background: rgba(163, 176, 135, 0.3);
+    border-color: var(--accent-green);
+  }
+
+  /* Main Content */
+  .main-content {
+    flex: 1;
+    background: #ffffff;
+    padding: 2rem;
+    overflow-y: auto;
+    min-height: calc(100vh - 90px);
+    display: flex;
+    flex-direction: column;
+    gap: 2rem;
+    position: relative;
+  }
+
+  /* Page Header */
+  .page-header {
+    margin-bottom: 0;
+    background: linear-gradient(135deg, var(--accent-green) 0%, #8a9975 100%);
+    border-radius: 20px;
+    padding: 1.5rem 2rem;
+    box-shadow: 0 8px 32px rgba(163, 176, 135, 0.2);
+    border: 2px solid black;
+  }
+
+  .header-content {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+  }
+
+  .header-text {
+    text-align: center;
+  }
+
+  .page-title {
+    font-size: 2rem;
+    font-weight: 700;
+    color: white;
+    margin-bottom: 0.5rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.75rem;
+  }
+
+  .page-title i {
+    font-size: 1.75rem;
+  }
+
+  .page-subtitle {
+    font-size: 1rem;
+    color: white;
+    font-weight: 400;
+  }
+
+  /* Advance Sale Card - Rename to generic card */
+  .advance-sale-card {
+    background: white;
+    border-radius: 16px;
+    border: 2px solid black;
+    overflow: hidden;
+    box-shadow: 0 8px 32px rgba(163, 176, 135, 0.2);
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .card-header {
+    background: var(--primary-dark);
+    color: white;
+    padding: 1.5rem 2rem;
+    border-bottom: 2px solid var(--accent-green);
+  }
+
+  .card-title {
+    font-size: 1.5rem;
+    font-weight: 600;
+    margin-bottom: 0.5rem;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+  }
+
+  .card-title i {
+    color: var(--accent-yellow);
+  }
+
+  .card-subtitle {
+    color: rgba(255, 255, 255, 0.8);
+    font-size: 0.95rem;
+  }
+
+  .card-content {
+    flex: 1;
+    padding: 2rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+  }
+
+  /* Table Section */
+  .table-section {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .table-responsive {
+    overflow-x: auto;
+    flex: 1;
+    border: 1px solid rgba(163, 176, 135, 0.2);
+    border-radius: 8px;
+    background: white;
+  }
+
+  /* Card Footer */
+  .card-footer {
+    padding: 1.5rem 2rem;
+    background: rgba(163, 176, 135, 0.05);
+    border-top: 1px solid rgba(163, 176, 135, 0.2);
+  }
+
+  .footer-info h5 {
+    color: var(--text-dark);
+    margin-bottom: 1rem;
+    font-size: 1rem;
+  }
+
+  .footer-info ul {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 0.75rem;
+  }
+
+  .footer-info li {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.5rem;
+    font-size: 0.9rem;
+    color: var(--text-light);
+  }
+
+  .footer-info li i {
+    color: var(--accent-green);
+    margin-top: 0.25rem;
+  }
+
+  .footer-info strong {
+    color: var(--text-dark);
+  }
+
+  /* Responsive Design */
+  @media (max-width: 1200px) {
+    .layout-container {
+      flex-direction: column;
+    }
+    
+    .sidebar {
+      width: 100%;
+      margin: 0;
+      border-radius: 0;
+      position: relative;
+      top: 0;
+      min-height: auto;
+    }
+
+    .stats-section {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  @media (max-width: 992px) {
+    .insights-section {
+      grid-template-columns: 1fr;
+    }
+    
+    .stats-grid {
+      grid-template-columns: 1fr 1fr;
+    }
+  }
+
+  @media (max-width: 768px) {
+    .main-content {
+      padding: 1rem;
+    }
+
+    .page-header {
+      padding: 1.5rem;
+      border: 2px solid black;
+    }
+
+    .page-title {
+      font-size: 1.5rem;
+    }
+
+    .card-content {
+      padding: 1rem;
+    }
+
+    .stats-grid {
+      grid-template-columns: 1fr;
+    }
+
+    .footer-info ul {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  @media (max-width: 576px) {
+    .sidebar {
+      padding: 1rem;
+    }
+    
+    .welcome-title {
+      font-size: 1.25rem;
+    }
+    
+    .card-header {
+      padding: 1rem;
+    }
+    
+    .card-title {
+      font-size: 1.25rem;
+    }
+    
+    .whatsapp-messages-table th,
+    .whatsapp-messages-table td {
+      padding: 0.5rem;
+      font-size: 0.8rem;
+    }
+  }
+</style>
+
+<!-- ADD JQUERY AND BOOTSTRAP -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
+<script>
+$(document).ready(function() {
+  // Initialize tooltips
+  $('[data-bs-toggle="tooltip"]').tooltip();
+  
+  // Export messages button
+  $('#exportMessagesBtn').on('click', function() {
+    exportMessages();
+  });
+  
+  // Initialize status badges
+  initializeStatusBadges();
+});
+
+function initializeStatusBadges() {
+  // Add appropriate classes to status badges based on their text
+  $('.status-badge').each(function() {
+    const text = $(this).text().toLowerCase();
+    let statusClass = 'status-';
+    
+    if (text.includes('delivered')) {
+      statusClass += 'delivered';
+    } else if (text.includes('read')) {
+      statusClass += 'read';
+    } else if (text.includes('failed') || text.includes('error')) {
+      statusClass += 'failed';
+    } else if (text.includes('sent')) {
+      statusClass += 'sent';
+    } else if (text.includes('queued')) {
+      statusClass += 'queued';
+    } else {
+      statusClass += text.replace(/[^a-z0-9]/g, '-');
+    }
+    
+    $(this).addClass(statusClass);
+  });
+}
+
+function exportMessages() {
+  // Collect all message data
+  const messages = [];
+  $('tbody tr').each(function() {
+    const row = $(this);
+    if (row.find('td').length > 1) {
+      const message = {
+        datetime: row.find('td:eq(0)').text().trim(),
+        message: row.find('.message-preview').attr('title') || row.find('.message-preview').text(),
+        status: row.find('.status-badge').text(),
+        sent: row.find('td:eq(3)').text().trim(),
+        delivered: row.find('td:eq(4)').text().trim(),
+        read: row.find('td:eq(5)').text().trim(),
+        time_to_read: row.find('td:eq(6)').text().trim(),
+        unique_code: row.find('.unique-code-cell').text(),
+        error: row.find('.error-message').attr('title') || ''
+      };
+      messages.push(message);
+    }
+  });
+  
+  if (messages.length === 0) {
+    showToast('No messages to export', 'warning');
+    return;
+  }
+  
+  // Create CSV
+  let csvContent = "data:text/csv;charset=utf-8,";
+  
+  // Headers
+  const headers = [
+    'Date & Time', 'Message', 'Status', 'Sent At',
+    'Delivered At', 'Read At', 'Time to Read',
+    'Unique Code', 'Error Message'
+  ];
+  csvContent += headers.join(',') + "\n";
+  
+  // Data rows
+  messages.forEach(msg => {
+    const row = [
+      `"${msg.datetime}"`,
+      `"${msg.message.replace(/"/g, '""')}"`,
+      `"${msg.status}"`,
+      `"${msg.sent}"`,
+      `"${msg.delivered}"`,
+      `"${msg.read}"`,
+      `"${msg.time_to_read}"`,
+      `"${msg.unique_code}"`,
+      `"${msg.error.replace(/"/g, '""')}"`
+    ];
+    csvContent += row.join(',') + "\n";
+  });
+  
+  // Download
+  const encodedUri = encodeURI(csvContent);
+  const link = document.createElement("a");
+  link.setAttribute("href", encodedUri);
+  link.setAttribute("download", `whatsapp_messages_${new Date().toISOString().split('T')[0]}_${messages.length}_messages.csv`);
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  
+  showToast(`Exported ${messages.length} messages successfully`, 'success');
+}
+
+function showToast(message, type = 'info') {
+  const icon = type === 'success' ? 'check-circle' : 
+               type === 'error' ? 'exclamation-triangle' : 
+               type === 'warning' ? 'exclamation-circle' : 'info-circle';
+  
+  const bgColor = type === 'success' ? 'success' : 
+                  type === 'error' ? 'danger' : 
+                  type === 'warning' ? 'warning' : 'info';
+  
+  // Remove existing toasts
+  $('.alert-toast').remove();
+  
+  const toast = $(`
+    <div class="alert alert-${bgColor} alert-dismissible fade show alert-toast" role="alert">
+      <div class="d-flex align-items-center">
+        <i class="fas fa-${icon} me-2"></i>
+        <span>${message}</span>
+      </div>
+      <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>
+  `);
+  
+  $('body').append(toast);
+  
+  // Position toast
+  toast.css({
+    'position': 'fixed',
+    'top': '20px',
+    'right': '20px',
+    'z-index': '9999',
+    'min-width': '300px',
+    'box-shadow': '0 4px 12px rgba(0,0,0,0.15)'
+  });
+  
+  // Auto remove after 5 seconds
+  setTimeout(() => {
+    toast.alert('close');
+  }, 5000);
+}
+
+console.log("✅ WhatsApp Message Detail view initialized");
+</script>
+
+{% endblock %}

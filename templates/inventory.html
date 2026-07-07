@@ -1,0 +1,2713 @@
+{% extends "base.html" %}
+{% load static %}
+{% block content %}
+
+<div class="layout-container">
+  <!-- Sidebar -->
+  <aside class="sidebar">
+    <div class="sidebar-content">
+      <!-- User Welcome Section -->
+      <div class="user-welcome">
+        <div class="welcome-header">
+          <h1 class="welcome-title">
+            Welcome!
+            <span class="wave-emoji">👋</span>
+          </h1>
+          <p class="user-name">{{request.user.first_name}} {{request.user.last_name}}</p>
+          <div class="user-details">
+            <span class="detail-badge">
+              <i class="fas fa-id-badge"></i>
+              {{ request.user.employee_code }}
+            </span>
+            <span class="detail-badge">
+              <i class="fas fa-building"></i>
+              {{ request.user.department }}
+            </span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Stats Section -->
+      <div class="stats-section">
+        <div class="stat-card">
+          <div class="stat-icon inventory-icon">
+            <i class="fas fa-boxes"></i>
+          </div>
+          <div class="stat-info">
+            <span class="stat-value" id="totalProducts">{{ inventory|length }}</span>
+            <span class="stat-label">Total Products</span>
+          </div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon inventory-icon">
+            <i class="fas fa-cube"></i>
+          </div>
+          <div class="stat-info">
+            <span class="stat-value" id="totalQuantity">{{ total_quantity }}</span>
+            <span class="stat-label">Total Items</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Quick Actions -->
+      <div class="quick-actions">
+        <h3 class="section-title">Quick Actions</h3>
+        <a href="{% url 'view-requests' %}" class="action-btn" style="text-decoration: none;">
+          <i class="fas fa-tachometer-alt"></i>
+          <span>Indent Dashboard</span>
+        </a>
+        <a href="{% url 'create-an-indent' %}" class="action-btn" style="text-decoration: none;">
+          <i class="fas fa-home"></i>
+          <span>Back to Home</span>
+        </a>
+        <a href="{% url 'dispatch_log_book' %}" class="action-btn" style="text-decoration: none;">
+          <i class="fas fa-book"></i>
+          <span>Dispatch Log Book</span>
+        </a>
+        <a href="{% url 'advance-sale' %}" class="action-btn" style="text-decoration: none;">
+          <i class="fas fa-truck"></i>
+          <span>Advance Sale</span>
+        </a>
+        <a href="{% url 'view_others_inventory' %}" class="action-btn" style="text-decoration: none;">
+          <i class="fas fa-window-restore"></i>
+          <span>Other's Inventory</span>
+        </a>
+      </div>
+    </div>
+  </aside>
+
+  <!-- Main Content -->
+  <main class="main-content">
+    <!-- Page Header -->
+    <div class="page-header">
+      <div class="header-content">
+        <div class="header-text">
+          <h1 class="page-title">
+            <i class="fas fa-warehouse"></i>
+            Inventory Management
+          </h1>
+          <p class="page-subtitle">Location <strong>{{ request.user.location }}</strong> - Complete inventory overview and analytics</p>
+        </div>
+        
+        <!-- Search Bar -->
+        <div class="search-container">
+          <div class="search-wrapper">
+            <i class="fas fa-search search-icon"></i>
+            <input
+              type="text"
+              id="search-input"
+              class="search-input"
+              placeholder="Search products by name..."
+              aria-label="Search"
+            />
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Analytics Dashboard -->
+    <div class="analytics-section">
+      <div class="analytics-header">
+        <h3 class="section-title">
+          <i class="fas fa-chart-bar"></i>
+          Inventory Analytics
+        </h3>
+      </div>
+      
+      <div class="charts-container">
+        <!-- Top Products Chart -->
+        <div class="chart-card">
+          <div class="chart-header">
+            <h4>Top Products by Quantity</h4>
+            <div class="chart-legend">
+              <span class="legend-item">
+                <span class="legend-color" style="background-color: #A3B087;"></span>
+                Quantity
+              </span>
+            </div>
+          </div>
+          <div class="chart-container">
+            <canvas id="topProductsChart"></canvas>
+          </div>
+        </div>
+
+        <!-- Stock Distribution Chart -->
+        <div class="chart-card">
+          <div class="chart-header">
+            <h4>Stock Distribution</h4>
+            <div class="chart-legend" id="distributionLegend"></div>
+          </div>
+          <div class="chart-container">
+            <canvas id="stockDistributionChart"></canvas>
+          </div>
+        </div>
+
+        <!-- Inventory Trends -->
+        <div class="chart-card full-width">
+          <div class="chart-header">
+            <h4>Inventory Trends</h4>
+            <div class="chart-controls">
+              <select id="trendPeriod" class="trend-select">
+                <option value="7">Last 7 Days</option>
+                <option value="30" selected>Last 30 Days</option>
+                <option value="90">Last 90 Days</option>
+              </select>
+            </div>
+          </div>
+          <div class="chart-container">
+            <canvas id="inventoryTrendsChart"></canvas>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Inventory Table Section -->
+    <div class="inventory-table-section">
+      <div class="section-header">
+        <h3 class="section-title">
+          <i class="fas fa-list"></i>
+          Product Inventory
+        </h3>
+        <p class="section-subtitle">Manage and view all products in your inventory with stock status and actions</p>
+      </div>
+
+      <!-- Table Wrapper -->
+      <div class="table-wrapper">
+        <div class="table-header-actions">
+          <div class="selected-info" id="selectedInfo" style="display: none;">
+            <i class="fas fa-check-circle"></i>
+            <span id="selectedCount">0</span> products selected
+          </div>
+          <div class="table-filters">
+            <button class="filter-btn active" data-filter="all">
+              <i class="fas fa-list"></i> All
+            </button>
+            <button class="filter-btn" data-filter="high">
+              <i class="fas fa-arrow-up"></i> High Stock
+            </button>
+            <button class="filter-btn" data-filter="low">
+              <i class="fas fa-arrow-down"></i> Low Stock
+            </button>
+            <button class="filter-btn" data-filter="critical">
+              <i class="fas fa-exclamation-triangle"></i> Critical
+            </button>
+          </div>
+        </div>
+
+        <div class="table-content">
+          <table class="modern-table" id="inventoryTable">
+            <thead>
+              <tr>
+                <th class="product-col">Product Name</th>
+                <th class="mapped-col">SAP Mapped Product</th>
+                <th class="quantity-col">Current Stock</th>
+                <th class="status-col">Stock Status</th>
+                <th class="trend-col">Trend</th>
+                <th class="value-col">Stock Value</th>
+                <th class="actions-col">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% if inventory %}
+                {% for item in inventory %}
+                <tr class="table-row" data-quantity="{{ item.total_quantity }}" data-status="{% if item.total_quantity > 100 %}high{% elif item.total_quantity > 20 %}medium{% else %}low{% endif %}">
+                  <td>
+                    <div class="product-cell">
+                      <div class="product-name">{{ item.product__name }}</div>
+                      <div class="product-category">Material Type: {{ item.product__material_type|default:"General" }}</div>
+                    </div>
+                  </td>
+                  <td>
+                    <div class="mapped-product-cell">
+                      {% if item.sap_mapped_product and item.sap_mapped_product != item.product__name %}
+                        <div class="mapped-product-name">{{ item.sap_mapped_product }}</div>
+                        <div class="mapping-badge sap-badge">
+                          <i class="fas fa-exchange-alt"></i> SAP Mapped
+                        </div>
+                      {% else %}
+                        <div class="mapped-product-name same-product">{{ item.product__name }}</div>
+                        <div class="mapping-badge indent-badge">
+                          <i class="fas fa-cube"></i> INDENT_EASY
+                        </div>
+                      {% endif %}
+                    </div>
+                  </td>
+                  <td>
+                    <div class="quantity-cell">
+                      <span class="quantity-value">{{ item.total_quantity }}</span>
+                      <span class="quantity-unit">units</span>
+                    </div>
+                    {% if item.expired_qty or item.damaged_qty %}
+                    <div class="cond-badges">
+                      {% if item.expired_qty %}<span class="cond-badge expired" title="Expired"><i class="fas fa-hourglass-end"></i> {{ item.expired_qty }}</span>{% endif %}
+                      {% if item.damaged_qty %}<span class="cond-badge damaged" title="Damaged"><i class="fas fa-house-damage"></i> {{ item.damaged_qty }}</span>{% endif %}
+                    </div>
+                    {% endif %}
+                  </td>
+                  <td>
+                    <div class="status-cell">
+                      {% if item.total_quantity > 100 %}
+                      <span class="status-badge high">
+                        <i class="fas fa-check-circle"></i> High Stock
+                      </span>
+                      {% elif item.total_quantity > 20 %}
+                      <span class="status-badge medium">
+                        <i class="fas fa-info-circle"></i> Medium Stock
+                      </span>
+                      {% else %}
+                      <span class="status-badge low">
+                        <i class="fas fa-exclamation-triangle"></i> Low Stock
+                      </span>
+                      {% endif %}
+                    </div>
+                  </td>
+                  <td>
+                    <div class="trend-cell">
+                      {% if item.trend > 0 %}
+                      <span class="trend-up">
+                        <i class="fas fa-arrow-up"></i>
+                        {{ item.trend }}%
+                      </span>
+                      {% elif item.trend < 0 %}
+                      <span class="trend-down">
+                        <i class="fas fa-arrow-down"></i>
+                        {{ item.trend|slice:"1:" }}%
+                      </span>
+                      {% else %}
+                      <span class="trend-neutral">
+                        <i class="fas fa-minus"></i>
+                        Stable
+                      </span>
+                      {% endif %}
+                    </div>
+                  </td>
+                  <td>
+                    <div class="value-cell">
+                      <span class="value-amount">₹{{ item.value|default:"0" }}</span>
+                    </div>
+                  </td>
+                  <td>
+                    <div class="actions-cell">
+                      <button class="action-btn-small primary" data-product="{{ item.product__name }}" data-product-id="{{ item.product__id }}">
+                        <i class="fas fa-eye"></i>
+                        <span>View Details</span>
+                      </button>
+                      <button class="action-btn-small warning" data-product="{{ item.product__name }}" data-product-id="{{ item.product__id }}">
+                        <i class="fas fa-chart-line"></i>
+                        <span>History</span>
+                      </button>
+                      <button class="action-btn-small adjust adjust-btn" data-product="{{ item.product__name }}" data-product-id="{{ item.product__id }}">
+                        <i class="fas fa-sliders-h"></i>
+                        <span>Adjust</span>
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+                {% endfor %}
+              {% else %}
+                <tr>
+                  <td colspan="7" class="empty-state">
+                    <div class="empty-state-content">
+                      <i class="fas fa-inbox"></i>
+                      <h3>No Inventory Found</h3>
+                      <p>There is no inventory data available for your location.</p>
+                    </div>
+                  </td>
+                </tr>
+              {% endif %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- Stock Condition Overview -->
+    <div class="condition-section">
+      <div class="condition-header">
+        <h3><i class="fas fa-clipboard-list"></i> Stock Condition Overview</h3>
+        <p>Usable stock vs. expired / damaged held stock and items disposed (scrapped) for this location.</p>
+      </div>
+
+      <div class="condition-cards">
+        <div class="cond-card good">
+          <div class="cond-card-icon"><i class="fas fa-check-circle"></i></div>
+          <div class="cond-card-info"><span class="cond-card-value">{{ total_good }}</span><span class="cond-card-label">Usable (Good)</span></div>
+        </div>
+        <div class="cond-card expired">
+          <div class="cond-card-icon"><i class="fas fa-hourglass-end"></i></div>
+          <div class="cond-card-info"><span class="cond-card-value">{{ total_expired }}</span><span class="cond-card-label">Expired (held)</span></div>
+        </div>
+        <div class="cond-card damaged">
+          <div class="cond-card-icon"><i class="fas fa-house-damage"></i></div>
+          <div class="cond-card-info"><span class="cond-card-value">{{ total_damaged }}</span><span class="cond-card-label">Damaged (held)</span></div>
+        </div>
+        <div class="cond-card scrapped">
+          <div class="cond-card-icon"><i class="fas fa-fire"></i></div>
+          <div class="cond-card-info"><span class="cond-card-value">{{ total_scrapped }}</span><span class="cond-card-label">Scrapped / Disposed</span></div>
+        </div>
+      </div>
+
+      <div class="flagged-panel">
+        <div class="flagged-title">
+          <h4><i class="fas fa-exclamation-triangle"></i> Flagged Stock — Expired / Damaged</h4>
+          <span class="flagged-count">{{ flagged_count }} product{{ flagged_count|pluralize }}</span>
+        </div>
+        {% if flagged_items %}
+        <div class="flagged-table-wrap">
+          <table class="flagged-table">
+            <thead>
+              <tr>
+                <th>Product</th>
+                <th>Material Type</th>
+                <th>Expired</th>
+                <th>Damaged</th>
+                <th>Usable (Good)</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for item in flagged_items %}
+              <tr>
+                <td class="fp-name">{{ item.product__name }}</td>
+                <td>{{ item.product__material_type|default:"General" }}</td>
+                <td>{% if item.expired_qty %}<span class="cond-badge expired">{{ item.expired_qty }}</span>{% else %}—{% endif %}</td>
+                <td>{% if item.damaged_qty %}<span class="cond-badge damaged">{{ item.damaged_qty }}</span>{% else %}—{% endif %}</td>
+                <td>{{ item.total_quantity }}</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        {% else %}
+        <div class="flagged-empty">
+          <i class="fas fa-check-circle"></i>
+          <span>No expired or damaged stock flagged at your location.</span>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- Quick Stats -->
+    <div class="quick-stats">
+      <div class="stat-item">
+        <div class="stat-icon">
+          <i class="fas fa-box-open"></i>
+        </div>
+        <div class="stat-content">
+          <span class="stat-number">{{ high_stock_count }}</span>
+          <span class="stat-label">High Stock Items</span>
+        </div>
+      </div>
+      <div class="stat-item">
+        <div class="stat-icon">
+          <i class="fas fa-exclamation-triangle"></i>
+        </div>
+        <div class="stat-content">
+          <span class="stat-number">{{ low_stock_count }}</span>
+          <span class="stat-label">Low Stock Items</span>
+        </div>
+      </div>
+      <div class="stat-item">
+        <div class="stat-icon">
+          <i class="fas fa-rupee-sign"></i>
+        </div>
+        <div class="stat-content">
+          <span class="stat-number">₹{{ total_value }}</span>
+          <span class="stat-label">Total Inventory Value</span>
+        </div>
+      </div>
+      <div class="stat-item">
+        <div class="stat-icon">
+          <i class="fas fa-sync-alt"></i>
+        </div>
+        <div class="stat-content">
+          <span class="stat-number">{{ avg_trend }}%</span>
+          <span class="stat-label">Avg Monthly Trend</span>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<!-- Product Detail Modal -->
+<div class="modal fade" id="productDetailModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered modal-lg">
+    <div class="modal-content modern-modal">
+      <div class="modal-header">
+        <h5 class="modal-title">
+          <i class="fas fa-box"></i>
+          Product Details
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <div class="product-detail-content">
+          <div class="product-header">
+            <h4 id="detailProductName">Product Name</h4>
+            <span class="product-sku" id="detailProductSKU">SKU: Loading...</span>
+          </div>
+          
+          <div class="detail-grid">
+            <div class="detail-item">
+              <label>Current Stock</label>
+              <span class="detail-value" id="detailStock">0 units</span>
+            </div>
+            <div class="detail-item">
+              <label>Stock Status</label>
+              <span class="detail-value" id="detailStatus">Loading...</span>
+            </div>
+            <div class="detail-item">
+              <label>Category</label>
+              <span class="detail-value" id="detailCategory">Loading...</span>
+            </div>
+            <div class="detail-item">
+              <label>Last Updated</label>
+              <span class="detail-value" id="detailLastUpdated">Loading...</span>
+            </div>
+            <div class="detail-item">
+              <label>Product Code</label>
+              <span class="detail-value" id="detailProductCode">Loading...</span>
+            </div>
+            <div class="detail-item">
+              <label>Size</label>
+              <span class="detail-value" id="detailSize">Loading...</span>
+            </div>
+            <div class="detail-item full-width">
+              <label>SAP Mapped Product</label>
+              <span class="detail-value" id="detailSapMappedProduct">Loading...</span>
+            </div>
+            <div class="detail-item full-width">
+              <label>NDDB Mapped Product</label>
+              <span class="detail-value" id="detailNddbMappedProduct">Loading...</span>
+            </div>
+          </div>
+          
+          <div class="stock-history">
+            <h5>Stock History</h5>
+            <div class="history-chart">
+              <canvas id="productHistoryChart"></canvas>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn-secondary" data-bs-dismiss="modal">
+          Close
+        </button>
+        <button type="button" class="btn-primary" id="updateStockBtn">
+          <i class="fas fa-edit"></i>
+          Update Stock
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Product History Modal -->
+<div class="modal fade" id="productHistoryModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered modal-xl">
+    <div class="modal-content modern-modal">
+      <div class="modal-header">
+        <h5 class="modal-title">
+          <i class="fas fa-chart-line"></i>
+          Product History
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <div class="history-content">
+          <div class="history-header">
+            <h4 id="historyProductName">Product Name</h4>
+            <span class="history-period" id="historyPeriod">Last 30 days</span>
+          </div>
+          
+          <div class="history-filters">
+            <select id="historyPeriodSelect" class="history-select">
+              <option value="7">Last 7 Days</option>
+              <option value="30" selected>Last 30 Days</option>
+              <option value="90">Last 90 Days</option>
+              <option value="365">Last Year</option>
+            </select>
+          </div>
+          
+          <div class="history-chart-container">
+            <canvas id="detailedHistoryChart"></canvas>
+          </div>
+          
+          <div class="history-table-container">
+            <table class="modern-table" id="historyTable">
+              <thead>
+                <tr>
+                  <th>Date</th>
+                  <th>Action</th>
+                  <th>Quantity Change</th>
+                  <th>Previous Qty</th>
+                  <th>New Qty</th>
+                  <th>Reference</th>
+                  <th>Performed By</th>
+                </tr>
+              </thead>
+              <tbody id="historyTableBody">
+                <!-- History data will be populated here -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn-secondary" data-bs-dismiss="modal">
+          Close
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Adjust Condition / Dispose Modal -->
+<div class="modal fade" id="adjustModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content adjust-modal">
+      <div class="modal-header">
+        <h5 class="modal-title"><i class="fas fa-sliders-h"></i> Adjust Stock — <span id="adjProductName"></span></h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <form id="adjustForm" enctype="multipart/form-data">
+        {% csrf_token %}
+        <input type="hidden" name="product_id" id="adjProductId" />
+        <div class="modal-body">
+          <div class="adj-available">
+            <span class="adj-chip good"><i class="fas fa-check-circle"></i> Good: <b id="adjGood">0</b></span>
+            <span class="adj-chip expired"><i class="fas fa-hourglass-end"></i> Expired: <b id="adjExpired">0</b></span>
+            <span class="adj-chip damaged"><i class="fas fa-house-damage"></i> Damaged: <b id="adjDamaged">0</b></span>
+          </div>
+          <p class="adj-note">You can only adjust stock held at <strong>your own</strong> location. Marking is one-way (Good → bad). Disposing/scrapping <strong>removes</strong> the stock and needs a proof photo.</p>
+
+          <div class="adj-field">
+            <label>Action</label>
+            <select name="action" id="adjAction" required>
+              <option value="MARK_EXPIRED">Mark as Expired (Good → Expired)</option>
+              <option value="MARK_DAMAGED">Mark as Damaged (Good → Damaged)</option>
+              <option value="DISPOSE">Dispose / Scrap (remove from inventory)</option>
+            </select>
+          </div>
+
+          <div class="adj-field" id="adjSourceField" style="display:none;">
+            <label>Dispose from</label>
+            <select name="source" id="adjSource">
+              <option value="GOOD">Good</option>
+              <option value="EXPIRED">Expired</option>
+              <option value="DAMAGED">Damaged</option>
+            </select>
+          </div>
+
+          <div class="adj-field">
+            <label>Quantity <span id="adjMaxHint" class="adj-max"></span></label>
+            <input type="number" name="quantity" id="adjQuantity" min="1" step="1" required />
+          </div>
+
+          <div class="adj-field" id="adjProofField" style="display:none;">
+            <label><i class="fas fa-camera"></i> Proof photo <span class="adj-req">required</span></label>
+            <input type="file" name="proof" id="adjProof" accept="image/*" />
+            <small>Photo of the destroyed / burned / dumped goods. Once disposed, the stock is permanently removed.</small>
+          </div>
+
+          <div class="adj-field">
+            <label>Reason / Notes (optional)</label>
+            <textarea name="notes" id="adjNotes" rows="2" placeholder="e.g. expired on 12 Jun, burned as per SOP"></textarea>
+          </div>
+
+          <div class="adj-error" id="adjError" style="display:none;"></div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn-primary" id="adjSubmit"><i class="fas fa-check"></i> Apply</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<script>window.OWN_INVENTORY = {{ own_inventory_json|safe }};</script>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<style>
+  :root {
+    --primary-dark: #313647;
+    --primary-light: #435663;
+    --accent-green: #A3B087;
+    --accent-red: #EA5B6F;
+    --accent-yellow: #FFF8D4;
+    --text-dark: #2c3e50;
+    --text-light: #7f8c8d;
+    --bg-light: #f8f9fa;
+    --border-color: #e9ecef;
+    --success: #28a745;
+    --warning: #ffc107;
+    --danger: #dc3545;
+    --info: #17a2b8;
+    --sap-color: #0F828C;
+    --nddb-color: #8B4513;
+  }
+
+  /* Layout */
+  .layout-container {
+    display: flex;
+    min-height: calc(100vh - 90px);
+    background: white;
+    align-items: stretch;
+  }
+
+  /* Sidebar */
+  .sidebar {
+    width: 320px;
+    background: var(--primary-dark);
+    color: white;
+    padding: 2rem 1.5rem;
+    box-shadow: 2px 0 20px rgba(0, 0, 0, 0.1);
+    border-radius: 0 20px 20px 0;
+    position: sticky;
+    top: 90px;
+    height: auto;
+    min-height: calc(100vh - 90px);
+    overflow-y: auto;
+    flex-shrink: 0;
+    margin-top: 40px;
+    margin-left: 10px;
+  }
+
+  .sidebar-content {
+    display: flex;
+    flex-direction: column;
+    gap: 2rem;
+    height: 100%;
+  }
+
+  .user-welcome {
+    text-align: center;
+    padding-bottom: 1.5rem;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  }
+
+  .welcome-title {
+    font-size: 1.5rem;
+    font-weight: 600;
+    margin-bottom: 0.5rem;
+    color: var(--accent-green);
+  }
+
+  .wave-emoji {
+    display: inline-block;
+    animation: wave 1.5s ease-in-out infinite;
+  }
+
+  @keyframes wave {
+    0%, 100% { transform: rotate(0deg); }
+    25% { transform: rotate(15deg); }
+    75% { transform: rotate(-10deg); }
+  }
+
+  .user-name {
+    font-size: 1.1rem;
+    color: var(--accent-yellow);
+    font-weight: 500;
+    margin-bottom: 1rem;
+  }
+
+  .user-details {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    align-items: center;
+  }
+
+  .detail-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.4rem 0.8rem;
+    background: rgba(163, 176, 135, 0.1);
+    border-radius: 20px;
+    font-size: 0.85rem;
+    color: rgba(255, 255, 255, 0.9);
+  }
+
+  .detail-badge i {
+    color: var(--accent-green);
+  }
+
+  /* Stats Section */
+  .stats-section {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 1rem;
+    padding-bottom: 1.5rem;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  }
+
+  .stat-card {
+    background: rgba(163, 176, 135, 0.1);
+    padding: 1rem;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    border: 1px solid rgba(163, 176, 135, 0.2);
+  }
+
+  .stat-icon {
+    width: 48px;
+    height: 48px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.5rem;
+  }
+
+  .inventory-icon {
+    background: rgba(163, 176, 135, 0.2);
+    color: var(--accent-green);
+  }
+
+  .stat-info {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .stat-value {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: white;
+  }
+
+  .stat-label {
+    font-size: 0.75rem;
+    color: rgba(255, 255, 255, 0.7);
+  }
+
+  /* Quick Actions */
+  .quick-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+
+  .section-title {
+    font-size: 1.1rem;
+    color: var(--accent-yellow);
+    margin-bottom: 0.5rem;
+    font-weight: 500;
+  }
+
+  .action-btn {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.875rem 1rem;
+    background: rgba(163, 176, 135, 0.1);
+    color: var(--accent-yellow);
+    text-decoration: none;
+    border-radius: 10px;
+    transition: all 0.3s ease;
+    border: 1px solid rgba(163, 176, 135, 0.2);
+    position: relative;
+  }
+
+  .action-btn:hover {
+    background: rgba(163, 176, 135, 0.2);
+    color: white;
+    transform: translateX(5px);
+  }
+
+  .action-btn i {
+    color: var(--accent-green);
+    font-size: 1.1rem;
+  }
+
+  .action-btn span {
+    flex: 1;
+  }
+
+  /* Main Content */
+  .main-content {
+    flex: 1;
+    background: #ffffff;
+    padding: 2rem;
+    overflow-y: auto;
+    min-height: calc(100vh - 90px);
+    display: flex;
+    flex-direction: column;
+    gap: 2rem;
+  }
+
+  /* Page Header */
+  .page-header {
+    margin-bottom: 0;
+    background: linear-gradient(135deg, var(--accent-green) 0%, #8a9975 100%);
+    border-radius: 20px;
+    padding: 1.5rem 2rem;
+    box-shadow: 0 8px 32px rgba(163, 176, 135, 0.2);
+    border: 2px solid black;
+  }
+
+  .header-content {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+  }
+
+  .header-text {
+    text-align: center;
+  }
+
+  .page-title {
+    font-size: 2rem;
+    font-weight: 700;
+    color: #313647;
+    margin-bottom: 0.5rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.75rem;
+  }
+
+  .page-title i {
+    font-size: 1.75rem;
+  }
+
+  .page-subtitle {
+    font-size: 1rem;
+    color: #313647;
+    font-weight: 400;
+  }
+
+  /* Search Container */
+  .search-container {
+    width: 100%;
+    max-width: none;
+    margin: 0;
+    padding: 0 20px;
+  }
+
+  .search-wrapper {
+    position: relative;
+    display: flex;
+    align-items: center;
+    background: white;
+    border-radius: 50px;
+    overflow: hidden;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+    width: 100%;
+    border: 2px solid transparent;
+    transition: all 0.3s ease;
+  }
+
+  .search-wrapper:focus-within {
+    border-color: var(--accent-green);
+    box-shadow: 0 4px 20px rgba(163, 176, 135, 0.3);
+  }
+
+  .search-icon {
+    position: absolute;
+    left: 1.25rem;
+    color: var(--text-light);
+    font-size: 1rem;
+    z-index: 2;
+  }
+
+  .search-input {
+    flex: 1;
+    border: none;
+    padding: 1rem 1rem 1rem 3rem;
+    font-size: 0.95rem;
+    outline: none;
+    font-family: 'Lexend', sans-serif;
+    border-radius: 50px 0 0 50px;
+    background: transparent;
+    min-width: 0;
+  }
+
+  .search-input::placeholder {
+    color: var(--text-light);
+  }
+
+  /* Analytics Section */
+  .analytics-section {
+    background: linear-gradient(135deg, var(--accent-green) 0%, #8a9975 100%);
+    border-radius: 16px;
+    border: 2px solid black;
+    box-shadow: 0 8px 32px rgba(163, 176, 135, 0.2);
+    overflow: visible;
+  }
+
+  .analytics-header {
+    background: rgba(255, 255, 255, 0.95);
+    padding: 1.5rem;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+    backdrop-filter: blur(10px);
+  }
+
+  .analytics-header .section-title {
+    color: var(--primary-dark);
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+  }
+
+  .analytics-header .section-title i {
+    color: var(--accent-green);
+  }
+
+  .charts-container {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 2rem;
+    padding: 2rem;
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(10px);
+  }
+
+  .chart-card {
+    background: white;
+    border-radius: 16px;
+    padding: 2rem;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+    border: 1px solid rgba(138, 153, 117, 0.2);
+    min-height: 450px;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .chart-card.full-width {
+    grid-column: 1 / -1;
+    min-height: 500px;
+  }
+
+  .chart-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1.5rem;
+    flex-shrink: 0;
+  }
+
+  .chart-header h4 {
+    margin: 0;
+    color: var(--primary-dark);
+    font-weight: 700;
+    font-size: 1.3rem;
+  }
+
+  .chart-legend {
+    display: flex;
+    gap: 1rem;
+    font-size: 0.9rem;
+  }
+
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    color: var(--text-light);
+  }
+
+  .legend-color {
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+  }
+
+  .chart-controls {
+    display: flex;
+    gap: 0.5rem;
+  }
+
+  .trend-select {
+    padding: 0.6rem;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    font-size: 0.9rem;
+    background: white;
+    min-width: 140px;
+  }
+
+  .chart-container {
+    flex: 1;
+    position: relative;
+    min-height: 350px;
+  }
+
+  .chart-card.full-width .chart-container {
+    min-height: 400px;
+  }
+
+  /* NEW: Inventory Table Section */
+  .inventory-table-section {
+    background: linear-gradient(135deg, var(--accent-green) 0%, #8a9975 100%);
+    border-radius: 16px;
+    border: 2px solid black;
+    box-shadow: 0 8px 32px rgba(163, 176, 135, 0.2);
+    overflow: visible;
+  }
+
+  .section-header {
+    background: rgba(255, 255, 255, 0.95);
+    padding: 1.5rem 2rem;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+    backdrop-filter: blur(10px);
+    border-radius: 16px 16px 0 0;
+  }
+
+  .section-header .section-title {
+    color: var(--primary-dark);
+    margin: 0 0 0.5rem 0;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    font-size: 1.3rem;
+    font-weight: 700;
+  }
+
+  .section-header .section-title i {
+    color: var(--accent-green);
+  }
+
+  .section-subtitle {
+    color: var(--primary-dark);
+    margin: 0;
+    font-size: 1rem;
+  }
+
+  /* Table Wrapper - UPDATED */
+  .table-wrapper {
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(10px);
+    border-radius: 0 0 16px 16px;
+    overflow: visible;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .table-header-actions {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1.5rem 2rem;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+  }
+
+  .selected-info {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    color: var(--primary-dark);
+    font-weight: 500;
+  }
+
+  .selected-info i {
+    color: var(--success);
+  }
+
+  .table-filters {
+    display: flex;
+    gap: 0.5rem;
+  }
+
+  .filter-btn {
+    padding: 0.6rem 1.2rem;
+    border: 2px solid transparent black;
+    background: rgba(255, 255, 255, 0.8);
+    color: var(--text-dark);
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 0.95rem;
+    font-weight: 500;
+    transition: all 0.3s ease;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    backdrop-filter: blur(5px);
+  }
+
+  .filter-btn:hover {
+    background: rgba(255, 255, 255, 1);
+    transform: translateY(-2px);
+  }
+
+  .filter-btn.active {
+    background: var(--primary-dark);
+    color: white;
+    border-color: var(--primary-dark);
+  }
+
+  /* Table Content - NEW */
+  .table-content {
+    overflow-x: auto;
+    flex: 1;
+    border-radius: 0 0 16px 16px;
+  }
+
+  .table-content::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+
+  .table-content::-webkit-scrollbar-track {
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 4px;
+  }
+
+  .table-content::-webkit-scrollbar-thumb {
+    background: rgba(138, 153, 117, 0.6);
+    border-radius: 4px;
+  }
+
+  .table-content::-webkit-scrollbar-thumb:hover {
+    background: rgba(138, 153, 117, 0.8);
+  }
+
+  .modern-table {
+    width: 100%;
+    border-collapse: collapse;
+    background: transparent;
+    min-width: 800px;
+  }
+
+  .modern-table thead {
+    background: var(--primary-dark);
+    position: sticky;
+    top: 0;
+    z-index: 10;
+  }
+
+  .modern-table th {
+    color: var(--primary-dark);
+    padding: 1.2rem;
+    font-weight: 600;
+    text-align: left;
+    font-size: 1rem;
+    white-space: nowrap;
+    border-bottom: 2px solid #8a9975;
+  }
+
+  /* Column widths */
+  .product-col { width: 20%; }
+  .mapped-col { width: 20%; }
+  .quantity-col { width: 12%; }
+  .status-col { width: 12%; }
+  .trend-col { width: 12%; }
+  .value-col { width: 12%; }
+  .actions-col { width: 12%; }
+
+  .modern-table td {
+    padding: 1.2rem;
+    border-bottom: 1px solid rgba(138, 153, 117, 0.2);
+    vertical-align: middle;
+    font-size: 0.95rem;
+    background: rgba(255, 255, 255, 0.8);
+  }
+
+  .modern-table tbody tr {
+    transition: all 0.3s ease;
+    background: rgba(255, 255, 255, 0.8);
+  }
+
+  .modern-table tbody tr:hover {
+    background: rgba(255, 255, 255, 0.95);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(138, 153, 117, 0.2);
+  }
+
+  /* Cell Styles */
+  .product-cell {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+  }
+
+  .product-name {
+    font-weight: 600;
+    color: var(--primary-dark);
+    font-size: 1rem;
+  }
+
+  .product-category {
+    font-size: 0.9rem;
+    color: var(--text-light);
+  }
+
+  /* Mapped Product Cell */
+  .mapped-product-cell {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
+  .mapped-product-name {
+    font-weight: 500;
+    color: var(--primary-dark);
+    font-size: 0.95rem;
+  }
+
+  .mapped-product-name.same-product {
+    color: var(--text-light);
+    font-style: italic;
+  }
+
+  .mapping-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.3rem 0.6rem;
+    border-radius: 6px;
+    font-size: 0.75rem;
+    font-weight: 500;
+    white-space: nowrap;
+    width: fit-content;
+  }
+
+  .sap-badge {
+    background: rgba(15, 130, 140, 0.1);
+    color: var(--sap-color);
+    border: 1px solid rgba(15, 130, 140, 0.3);
+  }
+
+  .indent-badge {
+    background: rgba(163, 176, 135, 0.1);
+    color: var(--accent-green);
+    border: 1px solid rgba(163, 176, 135, 0.3);
+  }
+
+  .nddb-badge {
+    background: rgba(139, 69, 19, 0.1);
+    color: var(--nddb-color);
+    border: 1px solid rgba(139, 69, 19, 0.3);
+  }
+
+  .quantity-cell {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  .quantity-value {
+    font-weight: 700;
+    color: var(--text-dark);
+    font-size: 1.2rem;
+  }
+
+  .quantity-unit {
+    font-size: 0.9rem;
+    color: var(--text-light);
+  }
+
+  /* Status Cell */
+  .status-cell {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
+  .status-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.6rem 0.9rem;
+    border-radius: 8px;
+    font-size: 0.9rem;
+    font-weight: 600;
+    white-space: nowrap;
+  }
+
+  .status-badge.high {
+    background: rgba(40, 167, 69, 0.1);
+    color: var(--success);
+  }
+
+  .status-badge.medium {
+    background: rgba(255, 193, 7, 0.1);
+    color: var(--warning);
+  }
+
+  .status-badge.low {
+    background: rgba(220, 53, 69, 0.1);
+    color: var(--danger);
+  }
+
+  /* Trend Cell */
+  .trend-cell {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  .trend-up, .trend-down, .trend-neutral {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    padding: 0.4rem 0.7rem;
+    border-radius: 6px;
+    font-size: 0.9rem;
+    font-weight: 600;
+  }
+
+  .trend-up {
+    background: rgba(40, 167, 69, 0.1);
+    color: var(--success);
+  }
+
+  .trend-down {
+    background: rgba(220, 53, 69, 0.1);
+    color: var(--danger);
+  }
+
+  .trend-neutral {
+    background: rgba(108, 117, 125, 0.1);
+    color: var(--text-light);
+  }
+
+  /* Value Cell */
+  .value-cell {
+    font-weight: 600;
+    color: var(--primary-dark);
+  }
+
+  .value-amount {
+    font-size: 1.1rem;
+  }
+
+  /* Actions Cell */
+  .actions-cell {
+    display: flex;
+    gap: 0.5rem;
+  }
+
+  .action-btn-small {
+    padding: 0.6rem 0.9rem;
+    border: none;
+    border-radius: 8px;
+    font-size: 0.9rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    white-space: nowrap;
+  }
+
+  .action-btn-small.primary {
+    background: var(--primary-dark);
+    color: white;
+  }
+
+  .action-btn-small.primary:hover {
+    background: var(--primary-light);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(49, 54, 71, 0.3);
+  }
+
+  .action-btn-small.warning {
+    background: var(--warning);
+    color: white;
+  }
+
+  .action-btn-small.warning:hover {
+    background: #e0a800;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(255, 193, 7, 0.3);
+  }
+
+  /* Condition badges in table */
+  .cond-badges { display: flex; gap: .35rem; margin-top: .4rem; flex-wrap: wrap; }
+  .cond-badge { display: inline-flex; align-items: center; gap: .3rem; padding: .15rem .5rem; border-radius: 12px; font-size: .72rem; font-weight: 700; }
+  .cond-badge.expired { background: rgba(255,193,7,.2); color: #946200; }
+  .cond-badge.damaged { background: rgba(234,91,111,.16); color: #8a2330; }
+
+  /* Stock Condition Overview */
+  .condition-section {
+    background: linear-gradient(135deg, var(--accent-green) 0%, #8a9975 100%);
+    border: 2px solid #000; border-radius: 16px; overflow: hidden;
+    box-shadow: 0 8px 32px rgba(163,176,135,.2);
+  }
+  .condition-header { background: rgba(255,255,255,.95); padding: 1.25rem 1.75rem; }
+  .condition-header h3 { margin: 0 0 .3rem; color: var(--primary-dark); font-size: 1.25rem; font-weight: 700; display: flex; align-items: center; gap: .6rem; }
+  .condition-header h3 i { color: var(--accent-green); }
+  .condition-header p { margin: 0; color: var(--text-light); font-size: .9rem; }
+  .condition-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1rem; padding: 1.5rem; background: rgba(255,255,255,.95); }
+  .cond-card { display: flex; align-items: center; gap: 1rem; padding: 1.1rem 1.25rem; border-radius: 12px; background: #fff; box-shadow: 0 2px 10px rgba(0,0,0,.08); border-left: 5px solid var(--accent-green); }
+  .cond-card.expired { border-left-color: #ffc107; }
+  .cond-card.damaged { border-left-color: var(--accent-red); }
+  .cond-card.scrapped { border-left-color: #6c757d; }
+  .cond-card-icon { width: 46px; height: 46px; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 1.3rem; background: rgba(163,176,135,.15); color: var(--accent-green); }
+  .cond-card.expired .cond-card-icon { background: rgba(255,193,7,.18); color: #946200; }
+  .cond-card.damaged .cond-card-icon { background: rgba(234,91,111,.14); color: #8a2330; }
+  .cond-card.scrapped .cond-card-icon { background: rgba(108,117,125,.15); color: #495057; }
+  .cond-card-info { display: flex; flex-direction: column; }
+  .cond-card-value { font-size: 1.6rem; font-weight: 700; color: var(--primary-dark); line-height: 1.1; }
+  .cond-card-label { font-size: .82rem; color: var(--text-light); font-weight: 500; }
+
+  .flagged-panel { background: rgba(255,255,255,.95); padding: 0 1.5rem 1.5rem; }
+  .flagged-title { display: flex; align-items: center; justify-content: space-between; gap: 1rem; margin-bottom: .9rem; flex-wrap: wrap; }
+  .flagged-title h4 { margin: 0; color: var(--primary-dark); font-size: 1.05rem; font-weight: 700; display: flex; align-items: center; gap: .5rem; }
+  .flagged-title h4 i { color: var(--accent-red); }
+  .flagged-count { background: var(--primary-dark); color: #fff; border-radius: 20px; padding: .2rem .8rem; font-size: .78rem; font-weight: 600; }
+  .flagged-table-wrap { overflow-x: auto; border-radius: 10px; box-shadow: 0 2px 8px rgba(0,0,0,.08); }
+  .flagged-table { width: 100%; border-collapse: collapse; background: #fff; }
+  .flagged-table th { background: var(--primary-dark); color: #fff; padding: .7rem 1rem; text-align: left; font-size: .82rem; white-space: nowrap; }
+  .flagged-table td { padding: .6rem 1rem; border-bottom: 1px solid var(--border-color); font-size: .88rem; color: var(--text-dark); }
+  .flagged-table tbody tr:last-child td { border-bottom: none; }
+  .flagged-table .fp-name { font-weight: 600; color: var(--primary-dark); }
+  .flagged-empty { display: flex; align-items: center; gap: .6rem; padding: 1.25rem; color: #1e7e34; font-weight: 500; background: rgba(40,167,69,.08); border-radius: 10px; }
+  .flagged-empty i { font-size: 1.2rem; }
+
+  .action-btn-small.adjust {
+    background: var(--primary-light);
+    color: white;
+  }
+
+  .action-btn-small.adjust:hover {
+    background: var(--primary-dark);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(49, 54, 71, 0.3);
+  }
+
+  /* Adjust / Dispose modal */
+  .adjust-modal { border: 2px solid #000; border-radius: 16px; overflow: hidden; }
+  .adjust-modal .modal-header {
+    background: linear-gradient(135deg, var(--primary-dark) 0%, var(--primary-light) 100%);
+    color: #fff; border: none;
+  }
+  .adjust-modal .modal-title { display: flex; align-items: center; gap: .5rem; font-weight: 600; }
+  .adjust-modal .modal-body { padding: 1.5rem; }
+  .adj-available { display: flex; flex-wrap: wrap; gap: .5rem; margin-bottom: .75rem; }
+  .adj-chip { display: inline-flex; align-items: center; gap: .4rem; padding: .35rem .8rem; border-radius: 20px; font-size: .85rem; font-weight: 600; }
+  .adj-chip.good { background: rgba(40,167,69,.12); color: #1e7e34; }
+  .adj-chip.expired { background: rgba(255,193,7,.18); color: #946200; }
+  .adj-chip.damaged { background: rgba(234,91,111,.14); color: #8a2330; }
+  .adj-note { font-size: .82rem; color: var(--text-light); margin-bottom: 1rem; }
+  .adj-field { display: flex; flex-direction: column; gap: .35rem; margin-bottom: 1rem; }
+  .adj-field label { font-weight: 600; color: #435663; font-size: .9rem; display: flex; align-items: center; gap: .4rem; }
+  .adj-field select, .adj-field input, .adj-field textarea {
+    border: 2px solid var(--border-color); border-radius: 8px; padding: .6rem .7rem; font-size: .9rem; font-family: 'Lexend', sans-serif;
+  }
+  .adj-field select:focus, .adj-field input:focus, .adj-field textarea:focus { outline: none; border-color: var(--accent-green); }
+  .adj-field small { color: var(--text-light); font-size: .78rem; }
+  .adj-max { color: var(--text-light); font-weight: 400; font-size: .8rem; }
+  .adj-req { background: rgba(234,91,111,.15); color: #8a2330; font-size: .68rem; font-weight: 700; padding: .1rem .45rem; border-radius: 10px; text-transform: uppercase; }
+  #adjProofField { border: 2px dashed var(--accent-red); border-radius: 10px; padding: .9rem; background: rgba(234,91,111,.04); }
+  .adj-error { background: rgba(234,91,111,.12); color: #8a2330; border-left: 4px solid var(--accent-red); padding: .7rem 1rem; border-radius: 8px; font-weight: 500; font-size: .88rem; }
+  .adjust-modal .modal-footer { border-top: 1px solid var(--border-color); }
+  .adjust-modal .btn-primary { background: var(--primary-dark); color: #fff; border: none; border-radius: 8px; padding: .6rem 1.3rem; font-weight: 600; }
+  .adjust-modal .btn-primary:hover { background: var(--primary-light); }
+  .adjust-modal .btn-secondary { background: #6c757d; color: #fff; border: none; border-radius: 8px; padding: .6rem 1.3rem; font-weight: 600; }
+
+  /* Quick Stats */
+  .quick-stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 1.5rem;
+    margin-top: 1rem;
+  }
+
+  .stat-item {
+    background: linear-gradient(135deg, var(--accent-green) 0%, #8a9975 100%);
+    border-radius: 16px;
+    padding: 2rem;
+    display: flex;
+    align-items: center;
+    gap: 1.5rem;
+    border: 2px solid black;
+    box-shadow: 0 8px 32px rgba(163, 176, 135, 0.2);
+  }
+
+  .stat-item .stat-icon {
+    width: 70px;
+    height: 70px;
+    background: rgba(255, 255, 255, 0.2);
+    border-radius: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.8rem;
+    color: white;
+  }
+
+  .stat-content {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .stat-number {
+    font-size: 2rem;
+    font-weight: 700;
+    color: white;
+  }
+
+  .stat-label {
+    font-size: 1rem;
+    color: rgba(255, 255, 255, 0.9);
+  }
+
+  /* Empty State */
+  .empty-state {
+    text-align: center;
+    padding: 4rem 2rem;
+  }
+
+  .empty-state-content {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1rem;
+  }
+
+  .empty-state-content i {
+    font-size: 4rem;
+    color: var(--text-light);
+    opacity: 0.5;
+  }
+
+  .empty-state-content h3 {
+    color: var(--text-dark);
+    font-weight: 600;
+    font-size: 1.5rem;
+  }
+
+  .empty-state-content p {
+    color: var(--text-light);
+    font-size: 1.1rem;
+  }
+
+  /* Modal Styles */
+  .modern-modal {
+    border: 2px solid black;
+    border-radius: 16px;
+    overflow: hidden;
+    background-color: var(--bg-light);
+  }
+
+  .modern-modal .modal-header {
+    background: linear-gradient(135deg, var(--primary-dark) 0%, var(--primary-light) 100%);
+    color: white;
+    padding: 1.5rem;
+    border: none;
+  }
+
+  .modal-backdrop {
+    background-color: transparent !important;
+  }
+
+  .modern-modal .modal-title {
+    font-size: 1.25rem;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+  }
+
+  .modern-modal .modal-body {
+    padding: 2rem;
+  }
+
+  .modern-modal .modal-footer {
+    padding: 1.5rem;
+    background: var(--bg-light);
+    border: none;
+    background-color: var(--bg-light);
+  }
+
+  /* Product Detail Styles */
+  .product-detail-content {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+  }
+
+  .product-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    padding-bottom: 1rem;
+    border-bottom: 1px solid var(--border-color);
+  }
+
+  .product-header h4 {
+    margin: 0;
+    color: var(--primary-dark);
+    font-size: 1.3rem;
+  }
+
+  .product-sku {
+    font-size: 0.9rem;
+    color: var(--text-light);
+    background: var(--bg-light);
+    padding: 0.4rem 0.8rem;
+    border-radius: 6px;
+  }
+
+  .detail-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1.5rem;
+  }
+
+  .detail-item {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
+  .detail-item.full-width {
+    grid-column: 1 / -1;
+  }
+
+  .detail-item label {
+    font-weight: 500;
+    color: var(--text-light);
+    font-size: 0.95rem;
+  }
+
+  .detail-value {
+    font-weight: 600;
+    color: var(--primary-dark);
+    font-size: 1.1rem;
+  }
+
+  .stock-history {
+    margin-top: 1.5rem;
+  }
+
+  .stock-history h5 {
+    margin-bottom: 1.5rem;
+    color: var(--primary-dark);
+    font-size: 1.2rem;
+  }
+
+  .history-chart {
+    height: 250px;
+    position: relative;
+  }
+
+  /* History Modal Styles */
+  .history-content {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+  }
+
+  .history-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding-bottom: 1rem;
+    border-bottom: 1px solid var(--border-color);
+  }
+
+  .history-header h4 {
+    margin: 0;
+    color: var(--primary-dark);
+    font-size: 1.3rem;
+  }
+
+  .history-period {
+    font-size: 0.9rem;
+    color: var(--text-light);
+    background: var(--bg-light);
+    padding: 0.4rem 0.8rem;
+    border-radius: 6px;
+  }
+
+  .history-filters {
+    display: flex;
+    justify-content: flex-end;
+  }
+
+  .history-select {
+    padding: 0.6rem;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    font-size: 0.9rem;
+    background: white;
+    min-width: 140px;
+  }
+
+  .history-chart-container {
+    height: 300px;
+    position: relative;
+  }
+
+  .history-table-container {
+    max-height: 400px;
+    overflow-y: auto;
+  }
+
+  /* Button Styles */
+  .btn-primary, .btn-secondary {
+    padding: 0.875rem 1.75rem;
+    border: none;
+    border-radius: 8px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 1rem;
+  }
+
+  .btn-primary {
+    background: var(--primary-dark);
+    color: white;
+  }
+
+  .btn-primary:hover {
+    background: var(--primary-light);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(49, 54, 71, 0.3);
+  }
+
+  .btn-secondary {
+    background: #31694E;
+    color: white;
+  }
+
+  .btn-secondary:hover {
+    background: #31694E;
+  }
+
+  /* Responsive Design */
+  @media (max-width: 1200px) {
+    .layout-container {
+      flex-direction: column;
+    }
+    
+    .sidebar {
+      width: 100%;
+      margin: 0;
+      border-radius: 0;
+      position: relative;
+      top: 0;
+      min-height: auto;
+    }
+
+    .charts-container {
+      grid-template-columns: 1fr;
+    }
+
+    .chart-card {
+      min-height: 400px;
+    }
+
+    .chart-card.full-width {
+      min-height: 450px;
+    }
+  }
+
+  @media (max-width: 768px) {
+    .main-content {
+      padding: 1rem;
+    }
+
+    .page-header {
+      padding: 1.5rem;
+    }
+
+    .page-title {
+      font-size: 1.5rem;
+    }
+
+    .table-header-actions {
+      flex-direction: column;
+      gap: 1rem;
+      align-items: stretch;
+    }
+
+    .table-filters {
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+
+    .filter-btn {
+      font-size: 0.85rem;
+      padding: 0.5rem 1rem;
+    }
+
+    .modern-table {
+      font-size: 0.85rem;
+    }
+
+    .modern-table th,
+    .modern-table td {
+      padding: 0.8rem;
+    }
+
+    .quick-stats {
+      grid-template-columns: 1fr;
+    }
+
+    .detail-grid {
+      grid-template-columns: 1fr;
+    }
+
+    .actions-cell {
+      flex-direction: column;
+    }
+
+    .action-btn-small {
+      width: 100%;
+      justify-content: center;
+    }
+
+    .chart-header {
+      flex-direction: column;
+      gap: 1rem;
+      align-items: flex-start;
+    }
+
+    .chart-legend {
+      flex-wrap: wrap;
+    }
+
+    .charts-container {
+      padding: 1.5rem;
+      gap: 1.5rem;
+    }
+
+    .chart-card {
+      padding: 1.5rem;
+      min-height: 350px;
+    }
+
+    .chart-card.full-width {
+      min-height: 400px;
+    }
+
+    .section-header {
+      padding: 1.5rem;
+    }
+
+    .table-header-actions {
+      padding: 1.5rem;
+    }
+
+    .history-header {
+      flex-direction: column;
+      gap: 1rem;
+      align-items: flex-start;
+    }
+
+    .history-filters {
+      justify-content: flex-start;
+    }
+  }
+
+  @media (max-width: 480px) {
+    .charts-container {
+      grid-template-columns: 1fr;
+    }
+    
+    .chart-card {
+      min-height: 300px;
+    }
+    
+    .chart-container {
+      min-height: 250px;
+    }
+
+    .chart-card.full-width {
+      min-height: 350px;
+    }
+
+    .chart-card.full-width .chart-container {
+      min-height: 300px;
+    }
+  }
+</style>
+
+<script>
+$(document).ready(function () {
+  console.log("=== DOCUMENT READY STARTED ===");
+  
+  // Global chart variables
+  let productHistoryChart = null;
+  let detailedHistoryChart = null;
+  let trendsChart = null;
+  
+  try {
+    // Initialize Charts
+    console.log("Initializing charts...");
+    initializeCharts();
+
+    // Filter functionality
+    $(".filter-btn").click(function () {
+      console.log("Filter button clicked:", $(this).data("filter"));
+      $(".filter-btn").removeClass("active");
+      $(this).addClass("active");
+
+      const filter = $(this).data("filter");
+      const rows = $("#inventoryTable tbody tr");
+      console.log("Total rows found:", rows.length);
+      console.log("Applying filter:", filter);
+
+      if (filter === "all") {
+        rows.show();
+        console.log("Showing all rows");
+      } else {
+        rows.hide();
+        let shownCount = 0;
+        rows.each(function () {
+          const status = $(this).data("status");
+          console.log("Row status:", status, "Filter:", filter);
+          if (filter === status) {
+            $(this).show();
+            shownCount++;
+          }
+        });
+        console.log("Rows shown with filter '" + filter + "':", shownCount);
+      }
+    });
+
+    // Search functionality
+    $("#search-input").on("keyup", function () {
+      const searchTerm = $(this).val().toLowerCase();
+      console.log("Search term:", searchTerm);
+      let shownCount = 0;
+      let hiddenCount = 0;
+      
+      $("#inventoryTable tbody tr").each(function () {
+        const productName = $(this).find(".product-name").text().toLowerCase();
+        const sapProductName = $(this).find(".mapped-product-name").text().toLowerCase();
+        console.log("Checking product:", productName, "SAP product:", sapProductName, "against search:", searchTerm);
+        
+        if (productName.indexOf(searchTerm) !== -1 || sapProductName.indexOf(searchTerm) !== -1) {
+          $(this).show();
+          shownCount++;
+        } else {
+          $(this).hide();
+          hiddenCount++;
+        }
+      });
+      console.log("Search results - Shown:", shownCount, "Hidden:", hiddenCount);
+    });
+
+    // Product detail modal
+    $(".action-btn-small.primary").click(function () {
+      const productName = $(this).data("product");
+      const productId = $(this).data("product-id");
+      console.log("Product detail button clicked. Product:", productName, "ID:", productId);
+      
+      $("#detailProductName").text(productName);
+      $("#productDetailModal").modal("show");
+      
+      // Load product details via AJAX
+      loadProductDetails(productId, productName);
+    });
+
+    // Product history modal
+    $(".action-btn-small.warning").click(function () {
+      const productName = $(this).data("product");
+      const productId = $(this).data("product-id");
+      console.log("Product history button clicked. Product:", productName, "ID:", productId);
+      
+      $("#historyProductName").text(productName);
+      $("#productHistoryModal").modal("show");
+      
+      // Store product ID for history period changes
+      $("#historyPeriodSelect").data("product-id", productId);
+      
+      // Load product history via AJAX
+      loadProductHistory(productId, productName, 30); // Default to 30 days
+    });
+
+    // ---------- Adjust Condition / Dispose ----------
+    const ownInv = window.OWN_INVENTORY || {};
+
+    function adjAvailable() {
+      const pid = $("#adjProductId").val();
+      return ownInv[pid] || { good: 0, expired: 0, damaged: 0 };
+    }
+
+    function adjMaxForCurrent() {
+      const a = adjAvailable();
+      const action = $("#adjAction").val();
+      if (action === "DISPOSE") {
+        const src = $("#adjSource").val().toLowerCase();
+        return a[src] || 0;
+      }
+      return a.good || 0; // MARK_* always draws from Good
+    }
+
+    function adjRefreshUI() {
+      const isDispose = $("#adjAction").val() === "DISPOSE";
+      $("#adjSourceField").toggle(isDispose);
+      $("#adjProofField").toggle(isDispose);
+      $("#adjProof").prop("required", isDispose);
+      const max = adjMaxForCurrent();
+      $("#adjQuantity").attr("max", max);
+      $("#adjMaxHint").text("(max " + max + ")");
+    }
+
+    $(".adjust-btn").click(function () {
+      const productName = $(this).data("product");
+      const productId = String($(this).data("product-id"));
+      $("#adjProductName").text(productName);
+      $("#adjProductId").val(productId);
+      const a = ownInv[productId] || { good: 0, expired: 0, damaged: 0 };
+      $("#adjGood").text(a.good || 0);
+      $("#adjExpired").text(a.expired || 0);
+      $("#adjDamaged").text(a.damaged || 0);
+      $("#adjAction").val("MARK_EXPIRED");
+      $("#adjSource").val("GOOD");
+      $("#adjQuantity").val("");
+      $("#adjProof").val("");
+      $("#adjNotes").val("");
+      $("#adjError").hide().text("");
+      adjRefreshUI();
+      $("#adjustModal").modal("show");
+    });
+
+    $("#adjAction, #adjSource").change(adjRefreshUI);
+
+    $("#adjustForm").on("submit", function (e) {
+      e.preventDefault();
+      const qty = parseInt($("#adjQuantity").val(), 10);
+      const max = adjMaxForCurrent();
+      const err = $("#adjError");
+      if (!qty || qty <= 0) { err.text("Enter a valid quantity.").show(); return; }
+      if (qty > max) { err.text("You only have " + max + " unit(s) available for this bucket.").show(); return; }
+      if ($("#adjAction").val() === "DISPOSE" && !$("#adjProof")[0].files.length) {
+        err.text("A proof photo is required to dispose/scrap stock.").show(); return;
+      }
+      err.hide();
+
+      const btn = $("#adjSubmit");
+      const original = btn.html();
+      btn.prop("disabled", true).html('<i class="fas fa-spinner fa-spin"></i> Applying…');
+
+      const fd = new FormData(this);
+      // Reused across retries of this adjustment so a re-submit doesn't apply twice.
+      const _idemKey = window.IdemKeys.get("adjust_inventory-" + $("#adjProductId").val());
+      fd.append("idempotency_key", _idemKey);
+      fetch("{% url 'adjust_inventory' %}", {
+        method: "POST",
+        body: fd,
+        headers: {
+          "X-Requested-With": "XMLHttpRequest",
+          "X-Idempotency-Key": _idemKey,
+        },
+        credentials: "same-origin",
+      }).then(function (r) { return r.json().then(function (d) { return { ok: r.ok, d: d }; }); })
+        .then(function (res) {
+          if (res.ok && res.d.success) {
+            const pid = $("#adjProductId").val();
+            ownInv[pid] = res.d.own;
+            $("#adjustModal").modal("hide");
+            location.reload();
+          } else {
+            err.text(res.d.error || "Could not apply the adjustment.").show();
+            btn.prop("disabled", false).html(original);
+          }
+        }).catch(function () {
+          err.text("Network error. Please try again.").show();
+          btn.prop("disabled", false).html(original);
+        });
+    });
+
+    // Update stock button
+    $("#updateStockBtn").click(function () {
+      const productName = $("#detailProductName").text();
+      console.log("Update stock button clicked for:", productName);
+      alert("Update stock functionality will be implemented in the next update for product: " + productName);
+    });
+
+    // History period change
+    $("#historyPeriodSelect").change(function () {
+      const selectedPeriod = $(this).val();
+      const productId = $(this).data("product-id");
+      const productName = $("#historyProductName").text();
+      console.log("History period changed to:", selectedPeriod, "for product:", productName);
+      loadProductHistory(productId, productName, selectedPeriod);
+    });
+
+    // Trend period change
+    $("#trendPeriod").change(function () {
+      const selectedPeriod = $(this).val();
+      console.log("Trend period changed to:", selectedPeriod);
+      updateTrendsChart(selectedPeriod);
+    });
+
+    function initializeCharts() {
+      console.log("=== INITIALIZING CHARTS ===");
+      
+      try {
+        // Parse data safely with better fallbacks
+        const productNames = {{ product_names|safe|default:"[]" }};
+        const productQuantities = {{ product_quantities|safe|default:"[]" }};
+        const highStockCount = {{ high_stock_count|default:"0" }};
+        const mediumStockCount = {{ medium_stock_count|default:"0" }};
+        const lowStockCount = {{ low_stock_count|default:"0" }};
+
+        console.log("Product names data:", productNames);
+        console.log("Product quantities data:", productQuantities);
+        console.log("Stock distribution - High:", highStockCount, "Medium:", mediumStockCount, "Low:", lowStockCount);
+
+        // Top Products Chart
+        const topProductsCtx = document.getElementById('topProductsChart');
+        console.log("Top products chart element found:", topProductsCtx);
+        
+        if (topProductsCtx) {
+          const hasData = productNames.length > 0 && productQuantities.length > 0;
+          const finalProductNames = hasData ? productNames : ['Sample Product 1', 'Sample Product 2', 'Sample Product 3'];
+          const finalProductQuantities = hasData ? productQuantities : [45, 30, 25];
+          
+          new Chart(topProductsCtx.getContext('2d'), {
+            type: 'bar',
+            data: {
+              labels: finalProductNames,
+              datasets: [{
+                label: 'Quantity',
+                data: finalProductQuantities,
+                backgroundColor: '#A3B087',
+                borderColor: '#8a9975',
+                borderWidth: 2
+              }]
+            },
+            options: {
+              responsive: true,
+              maintainAspectRatio: false,
+              scales: {
+                y: {
+                  beginAtZero: true,
+                  grid: {
+                    color: 'rgba(0, 0, 0, 0.1)'
+                  }
+                },
+                x: {
+                  grid: {
+                    display: false
+                  }
+                }
+              },
+              plugins: {
+                legend: {
+                  display: false
+                }
+              }
+            }
+          });
+          console.log("Top products chart initialized successfully");
+        }
+
+        // Stock Distribution Chart
+        const distributionCtx = document.getElementById('stockDistributionChart');
+        console.log("Distribution chart element found:", distributionCtx);
+        
+        if (distributionCtx) {
+          const distributionData = [highStockCount, mediumStockCount, lowStockCount];
+          const hasRealData = distributionData.some(val => val > 0);
+          
+          const finalDistributionData = hasRealData ? distributionData : [5, 3, 2];
+          
+          new Chart(distributionCtx.getContext('2d'), {
+            type: 'doughnut',
+            data: {
+              labels: ['High Stock', 'Medium Stock', 'Low Stock'],
+              datasets: [{
+                data: finalDistributionData,
+                backgroundColor: [
+                  '#28a745',
+                  '#ffc107',
+                  '#dc3545'
+                ],
+                borderWidth: 3,
+                borderColor: '#fff'
+              }]
+            },
+            options: {
+              responsive: true,
+              maintainAspectRatio: false,
+              plugins: {
+                legend: {
+                  position: 'bottom'
+                }
+              }
+            }
+          });
+          console.log("Distribution chart initialized successfully");
+        }
+
+        // Inventory Trends Chart
+        const trendsCtx = document.getElementById('inventoryTrendsChart');
+        console.log("Trends chart element found:", trendsCtx);
+        
+        if (trendsCtx) {
+          trendsChart = new Chart(trendsCtx.getContext('2d'), {
+            type: 'line',
+            data: {
+              labels: ['Week 1', 'Week 2', 'Week 3', 'Week 4'],
+              datasets: [{
+                label: 'Stock Level',
+                data: [120, 150, 180, 160],
+                borderColor: '#A3B087',
+                backgroundColor: 'rgba(163, 176, 135, 0.1)',
+                borderWidth: 3,
+                fill: true,
+                tension: 0.4
+              }]
+            },
+            options: {
+              responsive: true,
+              maintainAspectRatio: false,
+              scales: {
+                y: {
+                  beginAtZero: true
+                },
+                x: {
+                  grid: {
+                    display: false
+                  }
+                }
+              }
+            }
+          });
+          console.log("Trends chart initialized successfully");
+        }
+
+      } catch (chartError) {
+        console.error("Error initializing charts:", chartError);
+      }
+    }
+
+    function updateTrendsChart(period) {
+      console.log("Updating trends chart for period:", period);
+      
+      let data;
+      let labels;
+      
+      switch(period) {
+        case '7':
+          data = [45, 52, 48, 55, 60, 58, 62];
+          labels = ['Day 1', 'Day 2', 'Day 3', 'Day 4', 'Day 5', 'Day 6', 'Day 7'];
+          break;
+        case '30':
+          data = [120, 135, 125, 140, 150, 145, 160, 155, 165, 170];
+          labels = ['Week 1', 'Week 2', 'Week 3', 'Week 4'];
+          break;
+        case '90':
+          data = [100, 120, 110, 130, 140, 135, 150, 145, 160, 155, 165, 170];
+          labels = ['Month 1', 'Month 2', 'Month 3'];
+          break;
+        default:
+          data = [120, 150, 180, 160];
+          labels = ['Week 1', 'Week 2', 'Week 3', 'Week 4'];
+      }
+      
+      console.log("New chart data:", data);
+
+      if (trendsChart) {
+        trendsChart.data.labels = labels;
+        trendsChart.data.datasets[0].data = data;
+        trendsChart.update();
+        console.log("Trends chart updated successfully");
+      }
+    }
+
+    function loadProductDetails(productId, productName) {
+      console.log("Loading product details for:", productName, "ID:", productId);
+      
+      // Show loading state
+      $("#detailProductSKU").text("Loading...");
+      $("#detailStock").text("Loading...");
+      $("#detailStatus").html('<span class="status-badge medium">Loading...</span>');
+      $("#detailCategory").text("Loading...");
+      $("#detailLastUpdated").text("Loading...");
+      $("#detailProductCode").text("Loading...");
+      $("#detailSize").text("Loading...");
+      $("#detailSapMappedProduct").text("Loading...");
+      $("#detailNddbMappedProduct").text("Loading...");
+      
+      // Make AJAX call to get product details
+      $.ajax({
+        url: `/inventory/product/${productId}/`,
+        type: 'GET',
+        success: function(response) {
+          if (response.success) {
+            console.log("Product details loaded successfully:", response);
+            
+            // Update modal with real data
+            $("#detailProductSKU").text(`SKU: ${response.product.product_code}`);
+            $("#detailStock").text(`${response.inventory.total_quantity} units`);
+            $("#detailStatus").html(`<span class="status-badge ${response.inventory.status_class}">
+                <i class="fas fa-${getStatusIcon(response.inventory.status_class)}"></i> ${response.inventory.stock_status}
+            </span>`);
+            $("#detailCategory").text(response.product.material_type || "General");
+            $("#detailLastUpdated").text(response.last_updated);
+            $("#detailProductCode").text(response.product.product_code || "N/A");
+            $("#detailSize").text(response.product.size || "N/A");
+            
+            // Show mapped product information
+            $("#detailSapMappedProduct").html(formatMappedProduct(response.sap_mapping));
+            $("#detailNddbMappedProduct").html(formatMappedProduct(response.nddb_mapping));
+            
+            // Update product history chart with real data
+            updateProductHistoryChart(response.recent_history);
+            
+          } else {
+            console.error("Error loading product details:", response.error);
+            showError("Error loading product details: " + response.error);
+          }
+        },
+        error: function(xhr, status, error) {
+          console.error("AJAX error loading product details:", error);
+          showError("Error loading product details. Please try again.");
+        }
+      });
+    }
+
+    function formatMappedProduct(mapping) {
+      if (!mapping || !mapping.mapped_product_name) {
+        return '<span class="text-muted">No mapping found</span>';
+      }
+      
+      const isSame = mapping.mapped_product_name === mapping.original_product_name;
+      const badgeClass = mapping.mapped_system === 'SAP' ? 'sap-badge' : 
+                        mapping.mapped_system === 'NDDB' ? 'nddb-badge' : 'indent-badge';
+      
+      return `
+        <div class="d-flex align-items-center gap-2">
+          <span>${mapping.mapped_product_name}</span>
+          ${!isSame ? `<span class="mapping-badge ${badgeClass}">
+            <i class="fas fa-exchange-alt"></i> ${mapping.mapped_system}
+          </span>` : `<span class="mapping-badge indent-badge">
+            <i class="fas fa-cube"></i> ${mapping.mapped_system}
+          </span>`}
+        </div>
+      `;
+    }
+
+    function loadProductHistory(productId, productName, period) {
+      console.log("Loading product history for:", productName, "ID:", productId, "Period:", period);
+      
+      // Show loading state
+      $("#historyPeriod").text("Loading...");
+      $("#historyTableBody").html('<tr><td colspan="7" class="text-center">Loading history data...</td></tr>');
+      
+      // Make AJAX call to get product history
+      $.ajax({
+        url: `/inventory/product/${productId}/history/`,
+        type: 'GET',
+        data: { period: period },
+        success: function(response) {
+          if (response.success) {
+            console.log("Product history loaded successfully:", response);
+            
+            // Update period display
+            let periodText = '';
+            switch(period) {
+              case '7': periodText = 'Last 7 days'; break;
+              case '30': periodText = 'Last 30 days'; break;
+              case '90': periodText = 'Last 90 days'; break;
+              case '365': periodText = 'Last year'; break;
+            }
+            $("#historyPeriod").text(periodText);
+            
+            // Update detailed history chart with real data
+            updateDetailedHistoryChart(response.chart_data);
+            
+            // Populate history table with real data
+            populateHistoryTable(response.detailed_history);
+            
+          } else {
+            console.error("Error loading product history:", response.error);
+            $("#historyTableBody").html(`<tr><td colspan="7" class="text-center text-danger">Error: ${response.error}</td></tr>`);
+          }
+        },
+        error: function(xhr, status, error) {
+          console.error("AJAX error loading product history:", error);
+          $("#historyTableBody").html('<tr><td colspan="7" class="text-center text-danger">Error loading history data. Please try again.</td></tr>');
+        }
+      });
+    }
+
+    function updateProductHistoryChart(historyData) {
+      console.log("Updating product history chart with real data...");
+      
+      const historyCtx = document.getElementById('productHistoryChart');
+      if (!historyCtx) {
+        console.error("Product history chart element not found!");
+        return;
+      }
+
+      // Destroy existing chart if it exists
+      if (productHistoryChart) {
+        productHistoryChart.destroy();
+      }
+
+      if (historyData && historyData.length > 0) {
+        // Prepare data for chart from history
+        const labels = historyData.map(item => {
+          const date = new Date(item.date);
+          return date.toLocaleDateString();
+        }).reverse();
+        
+        const quantities = historyData.map(item => item.new_quantity).reverse();
+
+        productHistoryChart = new Chart(historyCtx.getContext('2d'), {
+          type: 'line',
+          data: {
+            labels: labels,
+            datasets: [{
+              label: 'Stock Quantity',
+              data: quantities,
+              borderColor: '#A3B087',
+              backgroundColor: 'rgba(163, 176, 135, 0.1)',
+              borderWidth: 2,
+              fill: true,
+              tension: 0.4
+            }]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+              y: {
+                beginAtZero: true
+              }
+            },
+            plugins: {
+              legend: {
+                display: false
+              }
+            }
+          }
+        });
+        console.log("Product history chart created successfully with real data");
+      } else {
+        console.log("No history data available for chart");
+        // Create an empty chart or show message
+        productHistoryChart = new Chart(historyCtx.getContext('2d'), {
+          type: 'line',
+          data: {
+            labels: ['No Data'],
+            datasets: [{
+              label: 'Stock Quantity',
+              data: [0],
+              borderColor: '#A3B087',
+              backgroundColor: 'rgba(163, 176, 135, 0.1)',
+              borderWidth: 2,
+              fill: true
+            }]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+              y: {
+                beginAtZero: true
+              }
+            },
+            plugins: {
+              legend: {
+                display: false
+              }
+            }
+          }
+        });
+      }
+    }
+
+    function updateDetailedHistoryChart(chartData) {
+      console.log("Updating detailed history chart with real data...");
+      
+      const detailedHistoryCtx = document.getElementById('detailedHistoryChart');
+      if (!detailedHistoryCtx) {
+        console.error("Detailed history chart element not found!");
+        return;
+      }
+
+      // Destroy existing chart if it exists
+      if (detailedHistoryChart) {
+        detailedHistoryChart.destroy();
+      }
+
+      if (chartData && chartData.labels && chartData.quantities) {
+        detailedHistoryChart = new Chart(detailedHistoryCtx.getContext('2d'), {
+          type: 'line',
+          data: {
+            labels: chartData.labels,
+            datasets: [{
+              label: 'Stock Quantity',
+              data: chartData.quantities,
+              borderColor: '#A3B087',
+              backgroundColor: 'rgba(163, 176, 135, 0.1)',
+              borderWidth: 3,
+              fill: true,
+              tension: 0.4
+            }]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+              y: {
+                beginAtZero: true,
+                grid: {
+                  color: 'rgba(0, 0, 0, 0.1)'
+                }
+              },
+              x: {
+                grid: {
+                  display: false
+                }
+              }
+            },
+            plugins: {
+              legend: {
+                display: false
+              }
+            }
+          }
+        });
+        console.log("Detailed history chart created successfully with real data");
+      } else {
+        console.log("No chart data available");
+        // Create empty chart
+        detailedHistoryChart = new Chart(detailedHistoryCtx.getContext('2d'), {
+          type: 'line',
+          data: {
+            labels: ['No Data'],
+            datasets: [{
+              label: 'Stock Quantity',
+              data: [0],
+              borderColor: '#A3B087',
+              backgroundColor: 'rgba(163, 176, 135, 0.1)',
+              borderWidth: 3,
+              fill: true
+            }]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+              y: {
+                beginAtZero: true
+              }
+            },
+            plugins: {
+              legend: {
+                display: false
+              }
+            }
+          }
+        });
+      }
+    }
+
+    function populateHistoryTable(historyData) {
+      console.log("Populating history table with real data:", historyData);
+      
+      const tableBody = $("#historyTableBody");
+      tableBody.empty();
+      
+      if (historyData && historyData.length > 0) {
+        historyData.forEach(item => {
+          const quantityChange = item.quantity_change;
+          const isPositive = quantityChange > 0;
+          const changeDisplay = isPositive ? `+${quantityChange}` : quantityChange;
+          
+          // Format reference number - show first 5 characters followed by *****
+          let referenceDisplay = item.reference_number;
+          if (referenceDisplay && referenceDisplay.length > 5) {
+            referenceDisplay = referenceDisplay.substring(0, 5) + '*****';
+          } else if (referenceDisplay) {
+            // If the number is shorter than 5 characters, just show it as is
+            referenceDisplay = referenceDisplay + '*****';
+          } else {
+            referenceDisplay = 'N/A';
+          }
+          
+          const row = `
+            <tr>
+              <td>${item.date}</td>
+              <td>
+                <span class="action-badge ${getActionClass(item.action)}">
+                  ${item.action}
+                </span>
+              </td>
+              <td class="${isPositive ? 'trend-up' : 'trend-down'}">
+                ${changeDisplay}
+              </td>
+              <td>${item.previous_quantity}</td>
+              <td>${item.new_quantity}</td>
+              <td>
+                <span class="reference-number">${referenceDisplay}</span>
+              </td>
+              <td>${item.performed_by}</td>
+            </tr>
+          `;
+          tableBody.append(row);
+        });
+        
+        console.log("History table populated with", historyData.length, "real records");
+      } else {
+        tableBody.html('<tr><td colspan="7" class="text-center">No history data available for the selected period.</td></tr>');
+        console.log("No history data available for table");
+      }
+    }
+
+    function getActionClass(action) {
+      switch(action) {
+        case 'GRN':
+        case 'TRANSFER_IN':
+        case 'ADJUSTMENT':
+        case 'Goods Received':
+        case 'Transfer In':
+          return 'high';
+        case 'SALE':
+        case 'TRANSFER_OUT':
+        case 'Sale':
+        case 'Transfer Out':
+        case 'Disposed':
+          return 'low';
+        default:
+          // Expired / Damaged / Return / Damage/Loss and anything else
+          return 'medium';
+      }
+    }
+
+    function getStatusIcon(statusClass) {
+      switch(statusClass) {
+        case 'high': return 'check-circle';
+        case 'medium': return 'info-circle';
+        case 'low': return 'exclamation-triangle';
+        default: return 'info-circle';
+      }
+    }
+
+    function showError(message) {
+      // You can implement a toast notification or alert here
+      alert(message);
+    }
+
+    // Auto-refresh data every 5 minutes
+    setInterval(() => {
+      console.log("=== AUTO-REFRESH TRIGGERED ===");
+      console.log("Current time:", new Date().toLocaleString());
+      // In real application, you can refresh the page or make AJAX calls here
+    }, 300000);
+
+    console.log("=== DOCUMENT READY COMPLETED SUCCESSFULLY ===");
+
+  } catch (error) {
+    console.error("=== CRITICAL ERROR IN DOCUMENT READY ===");
+    console.error("Error message:", error.message);
+    console.error("Error stack:", error.stack);
+  }
+});
+</script>
+
+{% endblock %}

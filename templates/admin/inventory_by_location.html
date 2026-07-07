@@ -1,0 +1,43 @@
+{% extends "admin/base_site.html" %}
+
+{% block content %}
+<div style="text-align: center;">
+    <h1 style="font-size: 24px; font-weight: bold;">INVENTORY BY LOCATION</h1>
+
+    <!-- Dropdown to select a location -->
+    <form method="get" action="{% url 'inventory_by_location' %}" style="margin: 20px 0;">
+        <label for="location" style="font-size: 18px; font-weight: bold; display: block; margin-bottom: 10px;">SELECT LOCATION:</label>
+        <select name="location" id="location" onchange="this.form.submit()" style="padding: 10px; font-size: 16px; width: 250px; text-align: center;">
+            <option value="">-- Select a Location --</option>
+            {% for location in locations %}
+            <option value="{{ location }}" {% if location == selected_location %}selected{% endif %}>
+                {{ location }}
+            </option>
+            {% endfor %}
+        </select>
+    </form>
+
+    <!-- Display inventory for the selected location -->
+    {% if selected_location %}
+    <h2 style="font-size: 20px; font-weight: bold; margin-top: 30px;">INVENTORY FOR LOCATION: {{ selected_location }}</h2>
+    <table style="margin: 20px auto; border-collapse: collapse; width: 60%; text-align: left;">
+        <thead>
+            <tr>
+                <th style="padding: 10px; border-bottom: 2px solid #ddd; text-align: left;">Product</th>
+                <th style="padding: 10px; border-bottom: 2px solid #ddd; text-align: right;">Quantity</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for inventory in inventories %}
+            <tr>
+                <td style="padding: 10px; border-bottom: 1px solid #ddd; text-align: left;">{{ inventory.product.name }}</td>
+                <td style="padding: 10px; border-bottom: 1px solid #ddd; text-align: right;">{{ inventory.quantity }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <p style="font-size: 16px; margin-top: 20px;">Please select a location to view its inventory.</p>
+    {% endif %}
+</div>
+{% endblock %}

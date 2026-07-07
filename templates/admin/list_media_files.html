@@ -1,0 +1,43 @@
+<!-- filepath: /C:/Users/SHIVAM/Desktop/shwetDhara_project/templates/admin/list_media_files.html -->
+{% extends "admin/base_site.html" %}
+
+{% block content %}
+<h1>Media Files</h1>
+<div style="margin-bottom: 20px;">
+    {% if current_path %}
+        <a href="{% url 'admin:list-media-files' %}" style="text-decoration: none; color:rgb(76, 78, 175);">Back to Root</a>
+        {% if parent_path %}
+            <a href="?path={{ parent_path }}" style="text-decoration: none; color:rgb(118, 49, 221); margin-left: 10px;">Back</a>
+        {% endif %}
+    {% endif %}
+</div>
+<table style="width: 100%; border-collapse: collapse;">
+    <thead>
+        <tr style="background-color: #f2f2f2;">
+            <th style="padding: 8px; text-align: left; border-bottom: 1px solid #ddd;">Name</th>
+            <th style="padding: 8px; text-align: left; border-bottom: 1px solid #ddd;">Type</th>
+            <th style="padding: 8px; text-align: left; border-bottom: 1px solid #ddd;">Action</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for folder in folders %}
+        <tr>
+            <td style="padding: 8px; border-bottom: 1px solid #ddd;">
+                <a href="?path={{ current_path }}/{{ folder }}" style="text-decoration: none; color:rgb(99, 76, 175);">{{ folder }}</a>
+            </td>
+            <td style="padding: 8px; border-bottom: 1px solid #ddd;">Folder</td>
+            <td style="padding: 8px; border-bottom: 1px solid #ddd;">-</td>
+        </tr>
+        {% endfor %}
+        {% for file_path, file_url in files %}
+        <tr>
+            <td style="padding: 8px; border-bottom: 1px solid #ddd;">{{ file_path }}</td>
+            <td style="padding: 8px; border-bottom: 1px solid #ddd;">File</td>
+            <td style="padding: 8px; border-bottom: 1px solid #ddd;">
+                <a href="{{ file_url }}" target="_blank" style="text-decoration: none; color:rgb(76, 78, 175);">View</a>
+            </td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% endblock %}

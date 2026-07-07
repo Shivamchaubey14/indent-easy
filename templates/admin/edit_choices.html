@@ -1,0 +1,13 @@
+{% extends "admin/base_site.html" %}
+
+{% block content %}
+<h1>Edit Choices</h1>
+<form method="post">
+    {% csrf_token %}
+    <div class="form-group">
+        <label for="content">Choices Content</label>
+        <textarea id="content" name="content" class="form-control" rows="20">{{ content }}</textarea>
+    </div>
+    <button type="submit" class="btn btn-primary mt-3">Save</button>
+</form>
+{% endblock %}

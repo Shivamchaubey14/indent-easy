@@ -1,0 +1,4076 @@
+{% extends "base.html" %}
+{% block title %}Finance Dashboard{% endblock %}
+
+{% block content %}
+<div class="layout-container">
+  <!-- Sidebar -->
+  <aside class="sidebar">
+    <div class="sidebar-content">
+      <!-- User Welcome Section -->
+      <div class="user-welcome">
+        <div class="welcome-header">
+          <h1 class="welcome-title">
+            Welcome!
+            <span class="wave-emoji">👋</span>
+          </h1>
+          <p class="user-name">{{request.user.first_name}} {{request.user.last_name}}</p>
+          <div class="user-details">
+            <span class="detail-badge">
+              <i class="fas fa-id-badge"></i>
+              {{ request.user.employee_code }}
+            </span>
+            <span class="detail-badge">
+              <i class="fas fa-building"></i>
+              {{ request.user.department }}
+            </span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Stats Section -->
+      <div class="stats-section">
+        <div class="stat-card">
+          <div class="stat-icon inventory-icon">
+            <i class="fas fa-file-invoice-dollar"></i>
+          </div>
+          <div class="stat-info">
+            <span class="stat-value" id="totalFiles">0</span>
+            <span class="stat-label">Total Files</span>
+          </div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon inventory-icon">
+            <i class="fas fa-boxes"></i>
+          </div>
+          <div class="stat-info">
+            <span class="stat-value" id="totalProducts">0</span>
+            <span class="stat-label">Total Products</span>
+          </div>
+        </div>
+        <!-- Sale Stats -->
+        <div class="stat-card">
+          <div class="stat-icon inventory-icon">
+            <i class="fas fa-chart-line"></i>
+          </div>
+          <div class="stat-info">
+            <span class="stat-value" id="totalSales">0</span>
+            <span class="stat-label">Total Sales</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Quick Actions -->
+      <div class="quick-actions">
+        <h3 class="section-title">Quick Actions</h3>
+        <a href="{% url 'export_excel_finance_data_of_grn_chaalan' %}" class="action-btn" style="text-decoration: none;">
+          <i class="fas fa-download"></i>
+          <span>Export Data In Excel</span>
+        </a>
+        <a href="{% url 'view_others_inventory' %}" class="action-btn" style="text-decoration: none;">
+          <i class="fas fa-cube"></i>
+          <span>View Other's Inventory</span>
+        </a>
+        <a href="{% url 'test_post_sheet' %}" class="action-btn" style="text-decoration: none;">
+          <i class="fas fa-file-excel"></i>
+          <span>Post Final Reconciliation Data Sheet</span>
+        </a>
+      </div>
+
+    </div>
+  </aside>
+
+  <!-- Main Content -->
+  <main class="main-content">
+    <!-- Page Header -->
+    <div class="page-header">
+      <div class="header-content">
+        <h1 class="page-title">
+          <i class="fas fa-file-invoice-dollar"></i>
+          Finance Department Dashboard
+        </h1>
+        <p class="page-subtitle">Manage GRN, Chaalan, inventory documents and sales tracking</p>
+      </div>
+    </div>
+
+    <!-- Monthly Cycle Management Section -->
+    <div class="monthly-cycle-management-card-section">
+      <div class="card-header" id="monthlyCycleManagementCardHeader">
+        <div class="header-content">
+          <h3 class="section-title">
+            <i class="fas fa-calendar-alt"></i>
+            Monthly Cycle Management
+          </h3>
+          <p class="section-subtitle">Create and manage multiple cycles within each month</p>
+        </div>
+        <button class="toggle-btn" id="toggleMonthlyCycleManagementCard">
+          <i class="fas fa-chevron-down"></i>
+        </button>
+      </div>
+      
+      <div class="card-body" id="monthlyCycleManagementCardBody" style="display: none;">
+        <div class="monthly-cycle-management-container">
+          <!-- Create Monthly Cycle Section -->
+          <div class="create-monthly-cycle-section">
+            <div class="section-header">
+              <h4 class="section-title">
+                <i class="fas fa-plus-circle"></i>
+                Create New Monthly Cycle
+              </h4>
+              <p class="section-description">Set up cycles for a specific month and year</p>
+            </div>
+            
+            <form id="createMonthlyCycleForm" class="modern-form">
+              {% csrf_token %}
+              <div class="form-grid">
+                <div class="form-group">
+                  <label for="cycleMonth">
+                    <i class="fas fa-calendar"></i>
+                    Month *
+                  </label>
+                  <select id="cycleMonth" name="month" class="form-control" required>
+                    <option value="">Select Month</option>
+                    {% for month in months %}
+                      <option value="{{ month }}" {% if month == current_month %}selected{% endif %}>
+                        {{ month }}
+                      </option>
+                    {% endfor %}
+                  </select>
+                </div>
+                
+                <div class="form-group">
+                  <label for="cycleYear">
+                    <i class="fas fa-calendar-alt"></i>
+                    Year *
+                  </label>
+                  <select id="cycleYear" name="year" class="form-control" required>
+                    <option value="">Select Year</option>
+                    {% for year in years %}
+                      <option value="{{ year }}" {% if year == current_year %}selected{% endif %}>
+                        {{ year }}
+                      </option>
+                    {% endfor %}
+                  </select>
+                </div>
+                
+                <div class="form-group">
+                  <label for="monthlyCycleName">
+                    <i class="fas fa-tag"></i>
+                    Cycle Set Name *
+                  </label>
+                  <input type="text" id="monthlyCycleName" name="name" class="form-control" required
+                         placeholder="e.g., January 2024 Cycles">
+                </div>
+              </div>
+              
+              <div class="form-group">
+                <label for="monthlyCycleDescription">
+                  <i class="fas fa-file-alt"></i>
+                  Description (Optional)
+                </label>
+                <textarea id="monthlyCycleDescription" name="description" class="form-control" rows="2"
+                          placeholder="Describe this monthly cycle set..."></textarea>
+              </div>
+              
+              <div class="form-actions">
+                <button type="submit" class="btn-primary" id="createMonthlyCycleBtn">
+                  <i class="fas fa-plus"></i>
+                  Create Monthly Cycles
+                </button>
+                <div class="form-note">
+                  <i class="fas fa-info-circle"></i>
+                  This will create 4 default cycles (initially inactive) that you can activate when ready
+                </div>
+              </div>
+            </form>
+          </div>
+          
+          <!-- Monthly Cycles List -->
+          <div class="monthly-cycles-list-section">
+            <div class="section-header">
+              <h4 class="section-title">
+                <i class="fas fa-list-alt"></i>
+                Monthly Cycles
+              </h4>
+              <button class="refresh-btn" id="refreshMonthlyCyclesBtn">
+                <i class="fas fa-sync-alt"></i>
+                Refresh
+              </button>
+            </div>
+            
+            <div class="monthly-cycles-grid" id="monthlyCyclesGrid">
+              <div class="loading-cycle">Loading monthly cycles...</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Sale Templates Section -->
+    <div class="sale-templates-card-section">
+      <div class="card-header" id="saleTemplatesCardHeader">
+        <div class="header-content">
+          <h3 class="section-title">
+            <i class="fas fa-file-excel"></i>
+            Sale Template Upload
+          </h3>
+          <p class="section-subtitle">Upload sales data for analysis</p>
+        </div>
+        <button class="toggle-btn" id="toggleSaleTemplatesCard">
+          <i class="fas fa-chevron-down"></i>
+        </button>
+      </div>
+      
+      <div class="card-body" id="saleTemplatesCardBody" style="display: none;">
+        <div class="sale-templates-container">
+          <!-- Upload Template Section - Only Upload Remains -->
+          <div class="template-section upload-section">
+            <div class="section-header">
+              <h4 class="section-title">
+                <i class="fas fa-upload"></i>
+                Upload Sale Data
+              </h4>
+              <p class="section-description">Upload completed sales template for analysis</p>
+            </div>
+            
+            <form id="uploadSaleTemplateForm" method="post" enctype="multipart/form-data">
+              {% csrf_token %}
+              <div class="form-row">
+                <div class="form-group">
+                  <label for="uploadMonth">
+                    <i class="fas fa-calendar"></i>
+                    Select Month
+                  </label>
+                  <select id="uploadMonth" name="month" class="form-control" required>
+                    <option value="" disabled selected>Choose month</option>
+                    {% for month in months %}
+                      <option value="{{ month }}">{{ month }}</option>
+                    {% endfor %}
+                  </select>
+                </div>
+                
+                <div class="form-group">
+                  <label for="uploadCycle">
+                    <i class="fas fa-sync"></i>
+                    Select Cycle
+                  </label>
+                  <select id="uploadCycle" name="cycle" class="form-control" required>
+                    <option value="" disabled selected>Choose cycle</option>
+                    <!-- This will be populated dynamically with available cycles -->
+                  </select>
+                </div>
+                
+                <div class="form-group file-upload-group">
+                  <label for="saleFile" class="file-input-label">
+                    <i class="fas fa-file-upload"></i>
+                    Select Excel File
+                    <span id="fileName" class="file-name">No file chosen</span>
+                  </label>
+                  <input type="file" id="saleFile" name="sale_file" class="form-control file-input" accept=".xlsx,.xls" required>
+                </div>
+                
+                <div class="form-group">
+                  <label>&nbsp;</label>
+                  <button type="submit" class="btn-secondary full-width" id="uploadTemplateBtn">
+                    <i class="fas fa-upload"></i>
+                    Upload & Analyze
+                  </button>
+                </div>
+              </div>
+            </form>
+          </div>
+        </div>
+        
+        <!-- Upload History -->
+        <div class="upload-history-section">
+          <div class="section-header">
+            <h4 class="section-title">
+              <i class="fas fa-history"></i>
+              Recent Uploads
+            </h4>
+            <button class="refresh-btn" id="refreshHistoryBtn">
+              <i class="fas fa-sync-alt"></i>
+              Refresh
+            </button>
+          </div>
+          <div id="uploadHistory" class="history-list">
+            <div class="history-item">
+              <div class="history-file-name">No upload history found</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Inventory Section -->
+    <div class="inventory-card-section">
+      <div class="card-header" id="inventoryCardHeader">
+        <div class="header-content">
+          <h3 class="section-title">
+            <i class="fas fa-warehouse"></i>
+            Inventory by Location
+          </h3>
+          <p class="section-subtitle">View inventory data for different locations</p>
+        </div>
+        <button class="toggle-btn" id="toggleInventoryCard">
+          <i class="fas fa-chevron-down"></i>
+        </button>
+      </div>
+      
+      <div class="card-body" id="inventoryCardBody" style="display: none;">
+        <div class="search-form-container">
+          <form id="inventoryFilterForm" class="modern-form">
+            <div class="form-grid">
+              <div class="form-group">
+                <label for="inventoryLocation">
+                  <i class="fas fa-map-marker-alt"></i>
+                  Select Location
+                </label>
+                <select id="inventoryLocation" name="location" class="form-control" required>
+                  <option value="" disabled selected>Choose a location</option>
+                  {% for location in locations %}
+                    <option value="{{ location }}">{{ location }}</option>
+                  {% endfor %}
+                </select>
+              </div>
+              
+              <div class="form-group">
+                <label>&nbsp;</label>
+                <button type="submit" class="btn-primary full-width" id="viewInventoryBtn" style="margin-bottom: 18px;">
+                  <i class="fas fa-eye"></i>
+                  View Inventory
+                </button>
+              </div>
+
+              <!-- Inventory Adjustment Button -->
+              <div class="form-group">
+                <label>&nbsp;</label>
+                <button type="button" class="btn btn-warning full-width" onclick="openInventoryAdjustment()" style="margin-bottom: 18px;">
+                  <i class="fas fa-edit"></i>
+                  Adjust Inventory Quantity
+                </button>
+              </div>
+            </div>
+          </form>
+        </div>
+        
+        <!-- Inventory Results -->
+        <div class="results-container" id="inventoryResults" style="display: none;">
+          <div class="results-header">
+            <h4>
+              <i class="fas fa-boxes"></i>
+              Inventory for Location: <span id="selectedLocation" class="location-name"></span>
+            </h4>
+            <div class="summary-stats" id="summaryStats">
+              <!-- Summary stats will be populated here -->
+            </div>
+          </div>
+          <div class="table-container">
+            <table class="modern-table" id="inventoryTable">
+              <thead>
+                <tr>
+                  <th>Product Name</th>
+                  <th>Quantity</th>
+                  <th>Stock Status</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody id="inventoryTableBody">
+                <!-- Inventory data will be populated here -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Document Search Section -->
+    <div class="document-card-section">
+      <div class="card-header" id="documentCardHeader">
+        <div class="header-content">
+          <h3 class="section-title">
+            <i class="fas fa-search"></i>
+            Document Search
+          </h3>
+          <p class="section-subtitle">Filter documents by location and date range</p>
+        </div>
+        <button class="toggle-btn" id="toggleDocumentCard">
+          <i class="fas fa-chevron-down"></i>
+        </button>
+      </div>
+      
+      <div class="card-body" id="documentCardBody" style="display: none;">
+        <div class="search-form-container">
+          <form id="filterForm" class="modern-form">
+            <div class="form-grid">
+              <div class="form-group">
+                <label for="location">
+                  <i class="fas fa-map-marker-alt"></i>
+                  Select Location
+                </label>
+                <select id="location" name="location" class="form-control" required>
+                  <option value="" disabled selected>Choose a location</option>
+                  {% for location in locations %}
+                    <option value="{{ location }}">{{ location }}</option>
+                  {% endfor %}
+                </select>
+              </div>
+              
+              <div class="form-group">
+                <label for="fromDate">
+                  <i class="fas fa-calendar-alt"></i>
+                  From Date
+                </label>
+                <input type="date" class="form-control" id="fromDate" name="fromDate" required>
+              </div>
+              
+              <div class="form-group">
+                <label for="toDate">
+                  <i class="fas fa-calendar-alt"></i>
+                  To Date
+                </label>
+                <input type="date" class="form-control" id="toDate" name="toDate" required>
+              </div>
+              
+              <div class="form-group">
+                <label>&nbsp;</label>
+                <button type="submit" class="btn-primary full-width" id="submitButton" style="margin-bottom: 18px;">
+                  <i class="fas fa-search"></i>
+                  Search Documents
+                </button>
+              </div>
+            </div>
+          </form>
+        </div>
+
+        <!-- Document Results Section -->
+        <div class="results-section" id="results" style="display: none;">
+          <div class="section-header">
+            <h3 class="section-title" style="margin-left: 10px;">
+              <i class="fas fa-folder-open"></i>
+              Document Results
+            </h3>
+            <p class="section-subtitle" style="margin-left: 10px;">Found <span id="fileCount">0</span> documents matching your criteria</p>
+          </div>
+
+          <div class="documents-grid">
+            <!-- GRN Files Card -->
+            <div class="document-card">
+              <div class="card-header grn-header">
+                <i class="fas fa-file-invoice"></i>
+                <h4 style="color: #313647;">GRN Files</h4>
+                <span class="file-count" id="grnCount">0</span>
+              </div>
+              <div class="card-body">
+                <button class="btn-secondary full-width mb-3" onclick="toggleFiles('grnFiles')">
+                  <i class="fas fa-eye"></i>
+                  View GRN Files
+                </button>
+                <div id="grnFiles" class="file-list" style="display: none;">
+                  <ul id="grnFilesList" class="file-items"></ul>
+                </div>
+              </div>
+            </div>
+
+            <!-- Chaalan/Invoice Files Card -->
+            <div class="document-card">
+              <div class="card-header chaalan-header">
+                <i class="fas fa-receipt"></i>
+                <h4 style="color: #313647;">Chaalan/Invoice Files</h4>
+                <span class="file-count" id="chaalanCount">0</span>
+              </div>
+              <div class="card-body">
+                <button class="btn-secondary full-width mb-3" onclick="toggleFiles('chaalanFiles')">
+                  <i class="fas fa-eye"></i>
+                  View Chaalan Files
+                </button>
+                <div id="chaalanFiles" class="file-list" style="display: none;">
+                  <ul id="chaalanFilesList" class="file-items"></ul>
+                </div>
+              </div>
+            </div>
+
+            <!-- GRN Against STN Files Card -->
+            <div class="document-card">
+              <div class="card-header stn-header">
+                <i class="fas fa-file-contract"></i>
+                <h4 style="color: #313647;">GRN Against STN Files</h4>
+                <span class="file-count" id="stnCount">0</span>
+              </div>
+              <div class="card-body">
+                <button class="btn-secondary full-width mb-3" onclick="toggleFiles('grnAgainstStnFiles')">
+                  <i class="fas fa-eye"></i>
+                  View STN Files
+                </button>
+                <div id="grnAgainstStnFiles" class="file-list" style="display: none;">
+                  <ul id="grnAgainstStnFilesList" class="file-items"></ul>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<!-- Inventory Adjustment Modal -->
+<div class="modal fade" id="inventoryAdjustmentModal" tabindex="-1" aria-labelledby="inventoryAdjustmentModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content modern-modal">
+            <div class="modal-header" style="background: linear-gradient(135deg, var(--accent-green) 0%, #8a9975 100%);">
+                <h5 class="modal-title" id="inventoryAdjustmentModalLabel">
+                    <i class="fas fa-edit"></i>
+                    Adjust Inventory Quantity
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="inventoryAdjustmentForm">
+                    {% csrf_token %}
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label for="adjustmentLocation" class="form-label">
+                                <i class="fas fa-map-marker-alt"></i>
+                                Location
+                            </label>
+                            <select id="adjustmentLocation" name="location" class="form-control" required>
+                                <option value="" disabled selected>Select Location</option>
+                                {% for location in locations %}
+                                    <option value="{{ location }}">{{ location }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">
+                                <i class="fas fa-cube"></i>
+                                Selected Product
+                            </label>
+                            <div id="adjustProductName" class="form-control-plaintext fw-bold text-primary">
+                                No product selected
+                            </div>
+                            <input type="hidden" id="adjustmentProduct" name="product_id" value="">
+                        </div>
+                    </div>
+                    
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label for="currentQuantity" class="form-label">
+                                <i class="fas fa-boxes"></i>
+                                Current Quantity
+                            </label>
+                            <input type="text" id="currentQuantity" class="form-control" readonly>
+                        </div>
+                        <div class="col-md-6">
+                            <label for="newQuantity" class="form-label">
+                                <i class="fas fa-edit"></i>
+                                New Quantity (Total) * 
+                            </label>
+                            <input type="number" id="newQuantity" name="new_quantity" class="form-control" min="0" required 
+                                   placeholder="Enter new quantity">
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="adjustmentReason" class="form-label">
+                            <i class="fas fa-comment"></i>
+                            Adjustment Reason *
+                        </label>
+                        <textarea id="adjustmentReason" name="adjustment_reason" class="form-control" rows="3" 
+                                  placeholder="Enter reason for inventory adjustment..." required></textarea>
+                    </div>
+                    
+                    <div class="alert alert-info">
+                        <i class="fas fa-info-circle"></i>
+                        This adjustment will be recorded in the inventory history and will update the current stock levels.
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                    <i class="fas fa-times"></i>
+                    Cancel
+                </button>
+                <button type="button" class="btn btn-primary" id="saveAdjustmentBtn">
+                    <i class="fas fa-save"></i>
+                    Save Adjustment
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Monthly Cycle Details Modal -->
+<div class="modal fade" id="monthlyCycleDetailsModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Monthly Cycle Details</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="monthlyCycleDetailsContent">
+                <!-- Content will be loaded dynamically -->
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Add Cycle Modal -->
+<div class="modal fade" id="addCycleModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content modern-modal">
+            <div class="modal-header" style="background: linear-gradient(135deg, var(--accent-green) 0%, #8a9975 100%);">
+                <h5 class="modal-title">
+                    <i class="fas fa-plus-circle"></i>
+                    Add New Cycle
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="addCycleForm">
+                    {% csrf_token %}
+                    <input type="hidden" id="addCycleMonthlyCycleId" name="monthly_cycle_id">
+                    
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label for="addCycleName" class="form-label">
+                                <i class="fas fa-tag"></i>
+                                Cycle Name *
+                            </label>
+                            <input type="text" id="addCycleName" name="name" class="form-control" required
+                                   placeholder="e.g., Cycle 1, Special Cycle">
+                        </div>
+                        <div class="col-md-6">
+                            <label for="addCycleSapNumber" class="form-label">
+                                <i class="fas fa-hashtag"></i>
+                                SAP Cycle Number (Optional)
+                            </label>
+                            <input type="text" id="addCycleSapNumber" name="sap_number" class="form-control"
+                                   placeholder="e.g., SAP001, CYC-2024-001">
+                        </div>
+                    </div>
+                    
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label for="addCycleStartDate" class="form-label">
+                                <i class="fas fa-calendar-day"></i>
+                                Start Date (DD-MM-YYYY) *
+                            </label>
+                            <input type="text" id="addCycleStartDate" name="start_date" class="form-control date-input" 
+                                   placeholder="DD-MM-YYYY" required pattern="\d{2}-\d{2}-\d{4}">
+                            <small class="text-muted">Format: DD-MM-YYYY (e.g., 01-12-2024)</small>
+                        </div>
+                        <div class="col-md-6">
+                            <label for="addCycleEndDate" class="form-label">
+                                <i class="fas fa-calendar-day"></i>
+                                End Date (DD-MM-YYYY) *
+                            </label>
+                            <input type="text" id="addCycleEndDate" name="end_date" class="form-control date-input" 
+                                   placeholder="DD-MM-YYYY" required pattern="\d{2}-\d{2}-\d{4}">
+                            <small class="text-muted">Format: DD-MM-YYYY (e.g., 10-12-2024)</small>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="addCycleDescription" class="form-label">
+                            <i class="fas fa-file-alt"></i>
+                            Description (Optional)
+                        </label>
+                        <textarea id="addCycleDescription" name="description" class="form-control" rows="3"
+                                  placeholder="Describe this cycle..."></textarea>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="addCycleIsActive" name="is_active" value="true">
+                            <label class="form-check-label" for="addCycleIsActive">
+                                <i class="fas fa-toggle-on"></i>
+                                Activate this cycle immediately
+                            </label>
+                        </div>
+                        <small class="text-muted">If unchecked, the cycle will be created as inactive and can be activated later</small>
+                    </div>
+                    
+                    <div class="alert alert-info">
+                        <i class="fas fa-info-circle"></i>
+                        Note: All cycles are initially created as inactive by default. You can activate them when ready.
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                    <i class="fas fa-times"></i>
+                    Cancel
+                </button>
+                <button type="button" class="btn btn-primary" id="saveAddCycleBtn">
+                    <i class="fas fa-save"></i>
+                    Create Cycle
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Edit Cycle Modal -->
+<div class="modal fade" id="editCycleModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content modern-modal">
+            <div class="modal-header" style="background: linear-gradient(135deg, var(--accent-green) 0%, #8a9975 100%);">
+                <h5 class="modal-title">
+                    <i class="fas fa-edit"></i>
+                    Edit Cycle
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="editCycleForm">
+                    {% csrf_token %}
+                    <input type="hidden" id="editCycleId" name="cycle_id">
+                    
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label for="editCycleName" class="form-label">
+                                <i class="fas fa-tag"></i>
+                                Cycle Name *
+                            </label>
+                            <input type="text" id="editCycleName" name="name" class="form-control" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label for="editCycleSapNumber" class="form-label">
+                                <i class="fas fa-hashtag"></i>
+                                SAP Cycle Number
+                            </label>
+                            <input type="text" id="editCycleSapNumber" name="sap_number" class="form-control">
+                        </div>
+                    </div>
+                    
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label for="editCycleStartDate" class="form-label">
+                                <i class="fas fa-calendar-day"></i>
+                                Start Date (DD-MM-YYYY) *
+                            </label>
+                            <input type="text" id="editCycleStartDate" name="start_date" class="form-control date-input" 
+                                   required pattern="\d{2}-\d{2}-\d{4}">
+                        </div>
+                        <div class="col-md-6">
+                            <label for="editCycleEndDate" class="form-label">
+                                <i class="fas fa-calendar-day"></i>
+                                End Date (DD-MM-YYYY) *
+                            </label>
+                            <input type="text" id="editCycleEndDate" name="end_date" class="form-control date-input" 
+                                   required pattern="\d{2}-\d{2}-\d{4}">
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="editCycleDescription" class="form-label">
+                            <i class="fas fa-file-alt"></i>
+                            Description
+                        </label>
+                        <textarea id="editCycleDescription" name="description" class="form-control" rows="3"></textarea>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="editCycleIsActive" name="is_active" value="true">
+                            <label class="form-check-label" for="editCycleIsActive">
+                                <i class="fas fa-toggle-on"></i>
+                                Cycle Status (Active/Inactive)
+                            </label>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                    <i class="fas fa-times"></i>
+                    Cancel
+                </button>
+                <button type="button" class="btn btn-primary" id="saveEditCycleBtn">
+                    <i class="fas fa-save"></i>
+                    Save Changes
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+/* Monthly Cycle Management Styles - Enhanced */
+.monthly-cycle-management-card-section {
+    background: linear-gradient(135deg, var(--accent-green) 0%, #8a9975 100%);
+    border-radius: 16px;
+    border: 2px solid black;
+    box-shadow: 0 8px 32px rgba(163, 176, 135, 0.2);
+    overflow: hidden;
+    transition: all 0.3s ease;
+    min-height: 80px;
+}
+
+.monthly-cycle-management-container {
+    padding: 2rem;
+    display: flex;
+    flex-direction: column;
+    gap: 2rem;
+}
+
+.create-monthly-cycle-section {
+    background: rgba(255, 255, 255, 0.95);
+    border-radius: 12px;
+    padding: 1.5rem;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    border: 2px solid black;
+}
+
+.monthly-cycles-list-section {
+    background: rgba(255, 255, 255, 0.95);
+    border-radius: 12px;
+    padding: 1.5rem;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    border: 2px solid black;
+}
+
+.monthly-cycles-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(400px, 1fr));
+    gap: 1.5rem;
+    margin-top: 1rem;
+}
+
+.monthly-cycle-card {
+    background: white;
+    border-radius: 8px;
+    padding: 1.5rem;
+    border: 1px solid #213448;
+    transition: all 0.3s ease;
+    position: relative;
+}
+
+.monthly-cycle-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.monthly-cycle-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1rem;
+    padding-bottom: 0.75rem;
+    border-bottom: 1px solid #213448;
+}
+
+.monthly-cycle-header .header-actions {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.monthly-cycle-name {
+    font-weight: 600;
+    color: var(--primary-dark);
+    margin: 0;
+}
+
+.cycle-count {
+    background: var(--primary-dark);
+    color: white;
+    padding: 0.25rem 0.75rem;
+    border-radius: 20px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.btn-delete-monthly-cycle {
+    background: none;
+    border: none;
+    color: var(--danger);
+    cursor: pointer;
+    padding: 0.25rem;
+    border-radius: 4px;
+    transition: all 0.3s ease;
+}
+
+.btn-delete-monthly-cycle:hover {
+    background: rgba(220, 53, 69, 0.1);
+    transform: scale(1.1);
+}
+
+.cycles-timeline {
+    margin-bottom: 1rem;
+}
+
+.cycle-timeline-item {
+    display: flex;
+    align-items: center;
+    margin-bottom: 0.75rem;
+    padding: 0.5rem;
+    border-radius: 6px;
+    transition: background 0.3s ease;
+    border-left: 3px solid var(--accent-green);
+}
+
+.cycle-timeline-item.inactive {
+    border-left-color: #6c757d;
+    opacity: 0.8;
+    background: #f8f9fa;
+}
+
+.cycle-timeline-item:hover {
+    background: #f8f9fa;
+}
+
+.cycle-timeline-bar {
+    width: 4px;
+    height: 40px;
+    background: var(--accent-green);
+    border-radius: 2px;
+    margin-right: 1rem;
+}
+
+.cycle-timeline-bar.inactive {
+    background: #6c757d;
+}
+
+.cycle-timeline-info {
+    flex: 1;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.cycle-name {
+    font-weight: 500;
+    color: var(--primary-dark);
+}
+
+.cycle-name .sap-number {
+    font-size: 0.8rem;
+    color: #6c757d;
+    margin-left: 0.5rem;
+    font-style: italic;
+}
+
+.cycle-dates {
+    color: var(--text-light);
+    font-size: 0.9rem;
+}
+
+.cycle-status-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    margin-left: 0.5rem;
+}
+
+.cycle-status-badge.active {
+    background: rgba(40, 167, 69, 0.1);
+    color: var(--success);
+}
+
+.cycle-status-badge.inactive {
+    background: rgba(108, 117, 125, 0.1);
+    color: #6c757d;
+}
+
+.cycle-actions {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.btn-edit-cycle, .btn-delete-cycle, .btn-toggle-cycle {
+    background: none;
+    border: none;
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.btn-edit-cycle {
+    color: var(--primary-dark);
+}
+
+.btn-edit-cycle:hover {
+    background: rgba(49, 54, 71, 0.1);
+}
+
+.btn-delete-cycle {
+    color: var(--danger);
+}
+
+.btn-delete-cycle:hover {
+    background: rgba(220, 53, 69, 0.1);
+}
+
+.btn-toggle-cycle {
+    color: var(--warning);
+}
+
+.btn-toggle-cycle:hover {
+    background: rgba(255, 193, 7, 0.1);
+}
+
+.monthly-cycle-actions {
+    display: flex;
+    gap: 0.75rem;
+    justify-content: flex-end;
+}
+
+.btn-add-cycle, .btn-view-details {
+    padding: 0.5rem 1rem;
+    border: none;
+    border-radius: 6px;
+    font-size: 0.85rem;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.btn-add-cycle {
+    background: var(--success);
+    color: white;
+}
+
+.btn-add-cycle:hover {
+    background: #218838;
+}
+
+.btn-view-details {
+    background: var(--primary-dark);
+    color: white;
+}
+
+.btn-view-details:hover {
+    background: var(--primary-light);
+}
+
+.loading-cycle {
+    text-align: center;
+    padding: 2rem;
+    color: var(--text-light);
+}
+
+.empty-state {
+    text-align: center;
+    padding: 2rem;
+    color: var(--text-light);
+}
+
+.empty-state i {
+    font-size: 3rem;
+    margin-bottom: 1rem;
+    opacity: 0.5;
+}
+
+.empty-cycle-state {
+    text-align: center;
+    padding: 2rem;
+    color: var(--text-light);
+    background: rgba(255, 255, 255, 0.5);
+    border-radius: 8px;
+    border: 2px dashed var(--border-color);
+    margin: 1rem 0;
+}
+
+.empty-cycle-state i {
+    font-size: 2rem;
+    margin-bottom: 1rem;
+    display: block;
+    opacity: 0.5;
+}
+
+.cycle-message {
+    margin: 1rem 0;
+    animation: slideDown 0.3s ease;
+}
+
+@keyframes slideDown {
+    from {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.error-message {
+    text-align: center;
+    padding: 2rem;
+    color: var(--danger);
+    background: rgba(220, 53, 69, 0.1);
+    border-radius: 8px;
+    border: 1px solid rgba(220, 53, 69, 0.2);
+}
+
+.success-message {
+    text-align: center;
+    padding: 2rem;
+    color: var(--success);
+    background: rgba(40, 167, 69, 0.1);
+    border-radius: 8px;
+    border: 1px solid rgba(40, 167, 69, 0.2);
+}
+
+.date-input {
+    font-family: monospace;
+}
+
+.date-input:valid {
+    border-color: var(--success);
+}
+
+.date-input:invalid {
+    border-color: var(--danger);
+}
+
+/* Existing CSS styles remain the same */
+:root {
+    --primary-dark: #313647;
+    --primary-light: #435663;
+    --accent-green: #A3B087;
+    --accent-red: #EA5B6F;
+    --accent-yellow: #FFF8D4;
+    --text-dark: #2c3e50;
+    --text-light: #7f8c8d;
+    --bg-light: #f8f9fa;
+    --border-color: #e9ecef;
+    --success: #28a745;
+    --warning: #ffc107;
+    --danger: #dc3545;
+    --info: #17a2b8;
+}
+
+/* Layout */
+.layout-container {
+    display: flex;
+    min-height: calc(100vh - 90px);
+    background: white;
+    align-items: flex-start;
+}
+
+/* Sidebar */
+.sidebar {
+    width: 320px;
+    background: var(--primary-dark);
+    color: white;
+    padding: 2rem 1.5rem;
+    box-shadow: 2px 0 20px rgba(0, 0, 0, 0.1);
+    border-radius: 0 20px 20px 0;
+    position: sticky;
+    top: 90px;
+    height: auto;
+    max-height: none;
+    overflow-y: visible;
+    flex-shrink: 0;
+    margin-top: 40px;
+    margin-left: 10px;
+    align-self: flex-start;
+}
+
+.sidebar-content {
+    display: flex;
+    flex-direction: column;
+    gap: 2rem;
+    height: 100%;
+}
+
+.user-welcome {
+    text-align: center;
+    padding-bottom: 1.5rem;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.welcome-title {
+    font-size: 1.5rem;
+    font-weight: 600;
+    margin-bottom: 0.5rem;
+    color: var(--accent-green);
+}
+
+.wave-emoji {
+    display: inline-block;
+    animation: wave 1.5s ease-in-out infinite;
+}
+
+@keyframes wave {
+    0%, 100% { transform: rotate(0deg); }
+    25% { transform: rotate(15deg); }
+    75% { transform: rotate(-10deg); }
+}
+
+.user-name {
+    font-size: 1.1rem;
+    color: var(--accent-yellow);
+    font-weight: 500;
+    margin-bottom: 1rem;
+}
+
+.user-details {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    align-items: center;
+}
+
+.detail-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.4rem 0.8rem;
+    background: rgba(163, 176, 135, 0.1);
+    border-radius: 20px;
+    font-size: 0.85rem;
+    color: rgba(255, 255, 255, 0.9);
+}
+
+.detail-badge i {
+    color: var(--accent-green);
+}
+
+/* Stats Section */
+.stats-section {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 1rem;
+    padding-bottom: 1.5rem;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.stat-card {
+    background: rgba(163, 176, 135, 0.1);
+    padding: 1rem;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    border: 1px solid rgba(163, 176, 135, 0.2);
+}
+
+.stat-icon {
+    width: 48px;
+    height: 48px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.5rem;
+}
+
+.inventory-icon {
+    background: rgba(163, 176, 135, 0.2);
+    color: var(--accent-green);
+}
+
+.stat-info {
+    display: flex;
+    flex-direction: column;
+}
+
+.stat-value {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: white;
+}
+
+.stat-label {
+    font-size: 0.75rem;
+    color: rgba(255, 255, 255, 0.7);
+}
+
+/* Quick Actions */
+.quick-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+.section-title {
+    font-size: 1.1rem;
+    color: var(--success);
+    margin-bottom: 0.5rem;
+    font-weight: 500;
+}
+
+.action-btn {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.875rem 1rem;
+    background: rgba(163, 176, 135, 0.1);
+    color: var(--accent-yellow);
+    text-decoration: none;
+    border-radius: 10px;
+    transition: all 0.3s ease;
+    border: 1px solid rgba(163, 176, 135, 0.2);
+}
+
+.action-btn:hover {
+    background: rgba(163, 176, 135, 0.2);
+    color: white;
+    transform: translateX(5px);
+}
+
+.action-btn i {
+    color: var(--accent-green);
+    font-size: 1.1rem;
+}
+
+/* Color Legend */
+.color-legend {
+    background: rgba(163, 176, 135, 0.1);
+    padding: 1rem;
+    border-radius: 10px;
+    border: 1px solid rgba(163, 176, 135, 0.2);
+    margin-top: 1rem;
+}
+
+.legend-title {
+    color: var(--accent-yellow);
+    font-size: 0.9rem;
+    margin-bottom: 0.75rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.legend-items {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.legend-item {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.color-box {
+    width: 16px;
+    height: 16px;
+    border-radius: 3px;
+    border: 1px solid rgba(255, 255, 255, 0.3);
+}
+
+.ok-color {
+    background-color: #90EE90;
+}
+
+.over-sold-color {
+    background-color: #FFB6C1;
+}
+
+.under-sold-color {
+    background-color: #FFD700;
+}
+
+.not-sold-color {
+    background-color: #D3D3D3;
+}
+
+.legend-text {
+    font-size: 0.8rem;
+    color: rgba(255, 255, 255, 0.9);
+}
+
+/* Main Content */
+.main-content {
+    flex: 1;
+    background: #ffffff;
+    padding: 2rem;
+    display: flex;
+    flex-direction: column;
+    gap: 2rem;
+}
+
+/* Page Header */
+.page-header {
+    background: linear-gradient(135deg, var(--accent-green) 0%, #8a9975 100%);
+    border-radius: 20px;
+    padding: 2rem;
+    box-shadow: 0 8px 32px rgba(163, 176, 135, 0.2);
+    border: 2px solid black;
+}
+
+.header-content {
+    text-align: center;
+}
+
+.page-title {
+    font-size: 2.5rem;
+    font-weight: 700;
+    color: var(--primary-dark);
+    margin-bottom: 0.5rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 1rem;
+}
+
+.page-title i {
+    font-size: 2rem;
+}
+
+.page-subtitle {
+    font-size: 1.2rem;
+    color: var(--primary-dark);
+    font-weight: 400;
+}
+
+/* Card Sections */
+.inventory-card-section,
+.document-card-section,
+.sale-templates-card-section {
+    background: linear-gradient(135deg, #ffffff 0%, #ffffff 100%);
+    border-radius: 16px;
+    border: 2px solid black;
+    box-shadow: 0 8px 32px rgba(163, 176, 135, 0.2);
+    overflow: hidden;
+    transition: all 0.3s ease;
+    min-height: 80px;
+}
+
+.card-header {
+    background: linear-gradient(135deg, var(--accent-green) 0%, #8a9975 100%);
+    padding: 1.5rem 2rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    cursor: pointer;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+    backdrop-filter: blur(10px);
+}
+
+.card-header .header-content {
+    text-align: left;
+    flex: 1;
+}
+
+.card-header .section-title {
+    color: var(--primary-dark);
+    margin: 0 0 0.5rem 0;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    font-size: 1.3rem;
+    font-weight: 700;
+}
+
+.card-header .section-title i {
+    color: var(--accent-green);
+}
+
+.section-subtitle {
+    color: #313647;
+    margin: 0;
+    font-size: 1rem;
+}
+
+.toggle-btn {
+    background: var(--primary-dark);
+    color: white;
+    border: none;
+    border-radius: 8px;
+    padding: 0.75rem;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.toggle-btn:hover {
+    background: var(--primary-light);
+    transform: scale(1.05);
+}
+
+.toggle-btn i {
+    transition: transform 0.3s ease;
+}
+
+.toggle-btn.active i {
+    transform: rotate(180deg);
+}
+
+.card-body {
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(10px);
+    overflow: visible;
+}
+
+/* Search Form */
+.search-form-container {
+    padding: 2rem;
+}
+
+.modern-form {
+    width: 100%;
+}
+
+.form-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 1.5rem;
+    align-items: end;
+}
+
+.form-group {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.form-group label {
+    font-weight: 600;
+    color: var(--text-dark);
+    font-size: 0.9rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.form-group label i {
+    color: var(--accent-green);
+}
+
+.form-control {
+    padding: 0.875rem 1rem;
+    border: 2px solid var(--border-color);
+    border-radius: 10px;
+    font-size: 0.95rem;
+    transition: all 0.3s ease;
+    font-family: 'Lexend', sans-serif;
+    background: white;
+}
+
+.form-control:focus {
+    outline: none;
+    border-color: var(--accent-green);
+    box-shadow: 0 0 0 3px rgba(163, 176, 135, 0.1);
+}
+
+/* Buttons */
+.btn-primary, .btn-secondary {
+    padding: 0.875rem 1.5rem;
+    border: none;
+    border-radius: 10px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    font-size: 0.95rem;
+}
+
+.btn-primary {
+    background: var(--primary-dark);
+    color: white;
+}
+
+.btn-primary:hover {
+    background: var(--primary-light);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(49, 54, 71, 0.3);
+}
+
+.btn-secondary {
+    background: #31694E;
+    color: white;
+}
+
+.btn-secondary:hover {
+    background: #2a5d44;
+    transform: translateY(-2px);
+}
+
+.full-width {
+    width: 100%;
+}
+
+/* Results Container */
+.results-container {
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(10px);
+    border-radius: 0 0 16px 16px;
+}
+
+.results-header {
+    padding: 1.5rem 2rem;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+    background: rgba(255, 255, 255, 0.8);
+}
+
+.results-header h4 {
+    margin: 0;
+    color: var(--primary-dark);
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.location-name {
+    color: var(--accent-green);
+    font-weight: 700;
+}
+
+/* Summary Stats */
+.summary-stats {
+    display: flex;
+    gap: 1rem;
+    margin-top: 1rem;
+    flex-wrap: wrap;
+}
+
+.summary-item {
+    background: rgba(163, 176, 135, 0.1);
+    padding: 0.75rem 1rem;
+    border-radius: 8px;
+    border: 1px solid rgba(163, 176, 135, 0.2);
+}
+
+.summary-label {
+    font-size: 0.8rem;
+    color: var(--text-light);
+    margin-bottom: 0.25rem;
+}
+
+.summary-value {
+    font-size: 1.2rem;
+    font-weight: 700;
+    color: var(--primary-dark);
+}
+
+/* Table Styles */
+.table-container {
+    overflow-x: auto;
+    padding: 0 2rem 2rem;
+}
+
+.modern-table {
+    width: 100%;
+    border-collapse: collapse;
+    background: white;
+    border-radius: 10px;
+    overflow: hidden;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+}
+
+.modern-table thead {
+    background: var(--primary-dark);
+}
+
+.modern-table th {
+    color: var(--primary-dark);
+    padding: 1.2rem;
+    font-weight: 600;
+    text-align: left;
+    font-size: 0.9rem;
+    white-space: nowrap;
+}
+
+.modern-table td {
+    padding: 1.2rem;
+    border-bottom: 1px solid var(--border-color);
+    vertical-align: middle;
+    font-size: 0.9rem;
+}
+
+.modern-table tbody tr {
+    transition: all 0.3s ease;
+}
+
+.modern-table tbody tr:hover {
+    background: var(--bg-light);
+    transform: translateY(-1px);
+}
+
+/* Status Badges */
+.status-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 0.75rem;
+    border-radius: 8px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.status-badge.high {
+    background: rgba(40, 167, 69, 0.1);
+    color: var(--success);
+}
+
+.status-badge.medium {
+    background: rgba(255, 193, 7, 0.1);
+    color: var(--warning);
+}
+
+.status-badge.low {
+    background: rgba(220, 53, 69, 0.1);
+    color: var(--danger);
+}
+
+/* Documents Grid */
+.documents-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+    gap: 1.5rem;
+    padding: 2rem;
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(10px);
+}
+
+.document-card {
+    background: linear-gradient(135deg, var(--accent-green) 0%, #8a9975 100%);
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+    border: 1px solid var(--border-color);
+    transition: all 0.3s ease;
+}
+
+.document-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.15);
+}
+
+.document-card .card-header {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 1.5rem;
+    color: white;
+    font-weight: 600;
+    cursor: default;
+}
+
+.document-card .card-header i {
+    font-size: 1.5rem;
+}
+
+.document-card .card-header h4 {
+    margin: 0;
+    flex: 1;
+}
+
+.grn-header {
+    background: linear-gradient(135deg, var(--accent-green) 0%, #8a9975 100%);
+}
+
+.chaalan-header {
+    background: linear-gradient(135deg, var(--accent-green) 0%, #8a9975 100%);
+}
+
+.stn-header {
+    background: linear-gradient(135deg, var(--accent-green) 0%, #8a9975 100%);
+}
+
+.file-count {
+    background: rgba(255, 255, 255, 0.2);
+    padding: 0.25rem 0.75rem;
+    border-radius: 20px;
+    font-size: 0.9rem;
+    font-weight: 700;
+}
+
+.document-card .card-body {
+    padding: 1.5rem;
+    background: linear-gradient(135deg, var(--accent-green) 0%, #8a9975 100%);
+    max-height: none;
+}
+
+/* File List */
+.file-list {
+    max-height: none;
+    overflow-y: visible;
+}
+
+.file-items {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.file-items li {
+    padding: 1rem;
+    border-bottom: 1px solid var(--border-color);
+    transition: all 0.3s ease;
+}
+
+.file-items li:last-child {
+    border-bottom: none;
+}
+
+.file-items li:hover {
+    background: var(--bg-light);
+}
+
+.file-items a {
+    color: var(--text-dark);
+    text-decoration: none;
+    font-weight: 500;
+    display: block;
+    transition: color 0.3s ease;
+}
+
+.file-items a:hover {
+    color: var(--accent-green);
+}
+
+/* Empty States */
+.empty-state {
+    text-align: center;
+    padding: 2rem;
+    color: var(--text-light);
+}
+
+.empty-state i {
+    font-size: 3rem;
+    margin-bottom: 1rem;
+    opacity: 0.5;
+}
+
+/* Scrollbar Styling */
+.history-list::-webkit-scrollbar {
+    width: 4px;
+}
+
+.history-list::-webkit-scrollbar-track {
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 2px;
+}
+
+.history-list::-webkit-scrollbar-thumb {
+    background: var(--accent-green);
+    border-radius: 2px;
+}
+
+.history-list::-webkit-scrollbar-thumb:hover {
+    background: var(--accent-yellow);
+}
+
+/* Responsive Design */
+@media (max-width: 1200px) {
+    .layout-container {
+        flex-direction: column;
+    }
+    
+    .sidebar {
+        width: 100%;
+        margin: 0;
+        border-radius: 0;
+        position: relative;
+        top: 0;
+        min-height: auto;
+    }
+}
+
+@media (max-width: 768px) {
+    .main-content {
+        padding: 1rem;
+    }
+
+    .page-header {
+        padding: 1.5rem;
+    }
+
+    .page-title {
+        font-size: 1.8rem;
+    }
+
+    .documents-grid {
+        grid-template-columns: 1fr;
+        padding: 1rem;
+    }
+
+    .form-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .card-header {
+        padding: 1.5rem;
+    }
+
+    .search-form-container {
+        padding: 1.5rem;
+    }
+
+    .table-container {
+        padding: 0 1rem 1rem;
+    }
+
+    .summary-stats {
+        flex-direction: column;
+        gap: 0.5rem;
+    }
+
+    .monthly-cycles-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .monthly-cycle-management-container {
+        padding: 1rem;
+    }
+
+    .create-monthly-cycle-section,
+    .monthly-cycles-list-section {
+        padding: 1rem;
+    }
+}
+
+@media (max-width: 480px) {
+    .page-title {
+        font-size: 1.5rem;
+        flex-direction: column;
+        gap: 0.5rem;
+    }
+
+    .card-header {
+        flex-direction: column;
+        text-align: center;
+        gap: 0.5rem;
+    }
+
+    .file-count {
+        align-self: center;
+    }
+
+    .monthly-cycle-actions {
+        flex-direction: column;
+    }
+}
+
+/* Sale Templates Specific Styles */
+.sale-templates-container {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 2rem;
+    padding: 2rem;
+}
+
+.template-section {
+    background: rgba(255, 255, 255, 0.95);
+    border-radius: 12px;
+    padding: 1.5rem;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    border: 2px solid black;
+}
+
+.template-section .section-header {
+    margin-bottom: 1.5rem;
+    padding-bottom: 1rem;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+}
+
+.template-section .section-title {
+    font-size: 1.2rem;
+    color: var(--primary-dark);
+    margin-bottom: 0.5rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.template-section .section-description {
+    color: var(--text-light);
+    font-size: 0.9rem;
+    margin: 0;
+}
+
+.form-row {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+.file-upload-group {
+    grid-column: 1 / -1;
+}
+
+.upload-history-section {
+    background: rgba(255, 255, 255, 0.95);
+    margin: 0 2rem 2rem;
+    border-radius: 12px;
+    padding: 1.5rem;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    border: 2px solid black;
+}
+
+.upload-history-section .section-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1rem;
+}
+
+.refresh-btn {
+    background: var(--primary-dark);
+    color: white;
+    border: none;
+    border-radius: 6px;
+    padding: 0.5rem 1rem;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.9rem;
+}
+
+.refresh-btn:hover {
+    background: var(--primary-light);
+}
+
+.refresh-btn.loading i {
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+.history-list {
+    max-height: 200px;
+    overflow-y: auto;
+}
+
+.history-item {
+    background: rgba(163, 176, 135, 0.1);
+    padding: 1rem;
+    border-radius: 8px;
+    margin-bottom: 0.75rem;
+    border-left: 4px solid var(--accent-green);
+}
+
+.history-file-name {
+    font-weight: 600;
+    color: var(--primary-dark);
+    margin-bottom: 0.5rem;
+}
+
+.history-details {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.85rem;
+    color: var(--text-light);
+}
+
+.history-stats {
+    display: flex;
+    gap: 1rem;
+}
+
+.stat-success {
+    color: var(--success);
+}
+
+.stat-error {
+    color: var(--danger);
+}
+
+.file-input-label {
+    display: block;
+    padding: 0.875rem 1rem;
+    border: 2px dashed var(--border-color);
+    border-radius: 10px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    text-align: center;
+}
+
+.file-input-label:hover {
+    border-color: var(--accent-green);
+    background: rgba(163, 176, 135, 0.05);
+}
+
+.file-name {
+    display: block;
+    margin-top: 0.5rem;
+    font-size: 0.9rem;
+    color: var(--text-light);
+}
+
+.file-input {
+    display: none;
+}
+
+.upload-message {
+    padding: 1rem;
+    border-radius: 8px;
+    margin: 1rem 0;
+    font-weight: 500;
+}
+
+.upload-success {
+    background: rgba(40, 167, 69, 0.1);
+    color: var(--success);
+    border: 1px solid rgba(40, 167, 69, 0.2);
+}
+
+.upload-error {
+    background: rgba(220, 53, 69, 0.1);
+    color: var(--danger);
+    border: 1px solid rgba(220, 53, 69, 0.2);
+}
+
+.upload-info {
+    background: rgba(23, 162, 184, 0.1);
+    color: var(--info);
+    border: 1px solid rgba(23, 162, 184, 0.2);
+}
+
+.download-section {
+    background: rgba(40, 167, 69, 0.1);
+    padding: 1rem;
+    border-radius: 8px;
+    margin-top: 1rem;
+    border: 1px solid rgba(40, 167, 69, 0.2);
+}
+
+.download-section p {
+    margin: 0.5rem 0 0 0;
+    font-size: 0.9rem;
+    color: var(--text-light);
+    text-align: center;
+}
+
+.form-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    margin-top: 1.5rem;
+}
+
+.form-note {
+    font-size: 0.85rem;
+    color: var(--text-light);
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.btn-warning {
+    background: linear-gradient(135deg, #ffc107 0%, #e0a800 100%);
+    border: 2px solid #d39e00;
+    color: var(--primary-dark);
+    font-weight: 600;
+}
+
+.btn-warning:hover {
+    background: linear-gradient(135deg, #e0a800 0%, #c69500 100%);
+    transform: translateY(-2px);
+}
+
+/* Modal Styles */
+.modal-backdrop {
+    background-color: transparent !important;
+}
+
+.modal {
+    background-color: rgba(0, 0, 0, 0.1) !important;
+}
+
+.modern-modal {
+    border: 2px solid black !important;
+    border-radius: 16px !important;
+    overflow: hidden;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3) !important;
+}
+
+.modern-modal .modal-header {
+    background: linear-gradient(135deg, var(--accent-green) 0%, #8a9975 100%);
+    color: white;
+    padding: 1.5rem;
+    border: none;
+    border-bottom: 2px solid black;
+}
+
+.modern-modal .modal-title {
+    font-size: 1.25rem;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    color: var(--primary-dark);
+}
+
+.modern-modal .modal-body {
+    padding: 2rem;
+    background: white;
+}
+
+.modern-modal .modal-footer {
+    border-top: 2px solid black;
+    background: white;
+    padding: 1.5rem;
+}
+
+.adjustment-message {
+    margin-bottom: 1rem;
+}
+
+/* File item styles */
+.file-item-with-chaalan {
+    padding: 1rem;
+    border-bottom: 1px solid #e9ecef;
+    background: #f8f9fa;
+    margin-bottom: 0.5rem;
+    border-radius: 8px;
+    border-left: 4px solid #2c5f2d;
+}
+
+.file-link a {
+    color: #2c5f2d;
+    font-weight: 600;
+    text-decoration: none;
+    display: block;
+    margin-bottom: 0.5rem;
+}
+
+.chaalan-link {
+    margin-top: 0.5rem;
+    padding-left: 1.5rem;
+    border-left: 2px solid #8a9975;
+}
+
+.chaalan-file-link {
+    color: #8a9975 !important;
+    font-size: 0.9rem;
+    text-decoration: none;
+    display: block;
+}
+
+.chaalan-file-link:hover {
+    color: #2c5f2d !important;
+}
+
+.no-chaalan {
+    color: #dc3545;
+    font-size: 0.85rem;
+    margin-top: 0.5rem;
+    padding-left: 1.5rem;
+}
+
+.timestamp-match {
+    color: #28a745;
+    font-size: 0.8rem;
+    margin-top: 0.25rem;
+    padding-left: 1.5rem;
+    font-style: italic;
+}
+
+.file-item-with-chaalan:hover {
+    background: #e8f5e8;
+    transform: translateY(-1px);
+    transition: all 0.3s ease;
+}
+
+.chalan-with-grn {
+    background: #e8f5e8;
+    border-left: 4px solid #28a745;
+}
+
+.chalan-standalone {
+    background: #f8f9fa;
+    border-left: 4px solid #6c757d;
+}
+
+.grn-association {
+    font-size: 0.8rem;
+    color: #28a745;
+    margin-top: 0.25rem;
+    font-style: italic;
+}
+
+/* Responsive adjustments for sale templates */
+@media (max-width: 1024px) {
+    .sale-templates-container {
+        grid-template-columns: 1fr;
+    }
+}
+
+@media (max-width: 768px) {
+    .sale-templates-container {
+        padding: 1rem;
+    }
+    
+    .template-section {
+        padding: 1rem;
+    }
+    
+    .upload-history-section {
+        margin: 0 1rem 1rem;
+        padding: 1rem;
+    }
+}
+/* Add to your existing CSS */
+.active-highlight {
+    background: rgba(40, 167, 69, 0.1) !important;
+    border-left: 3px solid #28a745 !important;
+    border-radius: 6px;
+}
+
+.active-bar {
+    background: #28a745 !important;
+    box-shadow: 0 0 5px rgba(40, 167, 69, 0.5);
+}
+
+.active-cycle-indicator {
+    animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+    0% { opacity: 1; }
+    50% { opacity: 0.8; }
+    100% { opacity: 1; }
+}
+</style>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
+<script>
+$(document).ready(function() {
+    console.log("🚀 Finance Dashboard Document Ready");
+    console.log("📊 Available URLs:", {
+        uploadSaleTemplate: "{% url 'upload_sale_template' %}",
+        getSaleUploadHistory: "{% url 'get_sale_upload_history' %}",
+        fetchFinanceData: "{% url 'fetch_finance_data' %}",
+        getAvailableCycles: "{% url 'get_available_cycles' %}"
+    });
+    
+    console.log("🔄 Initializing dashboard components...");
+    
+    // Initialize dashboard
+    initializeDashboard();
+    
+    // Set default dates for document search
+    const today = new Date();
+    const firstDay = new Date(today.getFullYear(), today.getMonth(), 1);
+    const lastDay = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+    
+    $('#fromDate').val(firstDay.toISOString().split('T')[0]);
+    $('#toDate').val(lastDay.toISOString().split('T')[0]);
+    
+    console.log("📅 Default dates set:", {
+        fromDate: $('#fromDate').val(),
+        toDate: $('#toDate').val()
+    });
+
+    // Initialize total files count
+    loadTotalStats();
+    
+    // Card toggle functionality
+    initializeCardToggles();
+    
+    // Monthly cycle management
+    initializeMonthlyCycleManagement();
+    
+    // Document search
+    initializeDocumentSearch();
+    
+    // Inventory management
+    initializeInventoryManagement();
+    
+    // Sale templates
+    initializeSaleTemplates();
+    
+    // Inventory adjustment
+    initializeInventoryAdjustment();
+    
+    console.log("✅ All dashboard components initialized");
+});
+
+function initializeDashboard() {
+    console.log("📊 Finance Dashboard initialized");
+}
+
+function initializeCardToggles() {
+    console.log("🔄 Initializing card toggles...");
+    
+    // Define all card sections
+    const cardSections = [
+        {
+            toggleBtn: $('#toggleMonthlyCycleManagementCard'),
+            cardBody: $('#monthlyCycleManagementCardBody'),
+            cardId: 'monthlyCycle'
+        },
+        {
+            toggleBtn: $('#toggleSaleTemplatesCard'),
+            cardBody: $('#saleTemplatesCardBody'),
+            cardId: 'saleTemplates'
+        },
+        {
+            toggleBtn: $('#toggleInventoryCard'),
+            cardBody: $('#inventoryCardBody'),
+            cardId: 'inventory'
+        },
+        {
+            toggleBtn: $('#toggleDocumentCard'),
+            cardBody: $('#documentCardBody'),
+            cardId: 'document'
+        }
+    ];
+
+    console.log("📋 Found card sections:", cardSections.map(s => s.cardId));
+
+    // Function to close all other cards
+    function closeOtherCards(currentCardId) {
+        console.log(`🔒 Closing other cards except: ${currentCardId}`);
+        cardSections.forEach(section => {
+            if (section.cardId !== currentCardId && section.cardBody.is(':visible')) {
+                console.log(`   Closing: ${section.cardId}`);
+                section.cardBody.slideUp(300);
+                section.toggleBtn.removeClass('active');
+                section.toggleBtn.find('i').removeClass('fa-chevron-up').addClass('fa-chevron-down');
+            }
+        });
+    }
+
+    // Initialize toggle for each card
+    cardSections.forEach(section => {
+        section.toggleBtn.on('click', function() {
+            console.log(`🎯 Card toggle clicked: ${section.cardId}`);
+            const isVisible = section.cardBody.is(':visible');
+            
+            console.log(`   Current state: ${isVisible ? 'visible' : 'hidden'}`);
+            
+            // Close all other cards first
+            if (!isVisible) {
+                closeOtherCards(section.cardId);
+            }
+            
+            // Toggle current card
+            section.cardBody.slideToggle(300, function() {
+                if (section.cardBody.is(':visible')) {
+                    console.log(`   ✅ ${section.cardId} card expanded`);
+                    section.toggleBtn.addClass('active');
+                    section.toggleBtn.find('i').removeClass('fa-chevron-down').addClass('fa-chevron-up');
+                    
+                    // Load data if needed
+                    if (section.cardId === 'monthlyCycle') {
+                        console.log("📅 Loading monthly cycles...");
+                        loadMonthlyCycles();
+                    } else if (section.cardId === 'saleTemplates') {
+                        console.log("📊 Loading available cycles for sale templates...");
+                        loadAvailableCycles();
+                    }
+                } else {
+                    console.log(`   📁 ${section.cardId} card collapsed`);
+                    section.toggleBtn.removeClass('active');
+                    section.toggleBtn.find('i').removeClass('fa-chevron-up').addClass('fa-chevron-down');
+                }
+            });
+        });
+    });
+    
+    console.log("✅ Card toggles initialized");
+}
+
+function initializeMonthlyCycleManagement() {
+    console.log("🔄 Initializing monthly cycle management...");
+    
+    // Create new monthly cycle
+    $('#createMonthlyCycleForm').on('submit', function(e) {
+        e.preventDefault();
+        console.log("📝 Creating new monthly cycle form submitted");
+        
+        const formData = $(this).serialize();
+        console.log("📋 Form data:", formData);
+        
+        const createBtn = $('#createMonthlyCycleBtn');
+        const originalText = createBtn.html();
+        
+        createBtn.html('<i class="fas fa-spinner fa-spin"></i> Creating...');
+        createBtn.prop('disabled', true);
+        
+        $.ajax({
+            url: "{% url 'create_monthly_cycle' %}",
+            method: "POST",
+            data: formData,
+            success: function(response) {
+                console.log("📨 Server response for create monthly cycle:", response);
+                if (response.success) {
+                    console.log("✅ Monthly cycle created successfully");
+                    showToast('success', 'Monthly cycle created successfully!');
+                    $('#createMonthlyCycleForm')[0].reset();
+                    loadMonthlyCycles();
+                } else {
+                    console.warn("❌ Failed to create monthly cycle:", response);
+                    if (response.errors && response.errors.__all__) {
+                        showToast('error', response.errors.__all__[0]);
+                    } else {
+                        showToast('error', response.error || 'Failed to create monthly cycle');
+                    }
+                }
+            },
+            error: function(xhr) {
+                console.error("❌ AJAX error creating monthly cycle:", xhr);
+                try {
+                    const errorResponse = JSON.parse(xhr.responseText);
+                    if (errorResponse.errors && errorResponse.errors.__all__) {
+                        showToast('error', errorResponse.errors.__all__[0]);
+                    } else {
+                        showToast('error', 'Failed to create monthly cycle. Please try again.');
+                    }
+                } catch (e) {
+                    showToast('error', 'Failed to create monthly cycle. Please try again.');
+                }
+            },
+            complete: function() {
+                console.log("📝 Create monthly cycle request complete");
+                createBtn.html(originalText);
+                createBtn.prop('disabled', false);
+            }
+        });
+    });
+
+    // Refresh cycles
+    $('#refreshMonthlyCyclesBtn').on('click', function() {
+        console.log("🔄 Refresh monthly cycles clicked");
+        const refreshBtn = $(this);
+        refreshBtn.addClass('loading');
+        loadMonthlyCycles();
+        setTimeout(() => {
+            refreshBtn.removeClass('loading');
+            console.log("✅ Monthly cycles refreshed");
+        }, 1000);
+    });
+
+    // Add cycle form validation
+    $('.date-input').on('input', function() {
+        console.log("📅 Date input changed:", $(this).val());
+        validateDateInput($(this));
+    });
+
+    // Add cycle form submission
+    $('#saveAddCycleBtn').on('click', function() {
+        console.log("💾 Save new cycle button clicked");
+        saveNewCycle();
+    });
+
+    // Edit cycle form submission
+    $('#saveEditCycleBtn').on('click', function() {
+        console.log("✏️ Save edited cycle button clicked");
+        saveEditedCycle();
+    });
+    
+    console.log("✅ Monthly cycle management initialized");
+}
+
+function loadMonthlyCycles() {
+    console.log("📊 Loading monthly cycles from server...");
+    $.ajax({
+        url: "{% url 'get_available_cycles' %}",
+        method: "GET",
+        success: function(response) {
+            console.log("📨 Monthly cycles response:", response);
+            if (response.success) {
+                console.log(`✅ Found ${response.cycles?.length || 0} cycles`);
+                displayMonthlyCycles(response.cycles);
+            } else {
+                console.error("❌ Error loading cycles:", response.error);
+                $('#monthlyCyclesGrid').html('<div class="error-message">Error loading cycles: ' + (response.error || 'Unknown error') + '</div>');
+            }
+        },
+        error: function(xhr, status, error) {
+            console.error("❌ Failed to load monthly cycles:", error);
+            $('#monthlyCyclesGrid').html('<div class="error-message">Failed to load cycles. Please try again.</div>');
+        }
+    });
+}
+
+function displayMonthlyCycles(cycles) {
+    console.log("🎨 Displaying monthly cycles:", cycles);
+    const cyclesGrid = $('#monthlyCyclesGrid');
+    
+    if (!cycles || cycles.length === 0) {
+        console.log("📭 No cycles to display");
+        cyclesGrid.html(`
+            <div class="empty-state">
+                <i class="fas fa-calendar-times"></i>
+                <h4>No Monthly Cycles Found</h4>
+                <p>Create your first monthly cycle set to get started</p>
+            </div>
+        `);
+        return;
+    }
+    
+    console.log(`📊 Processing ${cycles.length} cycles`);
+    
+    const cyclesByMonth = {};
+    let activeCycleId = null;
+    
+    // First pass: find the active cycle
+    cycles.forEach(cycle => {
+        if (cycle.id && cycle.is_active) {
+            activeCycleId = cycle.id;
+            console.log(`⭐ Active cycle found: ${cycle.id} - ${cycle.name}`);
+        }
+    });
+    
+    cycles.forEach(cycle => {
+        if (!cyclesByMonth[cycle.monthly_cycle_id]) {
+            cyclesByMonth[cycle.monthly_cycle_id] = {
+                monthly_cycle: {
+                    id: cycle.monthly_cycle_id,
+                    name: cycle.monthly_cycle_name || (cycle.name ? cycle.name.split(' - ')[0] : 'Unknown Month'),
+                    month: cycle.month || 'Unknown',
+                    year: cycle.year || 'Unknown'
+                },
+                cycles: []
+            };
+        }
+        if (cycle.id) {
+            cyclesByMonth[cycle.monthly_cycle_id].cycles.push(cycle);
+        }
+    });
+
+    console.log(`📅 Organized into ${Object.keys(cyclesByMonth).length} monthly cycles`);
+
+    // Add active cycle indicator at the top
+    let html = '';
+    if (activeCycleId) {
+        const activeCycle = cycles.find(c => c.id === activeCycleId);
+        if (activeCycle) {
+            console.log(`🌟 Displaying active cycle: ${activeCycle.name}`);
+            html += `
+                <div class="active-cycle-indicator" style="grid-column: 1 / -1; margin-bottom: 20px;">
+                    <div class="alert alert-success" style="background: rgba(40, 167, 69, 0.1); border: 1px solid #28a745; border-radius: 8px; padding: 12px 16px;">
+                        <div style="display: flex; align-items: center; gap: 10px;">
+                            <i class="fas fa-star" style="color: #28a745; font-size: 1.2rem;"></i>
+                            <div>
+                                <strong style="color: #28a745;">Active Cycle:</strong>
+                                <span style="margin-left: 8px;">${activeCycle.name} (${activeCycle.date_range})</span>
+                                <div style="font-size: 0.85rem; color: #666; margin-top: 4px;">
+                                    <i class="fas fa-info-circle"></i> Only one cycle can be active at a time
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+    }
+
+    Object.keys(cyclesByMonth).forEach(monthlyCycleId => {
+        const monthData = cyclesByMonth[monthlyCycleId];
+        const monthCycles = monthData.cycles;
+        const monthlyCycle = monthData.monthly_cycle;
+        
+        const isActiveCycleInThisMonth = monthCycles.some(c => c.id === activeCycleId);
+        
+        console.log(`📅 Displaying month: ${monthlyCycle.name} with ${monthCycles.length} cycles`);
+        
+        html += `
+            <div class="monthly-cycle-card" data-monthly-cycle-id="${monthlyCycle.id}">
+                <div class="monthly-cycle-header">
+                    <h5 class="monthly-cycle-name">
+                        ${monthlyCycle.name}
+                        ${isActiveCycleInThisMonth ? '<span class="badge bg-success ms-2"><i class="fas fa-star"></i> Contains Active Cycle</span>' : ''}
+                    </h5>
+                    <div class="header-actions">
+                        <span class="cycle-count">${monthCycles.length} cycles</span>
+                        <button class="btn-delete-monthly-cycle" onclick="deleteMonthlyCycle(${monthlyCycle.id}, '${monthlyCycle.name.replace(/'/g, "\\'")}')" title="Delete entire month">
+                            <i class="fas fa-trash text-danger"></i>
+                        </button>
+                    </div>
+                </div>
+                
+                <div class="cycles-timeline">
+                    ${monthCycles.length > 0 ? monthCycles.map(cycle => `
+                        <div class="cycle-timeline-item ${cycle.is_active ? 'active-highlight' : ''} ${cycle.is_active ? '' : 'inactive'}" data-cycle-id="${cycle.id}">
+                            <div class="cycle-timeline-bar ${cycle.is_active ? 'active-bar' : ''} ${cycle.is_active ? '' : 'inactive'}"></div>
+                            <div class="cycle-timeline-info">
+                                <div class="cycle-name">
+                                    ${cycle.is_active ? '<i class="fas fa-star text-warning me-1"></i>' : ''}
+                                    ${cycle.name ? cycle.name.split(' - ')[1] : 'Unnamed Cycle'}
+                                    ${cycle.sap_number ? `<span class="sap-number">(${cycle.sap_number})</span>` : ''}
+                                    <span class="cycle-status-badge ${cycle.is_active ? 'active' : 'inactive'}">
+                                        <i class="fas fa-${cycle.is_active ? 'check-circle' : 'times-circle'}"></i>
+                                        ${cycle.is_active ? 'Active' : 'Inactive'}
+                                    </span>
+                                </div>
+                                <div class="cycle-dates">${cycle.date_range || 'No date range'}</div>
+                                <div class="cycle-actions">
+                                    <button class="btn-toggle-cycle" onclick="toggleCycleStatus(${cycle.id}, ${cycle.is_active})" title="${cycle.is_active ? 'Deactivate' : 'Activate'}">
+                                        <i class="fas fa-toggle-${cycle.is_active ? 'on' : 'off'}"></i>
+                                    </button>
+                                    <button class="btn-edit-cycle" onclick="openEditCycleModal(${cycle.id})" title="Edit">
+                                        <i class="fas fa-edit"></i>
+                                    </button>
+                                    <button class="btn-delete-cycle" onclick="deleteCycle(${cycle.id})" title="Delete">
+                                        <i class="fas fa-trash"></i>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    `).join('') : `
+                        <div class="empty-cycle-state">
+                            <i class="fas fa-calendar-alt"></i>
+                            <span>No cycles in this month. Click "Add Cycle" to create one.</span>
+                        </div>
+                    `}
+                </div>
+                
+                <div class="monthly-cycle-actions">
+                    <button class="btn-add-cycle" onclick="openAddCycleModal(${monthlyCycle.id})">
+                        <i class="fas fa-plus"></i> Add Cycle
+                    </button>
+                    <button class="btn-view-details" onclick="viewMonthlyCycleDetails(${monthlyCycle.id})">
+                        <i class="fas fa-eye"></i> View Details
+                    </button>
+                </div>
+            </div>
+        `;
+    });
+    
+    cyclesGrid.html(html);
+    console.log("✅ Monthly cycles displayed");
+}
+
+function openAddCycleModal(monthlyCycleId) {
+    console.log(`📝 Opening add cycle modal for monthly cycle ID: ${monthlyCycleId}`);
+    $('#addCycleMonthlyCycleId').val(monthlyCycleId);
+    $('#addCycleForm')[0].reset();
+    $('#addCycleIsActive').prop('checked', false);
+    $('#addCycleModal').modal('show');
+}
+
+function openEditCycleModal(cycleId) {
+    console.log(`✏️ Opening edit cycle modal for cycle ID: ${cycleId}`);
+    $.ajax({
+        url: `/finance/cycles/${cycleId}/get-details/`,
+        method: "GET",
+        success: function(response) {
+            console.log("📨 Cycle details response:", response);
+            if (response.success) {
+                $('#editCycleId').val(cycleId);
+                $('#editCycleName').val(response.cycle.name);
+                $('#editCycleSapNumber').val(response.cycle.sap_number || '');
+                $('#editCycleStartDate').val(formatDateForInput(response.cycle.start_date));
+                $('#editCycleEndDate').val(formatDateForInput(response.cycle.end_date));
+                $('#editCycleDescription').val(response.cycle.description || '');
+                $('#editCycleIsActive').prop('checked', response.cycle.is_active);
+                $('#editCycleModal').modal('show');
+                console.log("✅ Edit modal populated with cycle data");
+            } else {
+                console.error("❌ Failed to load cycle details:", response.error);
+                showToast('error', response.error || 'Failed to load cycle details');
+            }
+        },
+        error: function(xhr, status, error) {
+            console.error("❌ AJAX error loading cycle details:", error);
+            showToast('error', 'Failed to load cycle details');
+        }
+    });
+}
+
+function saveNewCycle() {
+    console.log("💾 Saving new cycle...");
+    const form = $('#addCycleForm');
+    const formData = form.serialize();
+    const saveBtn = $('#saveAddCycleBtn');
+    const originalText = saveBtn.html();
+    
+    console.log("📋 Form data for new cycle:", formData);
+    
+    // Validate dates
+    const startDate = $('#addCycleStartDate').val();
+    const endDate = $('#addCycleEndDate').val();
+    console.log("📅 Validating dates:", { startDate, endDate });
+    
+    if (!validateDateFormat(startDate) || !validateDateFormat(endDate)) {
+        console.warn("❌ Invalid date format");
+        showToast('error', 'Please enter dates in DD-MM-YYYY format');
+        return;
+    }
+    
+    if (!validateDateRange(startDate, endDate)) {
+        console.warn("❌ Invalid date range");
+        showToast('error', 'End date must be after start date');
+        return;
+    }
+    
+    saveBtn.html('<i class="fas fa-spinner fa-spin"></i> Creating...');
+    saveBtn.prop('disabled', true);
+    
+    $.ajax({
+        url: "{% url 'save_new_cycle' %}",
+        method: "POST",
+        data: formData,
+        success: function(response) {
+            console.log("📨 Save new cycle response:", response);
+            if (response.success) {
+                console.log("✅ New cycle created successfully");
+                showToast('success', 'Cycle created successfully!');
+                $('#addCycleModal').modal('hide');
+                loadMonthlyCycles();
+            } else {
+                console.error("❌ Failed to create cycle:", response.error);
+                showToast('error', response.error || 'Failed to create cycle');
+            }
+        },
+        error: function(xhr, status, error) {
+            console.error("❌ AJAX error saving new cycle:", error);
+            showToast('error', 'Failed to create cycle');
+        },
+        complete: function() {
+            console.log("📝 Save new cycle request complete");
+            saveBtn.html(originalText);
+            saveBtn.prop('disabled', false);
+        }
+    });
+}
+
+function saveEditedCycle() {
+    console.log("💾 Saving edited cycle...");
+    const form = $('#editCycleForm');
+    const formData = form.serialize();
+    const saveBtn = $('#saveEditCycleBtn');
+    const originalText = saveBtn.html();
+    
+    console.log("📋 Form data for edited cycle:", formData);
+    
+    // Validate dates
+    const startDate = $('#editCycleStartDate').val();
+    const endDate = $('#editCycleEndDate').val();
+    console.log("📅 Validating dates:", { startDate, endDate });
+    
+    if (!validateDateFormat(startDate) || !validateDateFormat(endDate)) {
+        console.warn("❌ Invalid date format");
+        showToast('error', 'Please enter dates in DD-MM-YYYY format');
+        return;
+    }
+    
+    if (!validateDateRange(startDate, endDate)) {
+        console.warn("❌ Invalid date range");
+        showToast('error', 'End date must be after start date');
+        return;
+    }
+    
+    saveBtn.html('<i class="fas fa-spinner fa-spin"></i> Saving...');
+    saveBtn.prop('disabled', true);
+    
+    $.ajax({
+        url: `/finance/cycles/${$('#editCycleId').val()}/update/`,
+        method: "POST",
+        data: formData,
+        success: function(response) {
+            console.log("📨 Save edited cycle response:", response);
+            if (response.success) {
+                console.log("✅ Cycle updated successfully");
+                showToast('success', 'Cycle updated successfully!');
+                $('#editCycleModal').modal('hide');
+                loadMonthlyCycles();
+            } else {
+                console.error("❌ Failed to update cycle:", response.error);
+                showToast('error', response.error || 'Failed to update cycle');
+            }
+        },
+        error: function(xhr, status, error) {
+            console.error("❌ AJAX error saving edited cycle:", error);
+            showToast('error', 'Failed to update cycle');
+        },
+        complete: function() {
+            console.log("📝 Save edited cycle request complete");
+            saveBtn.html(originalText);
+            saveBtn.prop('disabled', false);
+        }
+    });
+}
+
+function toggleCycleStatus(cycleId, isCurrentlyActive) {
+    console.log(`🔄 Toggling cycle status for ID: ${cycleId}, Currently active: ${isCurrentlyActive}`);
+    
+    const action = isCurrentlyActive ? 'deactivate' : 'activate';
+    
+    let message = `Are you sure you want to ${action} this cycle?`;
+    
+    if (!isCurrentlyActive) {
+        message = `Are you sure you want to activate this cycle?\n\n` +
+                  `⚠️  Warning: This will deactivate ALL other cycles automatically.\n` +
+                  `Only one cycle can be active at a time.`;
+    }
+    
+    if (!confirm(message)) {
+        console.log("❌ Cycle status toggle cancelled by user");
+        return;
+    }
+    
+    const toggleBtn = $(`[data-cycle-id="${cycleId}"] .btn-toggle-cycle`);
+    const originalIcon = toggleBtn.html();
+    toggleBtn.html('<i class="fas fa-spinner fa-spin"></i>');
+    toggleBtn.prop('disabled', true);
+    
+    $.ajax({
+        url: `/finance/cycles/${cycleId}/toggle-status/`,
+        method: "POST",
+        data: {
+            csrfmiddlewaretoken: $('[name=csrfmiddlewaretoken]').val()
+        },
+        success: function(response) {
+            console.log("📨 Toggle cycle status response:", response);
+            if (response.success) {
+                console.log(`✅ Cycle ${action}d successfully`);
+                showToast('success', `Cycle ${action}d successfully!`);
+                if (!isCurrentlyActive) {
+                    showToast('info', 'All other cycles have been deactivated automatically.');
+                }
+                loadMonthlyCycles();
+            } else {
+                console.error("❌ Failed to toggle cycle status:", response.error);
+                showToast('error', response.error || `Failed to ${action} cycle`);
+            }
+        },
+        error: function(xhr, status, error) {
+            console.error("❌ AJAX error toggling cycle status:", error);
+            showToast('error', `Failed to ${action} cycle`);
+        },
+        complete: function() {
+            console.log("📝 Toggle cycle status request complete");
+            toggleBtn.html(originalIcon);
+            toggleBtn.prop('disabled', false);
+        }
+    });
+}
+
+function deleteMonthlyCycle(monthlyCycleId, monthName) {
+    console.log(`🗑️ Deleting monthly cycle ID: ${monthlyCycleId}, Name: ${monthName}`);
+    
+    if (!confirm(`Are you sure you want to delete the entire monthly cycle "${monthName}"? This will delete all cycles within it and cannot be undone.`)) {
+        console.log("❌ Monthly cycle deletion cancelled by user");
+        return;
+    }
+    
+    $.ajax({
+        url: `/finance/monthly-cycles/${monthlyCycleId}/delete/`,
+        method: "POST",
+        data: {
+            csrfmiddlewaretoken: $('[name=csrfmiddlewaretoken]').val()
+        },
+        success: function(response) {
+            console.log("📨 Delete monthly cycle response:", response);
+            if (response.success) {
+                console.log("✅ Monthly cycle deleted successfully");
+                showToast('success', response.message);
+                loadMonthlyCycles();
+            } else {
+                console.error("❌ Failed to delete monthly cycle:", response.error);
+                showToast('error', response.error);
+            }
+        },
+        error: function(xhr, status, error) {
+            console.error("❌ AJAX error deleting monthly cycle:", error);
+            showToast('error', 'Failed to delete monthly cycle');
+        }
+    });
+}
+
+function deleteCycle(cycleId) {
+    console.log(`🗑️ Deleting cycle ID: ${cycleId}`);
+    
+    if (!confirm('Are you sure you want to delete this cycle?')) {
+        console.log("❌ Cycle deletion cancelled by user");
+        return;
+    }
+    
+    $.ajax({
+        url: `/finance/cycles/${cycleId}/delete/`,
+        method: "POST",
+        data: { csrfmiddlewaretoken: $('[name=csrfmiddlewaretoken]').val() },
+        success: function(response) {
+            console.log("📨 Delete cycle response:", response);
+            if (response.success) {
+                console.log("✅ Cycle deleted successfully");
+                showToast('success', response.message);
+                loadMonthlyCycles();
+            } else {
+                console.error("❌ Failed to delete cycle:", response.error);
+                showToast('error', response.error);
+            }
+        },
+        error: function(xhr, status, error) {
+            console.error("❌ AJAX error deleting cycle:", error);
+            showToast('error', 'Failed to delete cycle');
+        }
+    });
+}
+
+function viewMonthlyCycleDetails(monthlyCycleId) {
+    console.log(`👁️ Viewing monthly cycle details for ID: ${monthlyCycleId}`);
+    
+    $.ajax({
+        url: `/finance/monthly-cycles/${monthlyCycleId}/details/`,
+        method: "GET",
+        success: function(response) {
+            console.log("📨 Monthly cycle details response:", response);
+            if (response.success) {
+                console.log(`✅ Found monthly cycle with ${response.cycles?.length || 0} cycles`);
+                showMonthlyCycleDetailsModal(response.monthly_cycle, response.cycles);
+            } else {
+                console.error("❌ Failed to load monthly cycle details:", response.error);
+                showToast('error', response.error);
+            }
+        },
+        error: function(xhr, status, error) {
+            console.error("❌ AJAX error loading monthly cycle details:", error);
+            showToast('error', 'Failed to load monthly cycle details');
+        }
+    });
+}
+
+function showMonthlyCycleDetailsModal(monthlyCycle, cycles) {
+    console.log("🎨 Showing monthly cycle details modal");
+    
+    const modalContent = `
+        <div class="monthly-cycle-overview">
+            <div class="overview-stats">
+                <div class="stat-item">
+                    <label>Monthly Cycle:</label>
+                    <span>${monthlyCycle.name || 'N/A'}</span>
+                </div>
+                <div class="stat-item">
+                    <label>Total Cycles:</label>
+                    <span>${cycles.length}</span>
+                </div>
+                <div class="stat-item">
+                    <label>Created By:</label>
+                    <span>${monthlyCycle.created_by || 'N/A'}</span>
+                </div>
+                <div class="stat-item">
+                    <label>Created At:</label>
+                    <span>${monthlyCycle.created_at || 'N/A'}</span>
+                </div>
+            </div>
+        </div>
+        
+        ${cycles.length > 0 ? `
+        <div class="cycles-details mt-4">
+            <h6>Cycles:</h6>
+            <div class="cycles-list">
+                ${cycles.map(cycle => `
+                    <div class="cycle-detail-item p-3 mb-2 border rounded">
+                        <div class="cycle-info">
+                            <strong>${cycle.name || 'Unnamed Cycle'}</strong>
+                            ${cycle.sap_number ? `<span class="text-muted ms-2">(${cycle.sap_number})</span>` : ''}
+                            <span class="date-range ms-2">${cycle.start_date || 'N/A'} to ${cycle.end_date || 'N/A'}</span>
+                            ${cycle.duration_days ? `<span class="duration ms-2">(${cycle.duration_days} days)</span>` : ''}
+                        </div>
+                        ${cycle.description ? `<div class="cycle-description mt-1 text-muted">${cycle.description}</div>` : ''}
+                        <div class="cycle-status mt-2">
+                            ${cycle.is_active ? 
+                                '<span class="badge bg-success">Active</span>' : 
+                                '<span class="badge bg-secondary">Inactive</span>'
+                            }
+                        </div>
+                    </div>
+                `).join('')}
+            </div>
+        </div>
+        ` : '<div class="alert alert-info mt-3">No cycles found in this monthly cycle.</div>'}
+    `;
+    
+    $('#monthlyCycleDetailsContent').html(modalContent);
+    $('#monthlyCycleDetailsModal').modal('show');
+}
+
+function validateDateInput(input) {
+    const value = input.val();
+    const isValid = validateDateFormat(value);
+    
+    console.log(`📅 Validating date input: "${value}", Valid: ${isValid}`);
+    
+    if (value && !isValid) {
+        input.addClass('is-invalid');
+        input.removeClass('is-valid');
+    } else if (value && isValid) {
+        input.removeClass('is-invalid');
+        input.addClass('is-valid');
+    } else {
+        input.removeClass('is-invalid is-valid');
+    }
+}
+
+function validateDateFormat(dateStr) {
+    console.log(`📅 Validating date format: "${dateStr}"`);
+    const regex = /^\d{2}-\d{2}-\d{4}$/;
+    if (!regex.test(dateStr)) {
+        console.warn("❌ Date format doesn't match regex");
+        return false;
+    }
+    
+    const parts = dateStr.split('-');
+    const day = parseInt(parts[0], 10);
+    const month = parseInt(parts[1], 10);
+    const year = parseInt(parts[2], 10);
+    
+    console.log(`📅 Parsed date: Day=${day}, Month=${month}, Year=${year}`);
+    
+    if (month < 1 || month > 12) {
+        console.warn("❌ Invalid month");
+        return false;
+    }
+    if (day < 1 || day > 31) {
+        console.warn("❌ Invalid day");
+        return false;
+    }
+    
+    // Check for valid day in month
+    const date = new Date(year, month - 1, day);
+    const isValid = date.getDate() === day && date.getMonth() === month - 1 && date.getFullYear() === year;
+    console.log(`📅 Date validation result: ${isValid}`);
+    return isValid;
+}
+
+function validateDateRange(startDateStr, endDateStr) {
+    console.log(`📅 Validating date range: ${startDateStr} to ${endDateStr}`);
+    
+    if (!validateDateFormat(startDateStr) || !validateDateFormat(endDateStr)) {
+        console.warn("❌ One or both dates have invalid format");
+        return false;
+    }
+    
+    const startParts = startDateStr.split('-');
+    const endParts = endDateStr.split('-');
+    
+    const startDate = new Date(startParts[2], startParts[1] - 1, startParts[0]);
+    const endDate = new Date(endParts[2], endParts[1] - 1, endParts[0]);
+    
+    const isValid = endDate >= startDate;
+    console.log(`📅 Date range validation: ${isValid ? 'Valid' : 'Invalid'} (end date must be >= start date)`);
+    return isValid;
+}
+
+function formatDateForInput(dateStr) {
+    console.log(`📅 Formatting date for input: "${dateStr}"`);
+    // Convert YYYY-MM-DD to DD-MM-YYYY
+    if (!dateStr) return '';
+    const parts = dateStr.split('-');
+    if (parts.length === 3) {
+        const formatted = `${parts[2]}-${parts[1]}-${parts[0]}`;
+        console.log(`📅 Formatted date: ${formatted}`);
+        return formatted;
+    }
+    console.log(`📅 Could not format date, returning original: ${dateStr}`);
+    return dateStr;
+}
+
+function loadAvailableCycles() {
+    console.log("📊 Loading available cycles for dropdowns...");
+    $.ajax({
+        url: "{% url 'get_available_cycles' %}",
+        method: "GET",
+        success: function(response) {
+            console.log("📨 Available cycles response:", response);
+            if (response.success) {
+                console.log(`✅ Found ${response.cycles?.length || 0} cycles for dropdowns`);
+                populateCycleDropdowns(response.cycles);
+            } else {
+                console.error("❌ Failed to load available cycles:", response.error);
+            }
+        },
+        error: function(xhr, status, error) {
+            console.error("❌ AJAX error loading available cycles:", error);
+        }
+    });
+}
+
+function populateCycleDropdowns(cycles) {
+    console.log("🎨 Populating cycle dropdowns");
+    const uploadCycleSelect = $('#uploadCycle');
+    
+    uploadCycleSelect.empty();
+    uploadCycleSelect.append('<option value="" disabled selected>Choose cycle</option>');
+    
+    const validCycles = cycles.filter(cycle => cycle.id);
+    console.log(`📋 Adding ${validCycles.length} valid cycles to dropdown`);
+    
+    validCycles.forEach(cycle => {
+        const optionText = `${cycle.name} ${cycle.date_range}`;
+        uploadCycleSelect.append(`<option value="${cycle.id}">${optionText}</option>`);
+    });
+    
+    console.log("✅ Cycle dropdowns populated");
+}
+
+function initializeDocumentSearch() {
+    console.log("🔍 Initializing document search...");
+    
+    $('#filterForm').on('submit', function(event) {
+        event.preventDefault();
+        console.log("📝 Document search form submitted");
+        
+        const formData = $(this).serialize();
+        console.log("📋 Search form data:", formData);
+        
+        const submitBtn = $('#submitButton');
+        const originalText = submitBtn.html();
+        submitBtn.html('<i class="fas fa-spinner fa-spin"></i> Searching...');
+        submitBtn.prop('disabled', true);
+
+        $.ajax({
+            url: "{% url 'fetch_finance_data' %}",
+            type: "GET",
+            data: formData,
+            dataType: "json",
+            success: function(response) {
+                console.log("📨 Document search response:", response);
+                
+                var grnFilesList = $('#grnFilesList');
+                var grnAgainstStnFilesList = $('#grnAgainstStnFilesList');
+                var chalanFilesList = $('#chaalanFilesList');
+                
+                grnFilesList.empty();
+                grnAgainstStnFilesList.empty();
+                chalanFilesList.empty();
+                
+                const grnCount = response.grn_files ? response.grn_files.length : 0;
+                const linkedChalanCount = response.grn_files ? response.grn_files.filter(grnFile => grnFile.chalan_file).length : 0;
+                const stnCount = response.grn_against_stn_files ? response.grn_against_stn_files.length : 0;
+                const totalCount = grnCount + linkedChalanCount + stnCount;
+                
+                console.log(`📊 Search results counts: GRN=${grnCount}, Chalan=${linkedChalanCount}, STN=${stnCount}, Total=${totalCount}`);
+                
+                $('#grnCount').text(grnCount);
+                $('#chaalanCount').text(linkedChalanCount);
+                $('#stnCount').text(stnCount);
+                $('#fileCount').text(totalCount);
+                $('#totalFiles').text(totalCount);
+                
+                // Populate GRN files
+                if (grnCount === 0) {
+                    console.log("📭 No GRN files found");
+                    grnFilesList.append('<li class="empty-state"><i class="fas fa-inbox"></i><div>No GRN files found</div></li>');
+                } else {
+                    console.log(`📄 Adding ${grnCount} GRN files to list`);
+                    response.grn_files.forEach(function(file, index) {
+                        var grnFileUrl = response.media_url + 'grns/' + file.employee_code + '/' + file.grn_file;
+                        var grnFileName = file.grn_file;
+                        var grnTimestamp = file.timestamp || extractTimestampFromFilename(grnFileName);
+                        var formattedDate = formatTimestamp(grnTimestamp);
+                        
+                        console.log(`   GRN ${index + 1}: ${grnFileName}, Date: ${formattedDate}`);
+                        
+                        var li = $('<li></li>').addClass('file-item-with-chaalan');
+                        
+                        var grnLink = $('<div></div>').addClass('file-link').append(
+                            $('<a></a>')
+                                .attr('href', grnFileUrl)
+                                .attr('target', '_blank')
+                                .html(`<i class="fas fa-file-invoice"></i> <strong>GRN</strong> - ${formattedDate} - ${grnFileName}`)
+                        );
+                        
+                        li.append(grnLink);
+                        
+                        if (file.chalan_file) {
+                            li.append($('<div></div>').addClass('timestamp-match').html('<i class="fas fa-check-circle text-success"></i> Has corresponding chalan file'));
+                        } else {
+                            li.append($('<div></div>').addClass('no-chaalan').html('<i class="fas fa-times-circle text-danger"></i> No corresponding chalan found'));
+                        }
+                        
+                        grnFilesList.append(li);
+                    });
+                }
+                
+                // Populate GRN Against STN files
+                if (stnCount === 0) {
+                    console.log("📭 No STN files found");
+                    grnAgainstStnFilesList.append('<li class="empty-state"><i class="fas fa-inbox"></i><div>No STN files found</div></li>');
+                } else {
+                    console.log(`📄 Adding ${stnCount} STN files to list`);
+                    response.grn_against_stn_files.forEach(function(file, index) {
+                        var fileUrl = response.media_url + 'grn_against_stn/' + file.employee_code + '/' + file.stn_file;
+                        var fileName = file.stn_file;
+                        var timestamp = file.timestamp || extractTimestampFromFilename(fileName);
+                        var formattedDate = formatTimestamp(timestamp);
+                        
+                        console.log(`   STN ${index + 1}: ${fileName}, Date: ${formattedDate}`);
+                        
+                        var li = $('<li></li>').append(
+                            $('<a></a>')
+                                .attr('href', fileUrl)
+                                .attr('target', '_blank')
+                                .html(`<i class="fas fa-file-contract"></i> <strong>STN</strong> - ${formattedDate} - ${fileName}`)
+                        );
+                        grnAgainstStnFilesList.append(li);
+                    });
+                }
+                
+                // Populate Chalan files
+                const linkedChalanFiles = response.grn_files ? response.grn_files.filter(grnFile => grnFile.chalan_file) : [];
+                
+                if (linkedChalanFiles.length === 0) {
+                    console.log("📭 No linked chalan files found");
+                    chalanFilesList.append('<li class="empty-state"><i class="fas fa-inbox"></i><div>No Chalan files linked to GRN found</div></li>');
+                } else {
+                    console.log(`📄 Adding ${linkedChalanFiles.length} linked chalan files to list`);
+                    linkedChalanFiles.forEach(function(grnFile, index) {
+                        var chalanFileUrl = response.media_url + 'chalan_files/' + grnFile.employee_code + '/' + grnFile.chalan_file;
+                        var chalanFileName = grnFile.chalan_file;
+                        var chalanTimestamp = extractTimestampFromFilename(chalanFileName);
+                        var chalanFormattedDate = formatTimestamp(chalanTimestamp);
+                        
+                        console.log(`   Chalan ${index + 1}: ${chalanFileName}, Linked to GRN: ${grnFile.grn_file}`);
+                        
+                        var li = $('<li></li>').addClass('chalan-with-grn');
+                        
+                        var chalanLink = $('<a></a>')
+                            .attr('href', chalanFileUrl)
+                            .attr('target', '_blank')
+                            .html(`<i class="fas fa-receipt text-success"></i> <strong>Chalan</strong> - ${chalanFormattedDate} - ${chalanFileName}`);
+                        
+                        li.append(chalanLink);
+                        li.append($('<div></div>').addClass('grn-association').html(`<i class="fas fa-link"></i> Linked to GRN: ${grnFile.grn_file}`));
+                        
+                        chalanFilesList.append(li);
+                    });
+                }
+                
+                $('#results').fadeIn();
+                console.log("✅ Search results displayed");
+            },
+            error: function(xhr, status, error) {
+                console.error("❌ Error fetching documents:", error);
+                showToast('error', 'Error fetching documents. Please try again.');
+            },
+            complete: function() {
+                console.log("📝 Document search request complete");
+                submitBtn.html(originalText);
+                submitBtn.prop('disabled', false);
+            }
+        });
+    });
+
+    $('#location, #fromDate, #toDate').on('change', function() {
+        console.log(`📅 Search filter changed: ${$(this).attr('id')} = ${$(this).val()}`);
+        $('#results').hide();
+    });
+    
+    console.log("✅ Document search initialized");
+}
+
+function initializeInventoryManagement() {
+    console.log("📦 Initializing inventory management...");
+    
+    $('#inventoryFilterForm').on('submit', function(event) {
+        event.preventDefault();
+        var location = $('#inventoryLocation').val();
+        
+        console.log(`📦 Inventory filter form submitted for location: ${location}`);
+        
+        const viewBtn = $('#viewInventoryBtn');
+        const originalText = viewBtn.html();
+        viewBtn.html('<i class="fas fa-spinner fa-spin"></i> Loading...');
+        viewBtn.prop('disabled', true);
+        
+        $.ajax({
+            url: "{% url 'get_finance_inventory_by_location' %}",
+            type: "GET",
+            data: { location: location },
+            dataType: "json",
+            success: function(response) {
+                console.log("📨 Inventory data response:", response);
+                
+                var inventoryTableBody = $('#inventoryTableBody');
+                inventoryTableBody.empty();
+                
+                if (response.summary) {
+                    var summary = response.summary;
+                    console.log("📊 Inventory summary:", summary);
+                    
+                    var summaryHtml = `
+                        <div class="summary-item">
+                            <div class="summary-label">Total Products</div>
+                            <div class="summary-value">${summary.total_products}</div>
+                        </div>
+                        <div class="summary-item">
+                            <div class="summary-label">Total Items</div>
+                            <div class="summary-value">${summary.total_items}</div>
+                        </div>
+                        <div class="summary-item">
+                            <div class="summary-label">High Stock</div>
+                            <div class="summary-value">${summary.high_stock_count}</div>
+                        </div>
+                        <div class="summary-item">
+                            <div class="summary-label">Medium Stock</div>
+                            <div class="summary-value">${summary.medium_stock_count}</div>
+                        </div>
+                        <div class="summary-item">
+                            <div class="summary-label">Low Stock</div>
+                            <div class="summary-value">${summary.low_stock_count}</div>
+                        </div>
+                    `;
+                    $('#summaryStats').html(summaryHtml);
+                    
+                    $('#totalProducts').text(summary.total_products);
+                }
+                
+                if (response.inventory && response.inventory.length > 0) {
+                    console.log(`📦 Found ${response.inventory.length} inventory items`);
+                    response.inventory.forEach(function(item, index) {
+                        var statusClass = '';
+                        var statusText = '';
+                        var quantity = item.total_quantity || 0;
+                        
+                        if (quantity > 100) {
+                            statusClass = 'status-badge high';
+                            statusText = '<i class="fas fa-check-circle"></i> High Stock';
+                        } else if (quantity > 20) {
+                            statusClass = 'status-badge medium';
+                            statusText = '<i class="fas fa-info-circle"></i> Medium Stock';
+                        } else {
+                            statusClass = 'status-badge low';
+                            statusText = '<i class="fas fa-exclamation-triangle"></i> Low Stock';
+                        }
+                        
+                        var productId = item.product__id || item.product_id || item.id || index + 1;
+                        var uom = item.product__uom || 'units';
+                        var escapedProductName = (item.product__name || 'Unknown Product').replace(/'/g, "\\'").replace(/"/g, '\\"');
+                        
+                        console.log(`   Item ${index + 1}: ${item.product__name || 'Unknown Product'}, Qty: ${quantity} ${uom}, Status: ${statusClass}`);
+                        
+                        var row = $('<tr></tr>').append(
+                            $('<td></td>').html(`<strong>${item.product__name || 'Unknown Product'}</strong>`),
+                            $('<td></td>').html(`<span class="fw-bold">${quantity}</span> ${uom}`),
+                            $('<td></td>').html(`<span class="${statusClass}">${statusText}</span>`),
+                            $('<td></td>').html(`
+                                <button class="btn btn-sm btn-outline-primary adjust-btn" 
+                                        data-location="${location}"
+                                        data-product-id="${productId}"
+                                        data-product-name="${escapedProductName}"
+                                        data-quantity="${quantity}"
+                                        data-uom="${uom}">
+                                    <i class="fas fa-edit"></i> Adjust
+                                </button>
+                            `)
+                        );
+                        inventoryTableBody.append(row);
+                    });
+                    
+                    // Attach click handlers to adjust buttons
+                    $('.adjust-btn').on('click', function() {
+                        var location = $(this).data('location');
+                        var productId = $(this).data('product-id');
+                        var productName = $(this).data('product-name');
+                        var quantity = $(this).data('quantity');
+                        var uom = $(this).data('uom');
+                        
+                        console.log(`🔄 Adjust button clicked: ${productName}, Qty: ${quantity} ${uom}`);
+                        openProductAdjustment(location, productId, productName, quantity, uom);
+                    });
+                } else {
+                    console.log("📭 No inventory data found for this location");
+                    inventoryTableBody.append(
+                        $('<tr></tr>').append(
+                            $('<td colspan="4" class="text-center py-4"></td>').html(
+                                '<div class="empty-state"><i class="fas fa-inbox"></i><div>No inventory data found for this location</div></div>'
+                            )
+                        )
+                    );
+                    $('#summaryStats').html('<div class="summary-item"><div class="summary-label">No data available</div></div>');
+                }
+                
+                $('#selectedLocation').text(location);
+                $('#inventoryResults').fadeIn();
+                console.log("✅ Inventory data displayed");
+            },
+            error: function(xhr, status, error) {
+                console.error("❌ Failed to fetch inventory data:", error);
+                showToast('error', 'Failed to fetch inventory data. Please try again.');
+            },
+            complete: function() {
+                console.log("📝 Inventory request complete");
+                viewBtn.html(originalText);
+                viewBtn.prop('disabled', false);
+            }
+        });
+    });
+    
+    console.log("✅ Inventory management initialized");
+}
+
+function initializeSaleTemplates() {
+    console.log("📊 Initializing sale templates...");
+    
+    $('#uploadSaleTemplateForm').on('submit', function(e) {
+        e.preventDefault();
+        console.log("📝 Upload sale template form submitted");
+        
+        const fileInput = document.getElementById('saleFile');
+        const month = $('#uploadMonth').val();
+        const cycle = $('#uploadCycle').val();
+        
+        console.log("📋 Form validation:");
+        console.log("   Month:", month);
+        console.log("   Cycle:", cycle);
+        console.log("   File input:", fileInput);
+        
+        if (!month || !cycle) {
+            console.warn('Validation failed: Missing month or cycle');
+            showToast('error', 'Please select both month and cycle');
+            return;
+        }
+        
+        if (!fileInput.files || fileInput.files.length === 0) {
+            console.warn('Validation failed: No file selected');
+            showToast('error', 'Please select a file to upload');
+            return;
+        }
+        
+        const file = fileInput.files[0];
+        const fileExtension = file.name.split('.').pop().toLowerCase();
+        
+        console.log('📄 File details:', {
+            name: file.name,
+            size: (file.size / 1024 / 1024).toFixed(2) + ' MB',
+            type: file.type,
+            extension: fileExtension
+        });
+        
+        if (!['xlsx', 'xls'].includes(fileExtension)) {
+            console.warn('Validation failed: Invalid file type', fileExtension);
+            showToast('error', 'Please select an Excel file (.xlsx or .xls)');
+            return;
+        }
+        
+        const uploadBtn = $('#uploadTemplateBtn');
+        const originalText = uploadBtn.html();
+        uploadBtn.html('<i class="fas fa-spinner fa-spin"></i> Processing...');
+        uploadBtn.prop('disabled', true);
+        $(this).addClass('loading');
+
+        const formData = new FormData(this);
+        console.log('📦 FormData created, submitting to server...');
+        console.log('   FormData entries:', Array.from(formData.entries()));
+        
+        const xhr = new XMLHttpRequest();
+        xhr.open('POST', "{% url 'upload_sale_template' %}", true);
+        xhr.setRequestHeader('X-CSRFToken', $('[name=csrfmiddlewaretoken]').val());
+        xhr.responseType = 'blob';
+        
+        xhr.onloadstart = function() {
+            console.log('📤 XHR: Upload started at ' + new Date().toISOString());
+        };
+        
+        xhr.upload.onprogress = function(e) {
+            if (e.lengthComputable) {
+                const percentComplete = (e.loaded / e.total) * 100;
+                console.log('📈 Upload progress:', percentComplete.toFixed(2) + '%');
+            }
+        };
+        
+        xhr.onload = function() {
+            console.log('📨 XHR: Response received. Status:', xhr.status);
+            console.log('📨 Response headers:', {
+                'Content-Type': xhr.getResponseHeader('Content-Type'),
+                'Content-Disposition': xhr.getResponseHeader('Content-Disposition')
+            });
+            
+            if (xhr.status === 200) {
+                const contentType = xhr.getResponseHeader('Content-Type');
+                console.log('📄 Content-Type received:', contentType);
+                
+                if (contentType && contentType.includes('application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')) {
+                    console.log('✅ Processing Excel file response');
+                    const blob = xhr.response;
+                    const url = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.style.display = 'none';
+                    a.href = url;
+                    
+                    const contentDisposition = xhr.getResponseHeader('Content-Disposition');
+                    let filename = `sale_results_${month}_${cycle.replace(' ', '_')}_color_coded.xlsx`;
+                    if (contentDisposition) {
+                        const filenameMatch = contentDisposition.match(/filename="(.+)"/);
+                        if (filenameMatch) {
+                            filename = filenameMatch[1];
+                        }
+                    }
+                    a.download = filename;
+                    console.log('💾 Downloading file:', filename);
+                    
+                    document.body.appendChild(a);
+                    a.click();
+                    window.URL.revokeObjectURL(url);
+                    document.body.removeChild(a);
+                    
+                    console.log('✅ File downloaded successfully');
+                    showToast('success', 'File processed successfully! Color-coded Excel has been downloaded.');
+                    
+                } else if (contentType && contentType.includes('application/json')) {
+                    console.log('📄 Processing JSON response');
+                    const reader = new FileReader();
+                    reader.onload = function() {
+                        try {
+                            const response = JSON.parse(reader.result);
+                            console.log('📨 Server JSON response:', response);
+                            if (response.success) {
+                                showToast('success', response.message);
+                                
+                                if (response.download_url) {
+                                    console.log('🔗 Download URL available:', response.download_url);
+                                    const downloadBtnHtml = `
+                                        <div class="download-section">
+                                            <a href="${response.download_url}" class="btn-primary full-width" target="_blank">
+                                                <i class="fas fa-download"></i>
+                                                Download Color-Coded Excel Results
+                                            </a>
+                                            <p>Click to download your analyzed sales data with color coding</p>
+                                        </div>
+                                    `;
+                                    $('#uploadSaleTemplateForm').after(downloadBtnHtml);
+                                }
+                            } else {
+                                console.error('❌ Server returned error:', response);
+                                showToast('error', response.message);
+                            }
+                        } catch (e) {
+                            console.error('❌ Error parsing JSON response:', e);
+                            showToast('error', 'Error processing server response');
+                        }
+                    };
+                    reader.readAsText(xhr.response);
+                } else {
+                    console.warn('⚠️ Unknown content type:', contentType);
+                    showToast('error', 'Unknown response from server');
+                }
+                
+                $('#uploadSaleTemplateForm')[0].reset();
+                $('#fileName').text('No file chosen');
+                loadUploadHistory();
+                
+            } else {
+                console.error('❌ Server returned error status:', xhr.status);
+                let errorMessage = 'Upload failed. Please try again.';
+                
+                const reader = new FileReader();
+                reader.onload = function() {
+                    try {
+                        const errorResponse = JSON.parse(reader.result);
+                        console.error('❌ Server error response:', errorResponse);
+                        if (errorResponse && errorResponse.message) {
+                            errorMessage = errorResponse.message;
+                        }
+                    } catch (e) {
+                        console.error('❌ Error parsing error response:', e);
+                    }
+                    showToast('error', errorMessage);
+                };
+                reader.readAsText(xhr.response);
+            }
+            
+            uploadBtn.html(originalText);
+            uploadBtn.prop('disabled', false);
+            $('#uploadSaleTemplateForm').removeClass('loading');
+            console.log('📝 Upload process complete');
+        };
+        
+        xhr.onerror = function() {
+            console.error('❌ Network error occurred during upload');
+            showToast('error', 'Network error occurred. Please try again.');
+            uploadBtn.html(originalText);
+            uploadBtn.prop('disabled', false);
+            $('#uploadSaleTemplateForm').removeClass('loading');
+        };
+        
+        xhr.ontimeout = function() {
+            console.warn('⚠️ Request timed out');
+            showToast('error', 'Request timed out. Please try again.');
+            uploadBtn.html(originalText);
+            uploadBtn.prop('disabled', false);
+            $('#uploadSaleTemplateForm').removeClass('loading');
+        };
+        
+        xhr.send(formData);
+        console.log('📤 XHR request sent to server');
+    });
+
+    $('#saleFile').on('change', function() {
+        console.log('📄 saleFile: File selected');
+        const fileInput = $(this)[0];
+        const fileNameSpan = $('#fileName');
+        
+        if (fileInput.files && fileInput.files.length > 0) {
+            const file = fileInput.files[0];
+            const fileName = file.name;
+            const fileSize = (file.size / 1024 / 1024).toFixed(2);
+            const fileExtension = fileName.split('.').pop().toLowerCase();
+            
+            console.log('📄 Selected file:', {
+                name: fileName, 
+                size: fileSize + 'MB', 
+                extension: fileExtension
+            });
+            fileNameSpan.text(`${fileName} (${fileSize} MB)`);
+            
+            if (!['xlsx', 'xls'].includes(fileExtension)) {
+                console.warn('❌ Invalid file extension:', fileExtension);
+                fileNameSpan.addClass('text-danger');
+                showToast('error', 'Please select an Excel file (.xlsx or .xls)');
+            } else {
+                fileNameSpan.removeClass('text-danger');
+                $('.upload-message').remove();
+                $('.download-section').remove();
+                console.log('✅ Valid Excel file selected');
+            }
+        } else {
+            console.log('📭 No file selected');
+            fileNameSpan.text('No file chosen');
+            fileNameSpan.removeClass('text-danger');
+        }
+    });
+
+    // Load upload history on page load and refresh every 30 seconds
+    console.log("🔄 Loading initial upload history...");
+    loadUploadHistory();
+    setInterval(loadUploadHistory, 30000);
+    console.log("📅 Set upload history refresh interval to 30 seconds");
+    
+    console.log("✅ Sale templates initialized");
+}
+
+function loadUploadHistory() {
+    console.log("📜 loadUploadHistory: Fetching upload history");
+    $.ajax({
+        url: "{% url 'get_sale_upload_history' %}",
+        type: "GET",
+        success: function(response) {
+            console.log("📨 Upload history received:", response);
+            displayUploadHistory(response.history);
+        },
+        error: function(xhr, status, error) {
+            console.error("❌ Failed to load upload history:", error);
+            $('#uploadHistory').html('<div class="history-item">Failed to load history</div>');
+        }
+    });
+}
+
+function displayUploadHistory(history) {
+    console.log("🎨 displayUploadHistory: Displaying", history?.length || 0, "history items");
+    const historyContainer = $('#uploadHistory');
+    
+    if (!history || history.length === 0) {
+        console.log("📭 No history found");
+        historyContainer.html('<div class="history-item">No upload history found</div>');
+        return;
+    }
+
+    let html = '';
+    history.forEach((item, index) => {
+        const successRate = ((item.success_count / item.total_records) * 100).toFixed(1);
+        console.log(`📜 History item ${index + 1}:`, item);
+        html += `
+            <div class="history-item">
+                <div class="history-file-name">${item.file_name}</div>
+                <div class="history-details">
+                    <span>${item.month} ${item.cycle}</span>
+                    <div class="history-stats">
+                        <span class="stat-success">✓ ${item.success_count}</span>
+                        <span class="stat-error">✗ ${item.error_count}</span>
+                        <span>${successRate}%</span>
+                    </div>
+                </div>
+                <div class="history-details">
+                    <span>By ${item.uploaded_by}</span>
+                    <span>${item.uploaded_at}</span>
+                </div>
+            </div>
+        `;
+    });
+    
+    historyContainer.html(html);
+    console.log(`✅ Displayed ${history.length} history items`);
+}
+
+function initializeInventoryAdjustment() {
+    console.log("🔄 Initializing inventory adjustment...");
+    
+    $('#saveAdjustmentBtn').on('click', function() {
+        console.log("💾 Save adjustment button clicked");
+        saveInventoryAdjustment();
+    });
+    
+    $('#newQuantity, #adjustmentReason').on('keypress', function(e) {
+        if (e.which === 13) {
+            console.log("↩️ Enter key pressed in adjustment form");
+            saveInventoryAdjustment();
+        }
+    });
+
+    $('#inventoryAdjustmentModal').on('hidden.bs.modal', function () {
+        console.log("📦 Inventory adjustment modal closed, resetting form");
+        $('#inventoryAdjustmentForm')[0].reset();
+        $('#adjustProductName').text('No product selected');
+        $('#currentQuantity').val('');
+    });
+    
+    console.log("✅ Inventory adjustment initialized");
+}
+
+function openProductAdjustment(location, productId, productName, currentQuantity, uom) {
+    console.log(`📦 Opening product adjustment modal:`, {
+        location,
+        productId,
+        productName,
+        currentQuantity,
+        uom
+    });
+    
+    if (!productId || productId === 'undefined' || productId === 'null' || productId === 0) {
+        console.error("❌ Invalid product selection");
+        showToast('error', 'Invalid product selection. Please try again.');
+        return;
+    }
+    
+    $('#adjustmentLocation').val(location);
+    $('#adjustmentProduct').val(productId);
+    $('#adjustProductName').text(productName);
+    $('#currentQuantity').val(`${currentQuantity} ${uom}`);
+    $('#newQuantity').val(currentQuantity);
+    $('#adjustmentReason').val('');
+    
+    setTimeout(() => {
+        $('#newQuantity').focus().select();
+        console.log("🎯 Focus set to new quantity field");
+    }, 300);
+    
+    $('#inventoryAdjustmentModal').modal('show');
+    console.log("✅ Product adjustment modal opened");
+}
+
+function openInventoryAdjustment() {
+    console.log("📦 Opening inventory adjustment modal");
+    $('#inventoryAdjustmentModal').modal('show');
+}
+
+function saveInventoryAdjustment() {
+    console.log("💾 Saving inventory adjustment...");
+    
+    const location = $('#adjustmentLocation').val();
+    const productId = $('#adjustmentProduct').val();
+    const newQuantity = $('#newQuantity').val();
+    const adjustmentReason = $('#adjustmentReason').val();
+    
+    console.log("📋 Adjustment data:", {
+        location,
+        productId,
+        newQuantity,
+        adjustmentReason
+    });
+    
+    if (!location) {
+        console.warn("❌ Validation failed: No location selected");
+        showToast('error', 'Please select a location');
+        return;
+    }
+    
+    if (!productId || productId === '0') {
+        console.warn("❌ Validation failed: Invalid product ID");
+        showToast('error', 'Product ID is missing. Please select a product again.');
+        return;
+    }
+    
+    if (!newQuantity || newQuantity < 0) {
+        console.warn("❌ Validation failed: Invalid quantity");
+        showToast('error', 'Please enter a valid quantity (0 or higher)');
+        return;
+    }
+    
+    if (!adjustmentReason || adjustmentReason.trim() === '') {
+        console.warn("❌ Validation failed: No adjustment reason");
+        showToast('error', 'Please enter an adjustment reason');
+        return;
+    }
+    
+    const formData = {
+        location: location,
+        product_id: parseInt(productId),
+        new_quantity: parseInt(newQuantity),
+        adjustment_reason: adjustmentReason.trim()
+    };
+    
+    console.log("📦 Sending adjustment data:", formData);
+    
+    const saveBtn = $('#saveAdjustmentBtn');
+    const originalText = saveBtn.html();
+    saveBtn.html('<i class="fas fa-spinner fa-spin"></i> Saving...').prop('disabled', true);
+
+    // Reused across retries of this adjustment so a re-submit doesn't apply twice.
+    const _adjIdemKey = window.IdemKeys.get("adjust_inv_qty-" + productId);
+
+    $.ajax({
+        url: "{% url 'adjust_inventory_quantity' %}",
+        type: "POST",
+        data: JSON.stringify(formData),
+        contentType: "application/json",
+        headers: {
+            'X-CSRFToken': $('[name=csrfmiddlewaretoken]').val(),
+            'X-Idempotency-Key': _adjIdemKey
+        },
+        success: function(response) {
+            console.log("📨 Inventory adjustment response:", response);
+            if (response.success) {
+                window.IdemKeys.reset("adjust_inv_qty-" + productId);
+                console.log("✅ Inventory adjustment saved successfully");
+                showToast('success', response.message);
+                $('#inventoryAdjustmentModal').modal('hide');
+                
+                $('#inventoryAdjustmentForm')[0].reset();
+                $('#adjustProductName').text('No product selected');
+                $('#currentQuantity').val('');
+                
+                const currentLocation = $('#inventoryLocation').val();
+                if (currentLocation === formData.location) {
+                    console.log("🔄 Refreshing inventory view for location:", currentLocation);
+                    $('#viewInventoryBtn').click();
+                }
+            } else {
+                console.error("❌ Failed to save adjustment:", response.error);
+                showToast('error', response.error || 'Failed to save adjustment');
+            }
+        },
+        error: function(xhr) {
+            console.error("❌ AJAX error saving inventory adjustment:", xhr);
+            let errorMessage = 'Failed to save adjustment';
+            try {
+                const errorResponse = JSON.parse(xhr.responseText);
+                if (errorResponse.error) {
+                    errorMessage = errorResponse.error;
+                }
+            } catch (e) {
+                console.error("❌ Error parsing error response:", e);
+            }
+            showToast('error', errorMessage);
+        },
+        complete: function() {
+            console.log("📝 Inventory adjustment request complete");
+            saveBtn.html(originalText).prop('disabled', false);
+        }
+    });
+}
+
+function loadTotalStats() {
+    console.log("📊 Loading total stats...");
+    // You can add AJAX call here to get total counts
+}
+
+function showToast(type, message) {
+    console.log(`📢 ${type.toUpperCase()} toast: ${message}`);
+    
+    const toastClass = type === 'success' ? 'success-message' : 'error-message';
+    const icon = type === 'success' ? 'fa-check-circle' : 'fa-exclamation-circle';
+    
+    const toastHtml = `
+        <div class="cycle-message ${toastClass} alert-dismissible fade show">
+            <i class="fas ${icon}"></i>
+            ${message}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    `;
+    
+    $('.cycle-message').remove();
+    $('#createMonthlyCycleForm').before(toastHtml);
+    
+    setTimeout(() => {
+        $('.cycle-message').alert('close');
+        console.log("📢 Toast auto-closed");
+    }, 5000);
+}
+
+// Utility functions
+function formatDate(dateString) {
+    console.log(`📅 Formatting date string: ${dateString}`);
+    var year = dateString.substring(0, 4);
+    var month = dateString.substring(4, 6);
+    var day = dateString.substring(6, 8);
+    const formatted = day + '-' + month + '-' + year;
+    console.log(`📅 Formatted date: ${formatted}`);
+    return formatted;
+}
+
+function toggleFiles(id) {
+    console.log(`📂 Toggling files for ID: ${id}`);
+    var element = $('#' + id);
+    var isVisible = element.is(':visible');
+    
+    console.log(`   Current state: ${isVisible ? 'visible' : 'hidden'}`);
+    
+    element.slideToggle(300);
+    
+    var button = element.siblings('button');
+    var icon = button.find('i');
+    if (!isVisible) {
+        icon.removeClass('fa-eye').addClass('fa-eye-slash');
+        button.find('span').text('Hide Files');
+        console.log(`   Now showing files, button text: Hide Files`);
+    } else {
+        icon.removeClass('fa-eye-slash').addClass('fa-eye');
+        button.find('span').text('View Files');
+        console.log(`   Now hiding files, button text: View Files`);
+    }
+}
+
+function extractTimestampFromFilename(filename) {
+    console.log(`🔍 Extracting timestamp from filename: ${filename}`);
+    var timestampMatch = filename.match(/(\d{14})/);
+    if (timestampMatch) {
+        console.log(`   Found 14-digit timestamp: ${timestampMatch[1]}`);
+        return timestampMatch[1];
+    }
+    var dateMatch = filename.match(/(\d{8})/);
+    if (dateMatch) {
+        console.log(`   Found 8-digit date: ${dateMatch[1]}`);
+        return dateMatch[1] + '000000';
+    }
+    console.log(`   No timestamp found in filename`);
+    return null;
+}
+
+function formatTimestamp(timestamp) {
+    console.log(`📅 Formatting timestamp: ${timestamp}`);
+    if (!timestamp) {
+        console.log(`   No timestamp provided`);
+        return 'Unknown Date';
+    }
+    
+    if (timestamp.length === 14) {
+        var year = timestamp.substring(0, 4);
+        var month = timestamp.substring(4, 6);
+        var day = timestamp.substring(6, 8);
+        var hour = timestamp.substring(8, 10);
+        var minute = timestamp.substring(10, 12);
+        var second = timestamp.substring(12, 14);
+        const formatted = `${day}-${month}-${year} ${hour}:${minute}:${second}`;
+        console.log(`   Formatted as: ${formatted}`);
+        return formatted;
+    } else if (timestamp.length === 8) {
+        var year = timestamp.substring(0, 4);
+        var month = timestamp.substring(4, 6);
+        var day = timestamp.substring(6, 8);
+        const formatted = `${day}-${month}-${year}`;
+        console.log(`   Formatted as: ${formatted}`);
+        return formatted;
+    }
+    
+    console.log(`   Invalid timestamp length: ${timestamp.length}`);
+    return 'Invalid Date';
+}
+
+console.log("✅ Finance Dashboard JavaScript loaded successfully");
+</script>
+{% endblock %}

@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% block title %}Order Details{% endblock %}
+{% block content %}
+<div class="container mt-5">
+    <div class="card shadow">
+        <div class="card-body">
+            <h2 class="text-center mb-4">Order details of {{orders.id}}</h2> 
+            <h5 class="card-title"><strong>Order Date:</strong> {{ orders.field3 }}</h5>
+            <p class="card-text">
+                <strong>Field 1:</strong> {{ orders.field1 }}<br>
+                <strong>Field 2:</strong> {{ orders.field2 }}<br>
+                <strong>Field 4:</strong> {{ orders.field4 }}<br>
+                <strong>Field 5:</strong> {{ orders.field5 }}
+            </p>
+            <p class="text-danger">
+                <strong>Status:</strong> {{ orders.status }}
+            </p>
+            <a href="#" class="btn btn-primary" style="text-decoration: none;">Download Report</a>
+        </div>
+    </div>
+</div>
+{% endblock %}

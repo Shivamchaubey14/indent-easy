@@ -1,0 +1,107 @@
+{% extends "base.html" %}
+{% block title %}Your Orders{% endblock %}
+{% block content %}
+<h2 class="text-center mb-4 fw-bold">
+  {{ user.username }}, Your Placed Orders
+</h2>
+
+<!-- Search Box -->
+<div class="d-flex justify-content-center mb-2">
+  <input
+    type="text"
+    class="form-control w-50 shadow-sm"
+    id="orderSearch"
+    placeholder="Search your orders..."
+    onkeyup="filterOrders()"
+    style="border-radius: 25px; padding: 10px;"
+  />
+</div>
+
+<!-- Go to Home Button -->
+<div class="d-flex justify-content-center mb-4">
+  <a href="{% url 'dashboard' %}" class="btn btn-secondary" style="text-decoration: none;">
+    Go to Home
+  </a>
+</div>
+
+<div class="d-flex flex-wrap justify-content-center g-4" id="orderList">
+  {% if orders %}
+    {% for order in orders %}
+    <a href="{% url 'order_detail' order.id %}" style="text-decoration: none; color: inherit;">
+      <div class="order-item card shadow m-3" style="width: 18rem;">
+        <div class="card-body">
+          <h5 class="card-title"><strong>Order Date:</strong> {{ order.field3 }}</h5>
+          <p class="card-text">
+            <strong>Field 1:</strong> {{ order.field1 }}<br>
+            <strong>Field 2:</strong> {{ order.field2 }}<br>
+            <strong>Field 4:</strong> {{ order.field4 }}<br>
+            <strong>Field 5:</strong> {{ order.field5 }}
+          </p>
+          <p class="text-danger">
+            <strong>Status:</strong> 
+            {% if order.status == 'pending' %}
+              <span class="text-primary">Pending</span>
+            {% elif order.status == 'accepted' %}
+              <span class="text-success">Accepted</span>
+            {% elif order.status == 'rejected' %}
+              <span class="text-danger">Rejected</span>
+            {% endif %}
+          </p>
+          <div class="text-center mt-3">
+            <a href="{% url 'download_report' order.id %}" class="btn btn-primary btn-sm" style="text-decoration: none;">
+              Download Report
+            </a>
+          </div>
+        </div>
+      </div>
+    </a>
+    {% endfor %}
+  {% else %}
+    <p class="text-center mt-4">You have no orders yet.</p>
+  {% endif %}
+</div>
+
+<!-- Pagination Controls -->
+<div class="d-flex justify-content-center mt-4">
+  <nav aria-label="Page navigation">
+    <ul class="pagination">
+      {% if page_obj.has_previous %}
+      <li class="page-item">
+        <a class="page-link" href="?page=1" aria-label="First">
+          &laquo;&laquo;
+        </a>
+      </li>
+      <li class="page-item">
+        <a class="page-link" href="?page={{ page_obj.previous_page_number }}" aria-label="Previous">
+          &laquo;
+        </a>
+      </li>
+      {% endif %}
+
+      {% for num in page_obj.paginator.page_range %}
+        {% if num == page_obj.number %}
+        <li class="page-item active"><span class="page-link">{{ num }}</span></li>
+        {% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %}
+        <li class="page-item">
+          <a class="page-link" href="?page={{ num }}">{{ num }}</a>
+        </li>
+        {% endif %}
+      {% endfor %}
+
+      {% if page_obj.has_next %}
+      <li class="page-item">
+        <a class="page-link" href="?page={{ page_obj.next_page_number }}" aria-label="Next">
+          &raquo;
+        </a>
+      </li>
+      <li class="page-item">
+        <a class="page-link" href="?page={{ page_obj.paginator.num_pages }}" aria-label="Last">
+          &raquo;&raquo;
+        </a>
+      </li>
+      {% endif %}
+    </ul>
+  </nav>
+</div>
+
+{% endblock %}

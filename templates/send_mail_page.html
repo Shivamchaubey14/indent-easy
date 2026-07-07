@@ -1,0 +1,1891 @@
+{% extends "base.html" %}
+{% load custom_filters %}
+{% block content %}
+
+<div class="layout-container">
+  <!-- Sidebar -->
+  <aside class="sidebar">
+    <div class="sidebar-content">
+      <!-- User Welcome Section -->
+      <div class="user-welcome">
+        <div class="welcome-header">
+          <h1 class="welcome-title">
+            Welcome!
+            <span class="wave-emoji">👋</span>
+          </h1>
+          <p class="user-name">{{request.user.first_name}} {{request.user.last_name}}</p>
+          <div class="user-details">
+            <span class="detail-badge">
+              <i class="fas fa-id-badge"></i>
+              {{ request.user.employee_code }}
+            </span>
+            <span class="detail-badge">
+              <i class="fas fa-building"></i>
+              {{ request.user.department }}
+            </span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Stats Section -->
+      <div class="stats-section">
+        <div class="stat-card">
+          <div class="stat-icon inventory-icon">
+            <i class="fas fa-envelope"></i>
+          </div>
+          <div class="stat-info">
+            <span class="stat-value" id="vendorCount">
+              {% if grouped_data %}
+                {{ grouped_data|length }}
+              {% else %}
+                0
+              {% endif %}
+            </span>
+            <span class="stat-label">Vendors</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Quick Actions -->
+      <div class="quick-actions">
+        <h3 class="section-title">Quick Info</h3>
+        <div class="info-item">
+          <i class="fas fa-paper-plane"></i>
+          <span>Send notifications to vendors</span>
+        </div>
+        <div class="info-item">
+          <i class="fas fa-file-excel"></i>
+          <span>Excel template support for NDDB</span>
+        </div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- Main Content -->
+  <main class="main-content">
+    <!-- Page Header -->
+    <div class="page-header">
+      <div class="header-content">
+        <div class="header-text">
+          <h1 class="page-title">
+            <i class="fas fa-envelope"></i>
+            Send Mail Notifications
+          </h1>
+          <p class="page-subtitle">Send purchase order notifications to vendors</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Vendor Notifications Container -->
+    <div class="vendor-container">
+      {% if grouped_data %}
+        {% for vendor, data in grouped_data.items %}
+          <div class="vendor-card">
+            <!-- Vendor Header -->
+            <div class="vendor-header">
+              <div class="vendor-info">
+                <h3 class="vendor-name">
+                  <i class="fas fa-building"></i>
+                  {{ vendor }}
+                </h3>
+                <div class="vendor-emails">
+                  <i class="fas fa-envelope"></i>
+                  <span class="email-list">{{ data.emails|join:", " }}</span>
+                </div>
+              </div>
+              <div class="vendor-count">
+                <span class="count-badge">{{ data.items|length }} items</span>
+              </div>
+            </div>
+
+            <!-- Excel Upload Section for NDDB -->
+            {% if "nddb" in vendor|lower %}
+            <div class="excel-section" id="excel-upload-{{ forloop.counter }}">
+              <div class="section-header">
+                <h4 class="section-title">
+                  <i class="fas fa-file-excel"></i>
+                  Excel Template Upload
+                </h4>
+              </div>
+              
+              <div class="upload-container">
+                <div class="upload-area" id="upload-area-{{ forloop.counter }}">
+                  <div class="upload-icon">
+                    <i class="fas fa-file-excel"></i>
+                  </div>
+                  <h5>Upload Delivery Schedule Template</h5>
+                  <p class="upload-text">Drag & drop your Excel file here or click to browse</p>
+                  <input type="file" id="excel-file-{{ forloop.counter }}" accept=".xlsx,.xls" class="file-input-hidden">
+                  <button type="button" class="btn-primary btn-choose-file" id="choose-file-btn-{{ forloop.counter }}">
+                    <i class="fas fa-folder-open"></i>
+                    Choose File
+                  </button>
+                </div>
+                
+                <div class="file-info" id="file-info-{{ forloop.counter }}"></div>
+                
+                <div class="fill-excel-button" id="fill-excel-button-{{ forloop.counter }}">
+                  <button type="button" class="btn-warning" id="fill-excel-btn-{{ forloop.counter }}">
+                    <i class="fas fa-pencil-alt"></i>
+                    Fill Excel with Table Data
+                  </button>
+                </div>
+                
+                <div class="process-status" id="process-status-{{ forloop.counter }}"></div>
+                
+                <div class="process-details" id="process-details-{{ forloop.counter }}"></div>
+                
+                <div class="action-buttons" id="action-buttons-{{ forloop.counter }}">
+                  <button type="button" class="btn-success" id="download-btn-{{ forloop.counter }}">
+                    <i class="fas fa-download"></i>
+                    Download Filled Template
+                  </button>
+                  <button type="button" class="btn-danger" id="remove-btn-{{ forloop.counter }}">
+                    <i class="fas fa-trash"></i>
+                    Remove Template
+                  </button>
+                </div>
+              </div>
+            </div>
+            {% endif %}
+
+            <!-- Items Table -->
+            <form class="vendor-form" id="sendMailForm-{{ forloop.counter }}" action="{% url 'send_mail' vendor %}" method="POST" enctype="multipart/form-data">
+              {% csrf_token %}
+              
+              <div class="table-container">
+                <table class="modern-table">
+                  <thead>
+                    <tr>
+                      <th class="checkbox-col">
+                        <input type="checkbox" class="select-all" data-vendor="{{ forloop.counter }}">
+                      </th>
+                      <th class="sno-col">S.No</th>
+                      <th class="req-col">Requisition No.</th>
+                      <th class="po-col">PO No.</th>
+                      <th class="item-col">Stock Item</th>
+                      <th class="qty-col">Quantity</th>
+                      <th class="delivery-col">Expected Delivery</th>
+                      <th class="address-col">Supply Address</th>
+                      <th class="point-col">Delivery Point</th>
+                      <th class="detail-col">Detailed Address</th>
+                      <th class="remarks-col">Remarks</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {% for item in data.items %}
+                    <tr class="item-row">
+                      <td class="checkbox-col">
+                        <input type="checkbox" name="selected_items[]" value="{{ item.vendor.id }}" class="product-checkbox" data-vendor="{{ forloop.parentloop.counter }}">
+                      </td>
+                      <td class="sno-col">
+                        <span class="serial-number">{{ forloop.counter }}</span>
+                      </td>
+                      <td class="req-col">
+                        <div class="requisition-number">
+                          <i class="fas fa-monument"></i>
+                          <span class="text-content">{{ item.requisition_number }}</span>
+                        </div>
+                      </td>
+                      <td class="po-col">
+                        <div class="po-number">
+                          <i class="fas fa-file-invoice"></i>
+                          <span class="text-content">{{ item.vendor.requisition.po_number|split_po_number }}</span>
+                        </div>
+                      </td>
+                      <td class="item-col">
+                        <div class="stock-item">
+                          <i class="fas fa-box"></i>
+                          <div class="product-name-content">
+                            {% if item.mapped_product_name and item.mapped_system != 'INDENT_EASY' %}
+                              <div class="mapped-product-info">
+                                <div class="mapped-product-name">{{ item.mapped_product_name }}</div>
+                                <div class="original-product-name">
+                                  <small class="text-muted">(Original: {{ item.original_product_name }})</small>
+                                </div>
+                                <div class="mapping-badge">
+                                  <span class="badge {% if item.mapped_system == 'NDDB' %}bg-warning{% else %}bg-info{% endif %}">
+                                    {{ item.mapped_system }}
+                                  </span>
+                                </div>
+                              </div>
+                            {% else %}
+                              <div class="product-name">{{ item.original_product_name }}</div>
+                            {% endif %}
+                          </div>
+                        </div>
+                      </td>
+                      <td class="qty-col">
+                        <div class="quantity-input-wrapper">
+                          <input 
+                            type="number" 
+                            name="quantity_{{ item.vendor.id }}" 
+                            value="{{ item.vendor.requisition.quantity }}" 
+                            class="form-control quantity-input" 
+                            placeholder="Enter quantity" 
+                            step="1" 
+                            readonly
+                          >
+                        </div>
+                      </td>
+                      <td class="delivery-col">
+                        <div class="delivery-date">
+                          <i class="fas fa-calendar"></i>
+                          <span class="text-content">{{ item.vendor.requisition.expected_delivery_date|date:"M j, Y" }}</span>
+                        </div>
+                      </td>
+                      <td class="address-col">
+                        <div class="location-info">
+                          <i class="fas fa-map-marker-alt"></i>
+                          <span class="text-content">{{ item.vendor.requisition.location }}</span>
+                        </div>
+                      </td>
+                      <td class="point-col">
+                        <div class="delivery-point">
+                          <i class="fas fa-code"></i>
+                          <span class="text-content">{{ item.vendor.requisition.created_by.delivery_point_code|default:"Not Set" }}</span>
+                        </div>
+                      </td>
+                      <td class="detail-col">
+                        <div class="address-info">
+                          <i class="fas fa-home"></i>
+                          <span class="address-text">{{ item.vendor.requisition.created_by.address }}</span>
+                        </div>
+                      </td>
+                      <td class="remarks-col">
+                        <div class="remarks-input-wrapper">
+                          <textarea 
+                            name="remarks_{{ item.vendor.id }}" 
+                            class="form-control remarks-textarea" 
+                            placeholder="Enter remarks"
+                            rows="3">{{ item.vendor.requisition.remark }}</textarea>
+                        </div>
+                      </td>
+                    </tr>
+                    {% endfor %}
+                  </tbody>
+                </table>
+              </div>
+
+              <!-- Hidden inputs for Excel file data -->
+              <input type="hidden" name="excel_file_path" id="excel-file-path-{{ forloop.counter }}" value="">
+              <input type="hidden" name="original_filename" id="original-filename-{{ forloop.counter }}" value="">
+              <input type="hidden" name="uploaded_file_path" id="uploaded-file-path-{{ forloop.counter }}" value="">
+
+              <!-- Email Input -->
+              <div class="email-section">
+                <div class="form-group full-width">
+                  <label for="email-{{ forloop.counter }}" class="form-label">
+                    <i class="fas fa-envelope"></i>
+                    Notification Emails
+                  </label>
+                  <div class="email-input-wrapper">
+                    <input type="text" id="email-{{ forloop.counter }}" name="email" class="form-control email-input" value="{{ data.emails|join:", " }}" placeholder="Enter recipient's email(s) separated by commas" required />
+                  </div>
+                </div>
+              </div>
+
+              <!-- Submit Section -->
+              <div class="submit-section">
+                <div class="form-actions">
+                  <button type="submit" class="btn-primary send-button" id="send-button-{{ forloop.counter }}">
+                    <i class="fas fa-paper-plane"></i>
+                    Send Mail Notification
+                  </button>
+                  <div class="loader" id="loader-{{ forloop.counter }}">
+                    <div class="spinner-border spinner-border-sm" role="status">
+                      <span class="visually-hidden">Loading...</span>
+                    </div>
+                    <span>Processing...</span>
+                  </div>
+                  <div class="success-message" id="success-message-{{ forloop.counter }}">
+                    <i class="fas fa-check-circle"></i>
+                    Mail sent successfully!
+                  </div>
+                </div>
+              </div>
+            </form>
+          </div>
+        {% endfor %}
+      {% else %}
+        <div class="empty-state">
+          <div class="empty-state-content">
+            <i class="fas fa-envelope-open"></i>
+            <h3>No Mail Notifications Found</h3>
+            <p>There are currently no pending mail notifications to send.</p>
+          </div>
+        </div>
+      {% endif %}
+    </div>
+  </main>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
+<style>
+  :root {
+    --primary-dark: #313647;
+    --primary-light: #435663;
+    --accent-green: #A3B087;
+    --accent-red: #EA5B6F;
+    --accent-yellow: #FFF8D4;
+    --text-dark: #2c3e50;
+    --text-light: #7f8c8d;
+    --bg-light: #f8f9fa;
+    --border-color: #e9ecef;
+    --success: #28a745;
+    --warning: #ffc107;
+    --danger: #dc3545;
+    --info: #17a2b8;
+  }
+
+  /* Layout */
+  .layout-container {
+    display: flex;
+    min-height: calc(100vh - 90px);
+    background: white;
+    align-items: stretch;
+  }
+
+  /* Sidebar */
+  .sidebar {
+    width: 320px;
+    background: var(--primary-dark);
+    color: white;
+    padding: 2rem 1.5rem;
+    box-shadow: 2px 0 20px rgba(0, 0, 0, 0.1);
+    border-radius: 0 20px 20px 0;
+    position: sticky;
+    top: 90px;
+    height: auto;
+    min-height: calc(100vh - 90px);
+    overflow-y: auto;
+    flex-shrink: 0;
+    margin-top: 40px;
+    margin-left: 10px;
+  }
+
+  .sidebar-content {
+    display: flex;
+    flex-direction: column;
+    gap: 2rem;
+    height: 100%;
+  }
+
+  .user-welcome {
+    text-align: center;
+    padding-bottom: 1.5rem;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  }
+
+  .welcome-title {
+    font-size: 1.5rem;
+    font-weight: 600;
+    margin-bottom: 0.5rem;
+    color: var(--accent-green);
+  }
+
+  .wave-emoji {
+    display: inline-block;
+    animation: wave 1.5s ease-in-out infinite;
+  }
+
+  @keyframes wave {
+    0%, 100% { transform: rotate(0deg); }
+    25% { transform: rotate(15deg); }
+    75% { transform: rotate(-10deg); }
+  }
+
+  .user-name {
+    font-size: 1.1rem;
+    color: var(--accent-yellow);
+    font-weight: 500;
+    margin-bottom: 1rem;
+  }
+
+  .user-details {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    align-items: center;
+  }
+
+  .detail-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.4rem 0.8rem;
+    background: rgba(163, 176, 135, 0.1);
+    border-radius: 20px;
+    font-size: 0.85rem;
+    color: rgba(255, 255, 255, 0.9);
+  }
+
+  .detail-badge i {
+    color: var(--accent-green);
+  }
+
+  /* Stats Section */
+  .stats-section {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 1rem;
+    padding-bottom: 1.5rem;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  }
+
+  .stat-card {
+    background: rgba(163, 176, 135, 0.1);
+    padding: 1rem;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    border: 1px solid rgba(163, 176, 135, 0.2);
+  }
+
+  .stat-icon {
+    width: 48px;
+    height: 48px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.5rem;
+  }
+
+  .inventory-icon {
+    background: rgba(163, 176, 135, 0.2);
+    color: var(--accent-green);
+  }
+
+  .stat-info {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .stat-value {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: white;
+  }
+
+  .stat-label {
+    font-size: 0.75rem;
+    color: rgba(255, 255, 255, 0.7);
+  }
+
+  /* Quick Actions */
+  .quick-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+
+  .section-title {
+    font-size: 1.1rem;
+    color: var(--accent-yellow);
+    margin-bottom: 0.5rem;
+    font-weight: 500;
+  }
+
+  .info-item {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.75rem;
+    background: rgba(163, 176, 135, 0.1);
+    color: rgba(255, 255, 255, 0.9);
+    border-radius: 8px;
+    font-size: 0.85rem;
+  }
+
+  .info-item i {
+    color: var(--accent-green);
+    width: 16px;
+  }
+
+  /* Main Content */
+  .main-content {
+    flex: 1;
+    background: #ffffff;
+    padding: 2rem;
+    overflow-y: auto;
+    min-height: calc(100vh - 90px);
+    display: flex;
+    flex-direction: column;
+    gap: 2rem;
+  }
+
+  /* Page Header */
+  .page-header {
+    margin-bottom: 0;
+    background: linear-gradient(135deg, var(--accent-green) 0%, #8a9975 100%);
+    border-radius: 20px;
+    padding: 1.5rem 2rem;
+    box-shadow: 0 8px 32px rgba(163, 176, 135, 0.2);
+    border: 2px solid black;
+  }
+
+  .header-content {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+  }
+
+  .header-text {
+    text-align: center;
+  }
+
+  .page-title {
+    font-size: 2rem;
+    font-weight: 700;
+    color: #313647;
+    margin-bottom: 0.5rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.75rem;
+  }
+
+  .page-title i {
+    font-size: 1.75rem;
+  }
+
+  .page-subtitle {
+    font-size: 1rem;
+    color: #313647;
+    font-weight: 400;
+  }
+
+  /* Vendor Container */
+  .vendor-container {
+    display: flex;
+    flex-direction: column;
+    gap: 2rem;
+  }
+
+  /* Vendor Card */
+  .vendor-card {
+    background: linear-gradient(135deg, var(--accent-green) 0%, #8a9975 100%);
+    border-radius: 16px;
+    border: 2px solid black;
+    box-shadow: 0 8px 32px rgba(163, 176, 135, 0.2);
+    overflow: hidden;
+  }
+
+  .vendor-header {
+    background: rgba(255, 255, 255, 0.95);
+    padding: 1.5rem;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+    backdrop-filter: blur(10px);
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 1rem;
+  }
+
+  .vendor-info {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    flex: 1;
+  }
+
+  .vendor-name {
+    font-size: 1.5rem;
+    font-weight: 600;
+    color: var(--primary-dark);
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin: 0;
+  }
+
+  .vendor-name i {
+    color: var(--accent-green);
+  }
+
+  .vendor-emails {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.75rem;
+    color: var(--text-light);
+    font-size: 0.9rem;
+    line-height: 1.4;
+  }
+
+  .vendor-emails i {
+    color: var(--accent-green);
+    margin-top: 0.2rem;
+    flex-shrink: 0;
+  }
+
+  .email-list {
+    word-break: break-word;
+    flex: 1;
+  }
+
+  .count-badge {
+    background: var(--primary-dark);
+    color: white;
+    padding: 0.5rem 1rem;
+    border-radius: 20px;
+    font-weight: 600;
+    font-size: 0.9rem;
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+
+  /* Excel Section */
+  .excel-section {
+    background: rgba(255, 255, 255, 0.9);
+    backdrop-filter: blur(10px);
+    padding: 1.5rem;
+    border-bottom: 1px solid rgba(138, 153, 117, 0.2);
+  }
+
+  .section-header {
+    margin-bottom: 1rem;
+  }
+
+  .section-title {
+    font-size: 1.2rem;
+    font-weight: 600;
+    color: var(--primary-dark);
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin: 0;
+  }
+
+  .section-title i {
+    color: var(--accent-green);
+  }
+
+  .upload-container {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+  }
+
+  .upload-area {
+    border: 2px dashed var(--primary-dark);
+    border-radius: 12px;
+    padding: 2rem;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    background: white;
+  }
+
+  .upload-area:hover {
+    border-color: var(--accent-green);
+    background: rgba(163, 176, 135, 0.05);
+  }
+
+  .upload-area.dragover {
+    border-color: var(--success);
+    background: rgba(40, 167, 69, 0.05);
+  }
+
+  .upload-area.disabled {
+    pointer-events: none;
+    opacity: 0.6;
+  }
+
+  .upload-area.hidden {
+    display: none;
+  }
+
+  .upload-icon {
+    font-size: 3rem;
+    color: var(--primary-dark);
+    margin-bottom: 1rem;
+  }
+
+  .upload-area h5 {
+    color: var(--primary-dark);
+    margin-bottom: 0.5rem;
+  }
+
+  .upload-text {
+    color: var(--text-light);
+    margin-bottom: 1.5rem;
+  }
+
+  .file-input-hidden {
+    display: none;
+  }
+
+  /* File Info */
+  .file-info {
+    padding: 1rem;
+    background: var(--bg-light);
+    border-radius: 8px;
+    border: 1px solid var(--border-color);
+    display: none;
+  }
+
+  .file-info.visible {
+    display: block;
+  }
+
+  /* Fill Excel Button */
+  .fill-excel-button {
+    display: none;
+  }
+
+  .fill-excel-button.visible {
+    display: block;
+  }
+
+  /* Process Status */
+  .process-status {
+    padding: 1rem;
+    border-radius: 8px;
+    display: none;
+    font-weight: 500;
+  }
+
+  .process-status.visible {
+    display: block;
+  }
+
+  .status-processing {
+    background: rgba(255, 193, 7, 0.1);
+    color: var(--warning);
+    border: 1px solid rgba(255, 193, 7, 0.2);
+  }
+
+  .status-success {
+    background: rgba(40, 167, 69, 0.1);
+    color: var(--success);
+    border: 1px solid rgba(40, 167, 69, 0.2);
+  }
+
+  .status-error {
+    background: rgba(220, 53, 69, 0.1);
+    color: var(--danger);
+    border: 1px solid rgba(220, 53, 69, 0.2);
+  }
+
+  /* Process Details */
+  .process-details {
+    max-height: 200px;
+    overflow-y: auto;
+    background: var(--bg-light);
+    border-radius: 8px;
+    padding: 1rem;
+    display: none;
+  }
+
+  .process-details.visible {
+    display: block;
+  }
+
+  .process-step {
+    padding: 0.5rem 0;
+    border-bottom: 1px solid var(--border-color);
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  .process-step:last-child {
+    border-bottom: none;
+  }
+
+  /* Action Buttons */
+  .action-buttons {
+    display: none;
+    gap: 1rem;
+    flex-wrap: wrap;
+  }
+
+  .action-buttons.visible {
+    display: flex;
+  }
+
+  /* Vendor Form */
+  .vendor-form {
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(10px);
+    padding: 2rem;
+  }
+
+  /* Table Container */
+  .table-container {
+    overflow-x: auto;
+    margin-bottom: 2rem;
+    border-radius: 8px;
+    border: 1px solid rgba(138, 153, 117, 0.2);
+  }
+
+  .modern-table {
+    width: 100%;
+    border-collapse: collapse;
+    background: white;
+    table-layout: auto;
+    min-width: 1200px;
+  }
+
+  .modern-table thead {
+    background: var(--primary-dark) !important;
+  }
+
+  .modern-table th {
+    color: white !important;
+    padding: 1rem 0.75rem;
+    font-weight: 600;
+    text-align: left;
+    font-size: 0.85rem;
+    white-space: nowrap;
+    border-bottom: 2px solid #8a9975;
+    background: var(--primary-dark) !important;
+    position: relative;
+  }
+
+  /* Fixed column widths with proper spacing */
+  .checkbox-col { 
+    width: 50px; 
+    min-width: 50px;
+    max-width: 50px;
+  }
+  .sno-col { 
+    width: 60px; 
+    min-width: 60px;
+    max-width: 60px;
+  }
+  .req-col { 
+    width: 120px; 
+    min-width: 120px;
+    max-width: 120px;
+  }
+  .po-col { 
+    width: 120px; 
+    min-width: 120px;
+    max-width: 120px;
+  }
+  .item-col { 
+    width: 150px; 
+    min-width: 150px;
+    max-width: 150px;
+  }
+  .qty-col { 
+    width: 100px; 
+    min-width: 100px;
+    max-width: 100px;
+  }
+  .delivery-col { 
+    width: 120px; 
+    min-width: 120px;
+    max-width: 120px;
+  }
+  .address-col { 
+    width: 120px; 
+    min-width: 120px;
+    max-width: 120px;
+  }
+  .point-col { 
+    width: 120px; 
+    min-width: 120px;
+    max-width: 120px;
+  }
+  .detail-col { 
+    width: 200px; 
+    min-width: 200px;
+    max-width: 200px;
+  }
+  .remarks-col { 
+    width: 180px; 
+    min-width: 180px;
+    max-width: 180px;
+  }
+
+  .modern-table td {
+    padding: 0.75rem;
+    border-bottom: 1px solid rgba(138, 153, 117, 0.2);
+    vertical-align: top;
+    font-size: 0.85rem;
+    background: rgba(255, 255, 255, 0.9);
+    word-wrap: break-word;
+    overflow: hidden;
+  }
+
+  .modern-table tbody tr {
+    transition: all 0.3s ease;
+  }
+
+  .modern-table tbody tr:hover {
+    background: rgba(255, 255, 255, 0.95);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(138, 153, 117, 0.2);
+  }
+
+  /* Checkbox Column */
+  .checkbox-col {
+    text-align: center;
+  }
+
+  .select-all, .product-checkbox {
+    width: 18px;
+    height: 18px;
+    cursor: pointer;
+    accent-color: var(--accent-green);
+  }
+
+  /* Cell Styles */
+  .serial-number {
+    font-weight: 600;
+    color: var(--primary-dark);
+    background: var(--bg-light);
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+    display: inline-block;
+  }
+
+  .requisition-number, .po-number, .stock-item, .delivery-date, .location-info, .delivery-point {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.5rem;
+    font-weight: 500;
+    min-height: 24px;
+  }
+
+  .requisition-number i, .po-number i, .stock-item i, .delivery-date i, .location-info i, .delivery-point i {
+    color: var(--accent-green);
+    width: 14px;
+    flex-shrink: 0;
+    margin-top: 0.1rem;
+  }
+
+  .text-content {
+    word-break: break-word;
+    flex: 1;
+    line-height: 1.4;
+  }
+
+  /* Mapped Product Styles */
+  .mapped-product-info {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+  }
+
+  .mapped-product-name {
+    font-weight: 600;
+    color: var(--primary-dark);
+  }
+
+  .original-product-name {
+    font-size: 0.8rem;
+    color: var(--text-light);
+  }
+
+  .mapping-badge {
+    margin-top: 0.25rem;
+  }
+
+  .mapping-badge .badge {
+    font-size: 0.7rem;
+    padding: 0.25rem 0.5rem;
+  }
+
+  .bg-warning {
+    background-color: var(--warning) !important;
+    color: #000 !important;
+  }
+
+  .bg-info {
+    background-color: var(--info) !important;
+    color: #fff !important;
+  }
+
+  .product-name-content {
+    width: 100%;
+  }
+
+  .quantity-input-wrapper, .remarks-input-wrapper {
+    position: relative;
+    width: 100%;
+  }
+
+  .quantity-input, .remarks-textarea {
+    width: 100%;
+    box-sizing: border-box;
+  }
+
+  .quantity-input {
+    padding-left: 2rem;
+    min-height: 38px;
+  }
+
+  .quantity-icon {
+    position: absolute;
+    left: 0.75rem;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--text-light);
+  }
+
+  .remarks-textarea {
+    padding-left: 2rem;
+    resize: vertical;
+    min-height: 80px;
+    font-family: inherit;
+    font-size: 0.85rem;
+  }
+
+  .remarks-icon {
+    position: absolute;
+    left: 0.75rem;
+    top: 0.75rem;
+    color: var(--text-light);
+  }
+
+  .address-info {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.5rem;
+  }
+
+  .address-info i {
+    color: var(--accent-green);
+    margin-top: 0.2rem;
+    flex-shrink: 0;
+  }
+
+  .address-text {
+    white-space: pre-wrap;
+    word-break: break-word;
+    font-size: 0.85rem;
+    line-height: 1.4;
+    flex: 1;
+  }
+
+  /* Email Section */
+  .email-section {
+    margin-bottom: 2rem;
+    padding: 1.5rem;
+    background: rgba(255, 255, 255, 0.8);
+    border-radius: 12px;
+    border: 1px solid rgba(138, 153, 117, 0.2);
+  }
+
+  .form-group {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
+  .form-group.full-width {
+    width: 100%;
+  }
+
+  .form-label {
+    font-weight: 500;
+    color: var(--text-dark);
+    font-size: 0.9rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  .form-label i {
+    color: var(--accent-green);
+  }
+
+  .email-input-wrapper {
+    position: relative;
+    width: 100%;
+  }
+
+  .email-input {
+    padding-left: 2.5rem;
+    width: 100%;
+    box-sizing: border-box;
+  }
+
+  .email-icon {
+    position: absolute;
+    left: 0.75rem;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--text-light);
+  }
+
+  .form-control {
+    padding: 0.75rem;
+    border: 2px solid var(--border-color);
+    border-radius: 8px;
+    font-size: 0.9rem;
+    transition: all 0.3s ease;
+    font-family: 'Lexend', sans-serif;
+    box-sizing: border-box;
+  }
+
+  .form-control:focus {
+    outline: none;
+    border-color: var(--accent-green);
+    box-shadow: 0 0 0 3px rgba(163, 176, 135, 0.1);
+  }
+
+  /* Submit Section */
+  .submit-section {
+    text-align: center;
+  }
+
+  .form-actions {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 1rem;
+    flex-wrap: wrap;
+  }
+
+  /* Button Styles */
+  .btn-primary, .btn-secondary, .btn-success, .btn-warning, .btn-danger {
+    padding: 0.75rem 1.5rem;
+    border: none;
+    border-radius: 8px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    white-space: nowrap;
+  }
+
+  .btn-primary {
+    background: var(--primary-dark);
+    color: white;
+  }
+
+  .btn-primary:hover {
+    background: var(--primary-light);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(49, 54, 71, 0.3);
+  }
+
+  .btn-success {
+    background: var(--success);
+    color: white;
+  }
+
+  .btn-success:hover {
+    background: #218838;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(40, 167, 69, 0.3);
+  }
+
+  .btn-warning {
+    background: var(--warning);
+    color: white;
+  }
+
+  .btn-warning:hover {
+    background: #e0a800;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(255, 193, 7, 0.3);
+  }
+
+  .btn-danger {
+    background: var(--danger);
+    color: white;
+  }
+
+  .btn-danger:hover {
+    background: #c82333;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(220, 53, 69, 0.3);
+  }
+
+  .btn-primary:disabled, .btn-success:disabled, .btn-warning:disabled, .btn-danger:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    transform: none;
+    box-shadow: none;
+  }
+
+  /* Loader */
+  .loader {
+    display: none;
+    align-items: center;
+    gap: 0.5rem;
+    color: var(--text-light);
+  }
+
+  .loader.visible {
+    display: inline-flex;
+  }
+
+  .spinner-border {
+    width: 1rem;
+    height: 1rem;
+    border-width: 2px;
+    border-color: var(--accent-green) transparent var(--accent-green) transparent;
+  }
+
+  /* Success Message */
+  .success-message {
+    display: none;
+    align-items: center;
+    gap: 0.5rem;
+    color: var(--success);
+    font-weight: 500;
+  }
+
+  .success-message.visible {
+    display: inline-flex;
+    animation: fadeIn 0.5s ease-in-out;
+  }
+
+  @keyframes fadeIn {
+    from {
+      opacity: 0;
+      transform: translateY(-10px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  /* Empty State */
+  .empty-state {
+    text-align: center;
+    padding: 4rem 2rem;
+    background: linear-gradient(135deg, var(--accent-green) 0%, #8a9975 100%);
+    border-radius: 16px;
+    border: 2px solid black;
+  }
+
+  .empty-state-content {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1rem;
+  }
+
+  .empty-state-content i {
+    font-size: 4rem;
+    color: var(--primary-dark);
+    opacity: 0.7;
+  }
+
+  .empty-state-content h3 {
+    color: var(--primary-dark);
+    font-weight: 600;
+  }
+
+  .empty-state-content p {
+    color: var(--primary-dark);
+    opacity: 0.8;
+  }
+
+  /* Responsive Design */
+  @media (max-width: 1200px) {
+    .layout-container {
+      flex-direction: column;
+    }
+    
+    .sidebar {
+      width: 100%;
+      margin: 0;
+      border-radius: 0;
+      position: relative;
+      top: 0;
+      min-height: auto;
+    }
+
+    .vendor-header {
+      flex-direction: column;
+      align-items: flex-start;
+    }
+
+    .vendor-count {
+      align-self: flex-end;
+    }
+  }
+
+  @media (max-width: 768px) {
+    .main-content {
+      padding: 1rem;
+    }
+
+    .page-header {
+      padding: 1.5rem;
+    }
+
+    .page-title {
+      font-size: 1.5rem;
+    }
+
+    .vendor-header {
+      flex-direction: column;
+      gap: 1rem;
+      text-align: left;
+    }
+
+    .vendor-count {
+      align-self: flex-start;
+    }
+
+    .modern-table {
+      font-size: 0.8rem;
+    }
+
+    .modern-table th,
+    .modern-table td {
+      padding: 0.5rem 0.25rem;
+    }
+
+    .action-buttons {
+      flex-direction: column;
+    }
+
+    .form-actions {
+      flex-direction: column;
+    }
+
+    .btn-primary, .btn-success, .btn-warning, .btn-danger {
+      width: 100%;
+      justify-content: center;
+    }
+
+    /* Adjust column widths for mobile */
+    .checkbox-col { width: 40px; min-width: 40px; max-width: 40px; }
+    .sno-col { width: 50px; min-width: 50px; max-width: 50px; }
+    .req-col, .po-col { width: 100px; min-width: 100px; max-width: 100px; }
+    .item-col { width: 120px; min-width: 120px; max-width: 120px; }
+    .qty-col { width: 80px; min-width: 80px; max-width: 80px; }
+    .delivery-col, .address-col, .point-col { width: 100px; min-width: 100px; max-width: 100px; }
+    .detail-col { width: 150px; min-width: 150px; max-width: 150px; }
+    .remarks-col { width: 140px; min-width: 140px; max-width: 140px; }
+  }
+</style>
+
+<script>
+// JavaScript code remains exactly the same as in the previous version
+// Only CSS fixes were applied to resolve the overlapping issues
+document.addEventListener('DOMContentLoaded', function () {
+  const forms = document.querySelectorAll('form[id^="sendMailForm"]');
+  const allSendButtons = document.querySelectorAll('.send-button');
+
+  // Initialize Excel upload functionality for NDDB vendors
+  initializeExcelUpload();
+
+  forms.forEach(form => {
+    const formId = form.id.split('-')[2];
+    const selectAllCheckbox = form.querySelector('.select-all');
+    const productCheckboxes = form.querySelectorAll('.product-checkbox');
+    const sendButton = form.querySelector('.send-button');
+    const successMessage = form.querySelector('.success-message');
+
+    // Select all functionality
+    selectAllCheckbox.addEventListener('change', function () {
+      const isChecked = selectAllCheckbox.checked;
+      productCheckboxes.forEach(checkbox => {
+        checkbox.checked = isChecked;
+      });
+      updateSendButtonState();
+    });
+
+    // Individual checkbox change
+    productCheckboxes.forEach(checkbox => {
+      checkbox.addEventListener('change', updateSendButtonState);
+    });
+
+    function updateSendButtonState() {
+      const hasSelected = Array.from(productCheckboxes).some(checkbox => checkbox.checked);
+      sendButton.style.display = hasSelected ? 'inline-flex' : 'none';
+    }
+
+    // Form submission
+    form.addEventListener('submit', function (event) {
+      event.preventDefault();
+      
+      // Check if Excel processing is required and completed
+      const excelSection = document.getElementById(`excel-upload-${formId}`);
+      const processStatus = document.getElementById(`process-status-${formId}`);
+      const excelFilePathInput = document.getElementById(`excel-file-path-${formId}`);
+      
+      // Fix for the null error - check if elements exist before accessing properties
+      let excelFilePath = '';
+      if (excelFilePathInput) {
+        excelFilePath = excelFilePathInput.value;
+        console.log('Excel file path found:', excelFilePath);
+      } else {
+        console.log('Excel file path input not found for form:', formId);
+      }
+      
+      if (excelSection && excelSection.classList.contains('visible')) {
+        if (!processStatus || !processStatus.classList.contains('status-success') || !excelFilePath) {
+          alert('Please complete the Excel template processing before sending the email.');
+          return;
+        }
+      }
+
+      const formData = new FormData(form);
+      const loader = form.querySelector('.loader');
+
+      // DEBUG: Log what's being sent
+      console.log('Before submitting form:', {
+        hasExcelSection: !!excelSection,
+        excelFilePath: excelFilePath,
+        formDataEntries: Array.from(formData.entries())
+      });
+
+      // Hide all other send buttons
+      allSendButtons.forEach(button => {
+        if (button !== sendButton) {
+          button.style.display = 'none';
+        }
+      });
+
+      loader.classList.add('visible');
+      sendButton.disabled = true;
+
+      fetch(form.action, {
+        method: 'POST',
+        body: formData,
+      })
+        .then(response => response.json())
+        .then(data => {
+          loader.classList.remove('visible');
+          if (data.success) {
+            sendButton.style.display = 'none';
+            successMessage.classList.add('visible');
+            setTimeout(function () {
+              window.location.href = "{% url 'view_purchase_requisitions' %}";
+            }, 3000);
+          } else {
+            alert('Error: ' + data.message);
+            sendButton.disabled = false;
+
+            // Show all other send buttons again
+            allSendButtons.forEach(button => {
+              if (button !== sendButton) {
+                button.style.display = 'inline-flex';
+              }
+            });
+          }
+        })
+        .catch(error => {
+          alert('An error occurred: ' + error.message);
+          loader.classList.remove('visible');
+          sendButton.disabled = false;
+
+          // Show all other send buttons again
+          allSendButtons.forEach(button => {
+            if (button !== sendButton) {
+              button.style.display = 'inline-flex';
+            }
+          });
+        });
+    });
+  });
+});
+
+function initializeExcelUpload() {
+  // Show Excel upload section for NDDB vendors
+  document.querySelectorAll('.vendor-card').forEach((card, index) => {
+    const vendorName = card.querySelector('.vendor-name').textContent;
+    if (vendorName.toLowerCase().includes('nddb')) {
+      const excelSection = document.getElementById(`excel-upload-${index + 1}`);
+      if (excelSection) {
+        excelSection.classList.add('visible');
+      }
+    }
+  });
+
+  // Set up file input change handlers
+  document.querySelectorAll('input[type="file"][id^="excel-file-"]').forEach(input => {
+    input.addEventListener('change', function(e) {
+      const vendorId = this.id.split('-')[2];
+      handleFileUpload(e, vendorId);
+    });
+  });
+
+  // Set up "Choose File" button handlers
+  document.querySelectorAll('.btn-choose-file').forEach(btn => {
+    btn.addEventListener('click', function(e) {
+      e.stopPropagation();
+      const vendorId = this.id.split('-')[3];
+      const fileInput = document.getElementById(`excel-file-${vendorId}`);
+      if (fileInput) {
+        fileInput.click();
+      }
+    });
+  });
+
+  // Set up drag and drop for upload areas
+  document.querySelectorAll('.upload-area').forEach(area => {
+    const areaId = area.id.split('-')[2];
+    
+    area.addEventListener('dragover', function(e) {
+      e.preventDefault();
+      if (!this.classList.contains('disabled')) {
+        this.classList.add('dragover');
+      }
+    });
+
+    area.addEventListener('dragleave', function(e) {
+      e.preventDefault();
+      this.classList.remove('dragover');
+    });
+
+    area.addEventListener('drop', function(e) {
+      e.preventDefault();
+      this.classList.remove('dragover');
+      
+      if (!this.classList.contains('disabled')) {
+        const files = e.dataTransfer.files;
+        if (files.length > 0) {
+          const fileInput = document.getElementById(`excel-file-${areaId}`);
+          if (fileInput) {
+            fileInput.files = files;
+            handleFileUpload({ target: { files: files } }, areaId);
+          }
+        }
+      }
+    });
+  });
+
+  // Set up fill excel buttons
+  document.querySelectorAll('button[id^="fill-excel-btn-"]').forEach(btn => {
+    btn.addEventListener('click', handleFillExcel);
+  });
+
+  // Set up download and remove buttons
+  document.querySelectorAll('button[id^="download-btn-"]').forEach(btn => {
+    btn.addEventListener('click', handleDownload);
+  });
+
+  document.querySelectorAll('button[id^="remove-btn-"]').forEach(btn => {
+    btn.addEventListener('click', handleRemove);
+  });
+}
+
+function handleFileUpload(event, vendorId) {
+  const file = event.target.files[0];
+  
+  if (file) {
+    // Disable the upload area to prevent re-selection
+    const uploadArea = document.getElementById(`upload-area-${vendorId}`);
+    if (uploadArea) {
+      uploadArea.classList.add('disabled');
+    }
+    
+    // Show file info
+    const fileInfo = document.getElementById(`file-info-${vendorId}`);
+    fileInfo.innerHTML = `<strong>Selected File:</strong> ${file.name}`;
+    fileInfo.classList.add('visible');
+    
+    // Store original filename
+    document.getElementById(`original-filename-${vendorId}`).value = file.name;
+    
+    // Upload file first
+    uploadExcelFile(file, vendorId);
+  }
+}
+
+function uploadExcelFile(file, vendorId) {
+  const processStatus = document.getElementById(`process-status-${vendorId}`);
+  const fillExcelButton = document.getElementById(`fill-excel-button-${vendorId}`);
+  const uploadArea = document.getElementById(`upload-area-${vendorId}`);
+
+  if (!processStatus) {
+    console.error('Process status element not found for vendor:', vendorId);
+    return;
+  }
+
+  // Reset previous state
+  processStatus.className = 'process-status status-processing visible';
+  processStatus.innerHTML = '⏳ Uploading Excel file...';
+  
+  const formData = new FormData();
+  formData.append('excel_file', file);
+  formData.append('vendor_id', vendorId);
+  formData.append('action', 'upload');
+
+  // Send file to backend for uploading
+  fetch("{% url 'process_excel_template' %}", {
+    method: 'POST',
+    body: formData,
+    headers: {
+      'X-CSRFToken': '{{ csrf_token }}'
+    }
+  })
+  .then(response => response.json())
+  .then(data => {
+    if (data.success) {
+      processStatus.className = 'process-status status-success visible';
+      processStatus.innerHTML = '✅ Excel file uploaded successfully! Click "Fill Excel with Table Data" to populate the template.';
+      
+      // Hide upload area after successful upload
+      if (uploadArea) {
+        uploadArea.classList.add('hidden');
+      }
+      
+      // Show fill excel button
+      if (fillExcelButton) {
+        fillExcelButton.classList.add('visible');
+      }
+      
+      // Store uploaded file path for later processing
+      if (data.uploaded_file_path) {
+        document.getElementById(`uploaded-file-path-${vendorId}`).value = data.uploaded_file_path;
+        console.log('Stored uploaded file path:', data.uploaded_file_path);
+      }
+    } else {
+      processStatus.className = 'process-status status-error visible';
+      processStatus.innerHTML = `❌ Error: ${data.message}`;
+      
+      // Re-enable upload area on error
+      if (uploadArea) {
+        uploadArea.classList.remove('disabled');
+      }
+    }
+  })
+  .catch(error => {
+    console.error('Error uploading Excel file:', error);
+    processStatus.className = 'process-status status-error visible';
+    processStatus.innerHTML = '❌ Network error: Failed to upload Excel file';
+    
+    // Re-enable upload area on error
+    if (uploadArea) {
+      uploadArea.classList.remove('disabled');
+    }
+  });
+}
+
+function handleFillExcel(event) {
+  const vendorId = event.target.id.split('-')[3];
+  const processStatus = document.getElementById(`process-status-${vendorId}`);
+  const processDetails = document.getElementById(`process-details-${vendorId}`);
+  const actionButtons = document.getElementById(`action-buttons-${vendorId}`);
+  const sendButton = document.getElementById(`send-button-${vendorId}`);
+  const excelFilePathInput = document.getElementById(`excel-file-path-${vendorId}`);
+  const uploadedFilePathInput = document.getElementById(`uploaded-file-path-${vendorId}`);
+  const fillExcelButton = document.getElementById(`fill-excel-button-${vendorId}`);
+  const form = document.getElementById(`sendMailForm-${vendorId}`);
+
+  if (!processStatus) {
+    console.error('Process status element not found for vendor:', vendorId);
+    return;
+  }
+
+  // Reset previous state
+  processStatus.className = 'process-status status-processing visible';
+  processStatus.innerHTML = '⏳ Filling Excel template with table data...';
+  processDetails.innerHTML = '';
+  processDetails.classList.add('visible');
+  actionButtons.classList.remove('visible');
+  if (sendButton) sendButton.disabled = true;
+
+  const uploadedFilePath = uploadedFilePathInput ? uploadedFilePathInput.value : '';
+
+  if (!uploadedFilePath) {
+    processStatus.className = 'process-status status-error visible';
+    processStatus.innerHTML = '❌ No uploaded file found. Please upload the template first.';
+    return;
+  }
+
+  // Get selected items from the table
+  const selectedItems = getSelectedTableData(vendorId);
+  if (selectedItems.length === 0) {
+    processStatus.className = 'process-status status-error visible';
+    processStatus.innerHTML = '❌ Please select at least one item from the table to fill in the Excel.';
+    return;
+  }
+
+  console.log('Selected items to fill:', selectedItems);
+
+  // Send request to fill the Excel template with selected items
+  fetch("{% url 'fill_excel_template' %}", {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-CSRFToken': '{{ csrf_token }}'
+    },
+    body: JSON.stringify({
+      uploaded_file_path: uploadedFilePath,
+      vendor_id: vendorId,
+      selected_items: selectedItems
+    })
+  })
+  .then(response => response.json())
+  .then(data => {
+    if (data.success) {
+      processStatus.className = 'process-status status-success visible';
+      processStatus.innerHTML = '✅ Excel template filled successfully!';
+      
+      // Hide fill excel button
+      if (fillExcelButton) {
+        fillExcelButton.classList.remove('visible');
+      }
+      
+      // Add process details
+      if (data.details) {
+        data.details.forEach(detail => {
+          const stepDiv = document.createElement('div');
+          stepDiv.className = 'process-step';
+          stepDiv.innerHTML = `<span class="text-success">✓</span> ${detail}`;
+          processDetails.appendChild(stepDiv);
+        });
+      }
+      
+      actionButtons.classList.add('visible');
+      if (sendButton) sendButton.disabled = false;
+      
+      // Store processed file path for email attachment
+      if (data.file_path) {
+        if (excelFilePathInput) {
+          excelFilePathInput.value = data.file_path;
+          console.log('Stored processed excel file path in form:', data.file_path);
+        } else {
+          console.error('excel-file-path input not found for vendor:', vendorId);
+        }
+      } else {
+        console.error('No file_path returned from backend');
+      }
+    } else {
+      processStatus.className = 'process-status status-error visible';
+      processStatus.innerHTML = `❌ Error: ${data.message}`;
+      if (sendButton) sendButton.disabled = true;
+    }
+  })
+  .catch(error => {
+    console.error('Error filling Excel template:', error);
+    processStatus.className = 'process-status status-error visible';
+    processStatus.innerHTML = '❌ Network error: Failed to fill Excel template';
+    if (sendButton) sendButton.disabled = true;
+  });
+}
+
+function getSelectedTableData(vendorId) {
+  const form = document.getElementById(`sendMailForm-${vendorId}`);
+  const checkboxes = form.querySelectorAll('.product-checkbox:checked');
+  const selectedItems = [];
+
+  checkboxes.forEach(checkbox => {
+    const row = checkbox.closest('tr');
+    const cells = row.querySelectorAll('td');
+    
+    // Extract data from the table row
+    const itemData = {
+      stock_item: cells[4].querySelector('.original-product-name') ? 
+                  cells[4].querySelector('.original-product-name').textContent.replace('(Original: ', '').replace(')', '').trim() : 
+                  cells[4].textContent.trim(), // Extract original product name
+      mapped_product_name: cells[4].querySelector('.mapped-product-name') ? 
+                          cells[4].querySelector('.mapped-product-name').textContent.trim() : 
+                          cells[4].textContent.trim(), // Use mapped name if available
+      quantity: cells[5].querySelector('input').value, // Quantity input
+      delivery_point_code: cells[8].textContent.trim(), // Delivery Point Code
+      requisition_number: cells[2].textContent.trim(), // Requisition Number
+      po_number: cells[3].textContent.trim(), // PO Number
+      expected_delivery_date: cells[6].textContent.trim(), // Expected Delivery Date
+      location: cells[7].textContent.trim(), // Supply Address
+      address: cells[9].textContent.trim(), // Detailed Address
+      remark: cells[10].querySelector('textarea').value // Remarks
+    };
+    
+    selectedItems.push(itemData);
+  });
+
+  return selectedItems;
+}
+
+function handleDownload(event) {
+  const vendorId = event.target.id.split('-')[2];
+  const processStatus = document.getElementById(`process-status-${vendorId}`);
+  const excelFilePathInput = document.getElementById(`excel-file-path-${vendorId}`);
+  const originalFilename = document.getElementById(`original-filename-${vendorId}`).value;
+  
+  if (!excelFilePathInput || !excelFilePathInput.value) {
+    alert('No processed file available for download');
+    return;
+  }
+
+  processStatus.className = 'process-status status-processing visible';
+  processStatus.innerHTML = '⏳ Preparing download...';
+
+  // Download the processed file
+  fetch("{% url 'download_excel_template' %}", {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-CSRFToken': '{{ csrf_token }}'
+    },
+    body: JSON.stringify({
+      file_path: excelFilePathInput.value,
+      original_filename: originalFilename
+    })
+  })
+  .then(response => response.blob())
+  .then(blob => {
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    
+    // Use original filename with "_filled" suffix
+    const filename = originalFilename ? 
+      originalFilename.replace('.xlsx', '_filled.xlsx').replace('.xls', '_filled.xls') :
+      `delivery_schedule_${vendorId}_${new Date().getTime()}.xlsx`;
+    
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    window.URL.revokeObjectURL(url);
+
+    processStatus.className = 'process-status status-success visible';
+    processStatus.innerHTML = '✅ File downloaded successfully!';
+  })
+  .catch(error => {
+    console.error('Download error:', error);
+    processStatus.className = 'process-status status-error visible';
+    processStatus.innerHTML = '❌ Error downloading file';
+  });
+}
+
+function handleRemove(event) {
+  const vendorId = event.target.id.split('-')[2];
+  const processStatus = document.getElementById(`process-status-${vendorId}`);
+  const processDetails = document.getElementById(`process-details-${vendorId}`);
+  const actionButtons = document.getElementById(`action-buttons-${vendorId}`);
+  const fileInput = document.getElementById(`excel-file-${vendorId}`);
+  const sendButton = document.getElementById(`send-button-${vendorId}`);
+  const excelFilePathInput = document.getElementById(`excel-file-path-${vendorId}`);
+  const uploadedFilePathInput = document.getElementById(`uploaded-file-path-${vendorId}`);
+  const uploadArea = document.getElementById(`upload-area-${vendorId}`);
+  const fileInfo = document.getElementById(`file-info-${vendorId}`);
+  const fillExcelButton = document.getElementById(`fill-excel-button-${vendorId}`);
+
+  // Reset everything
+  processStatus.className = 'process-status';
+  processStatus.innerHTML = '';
+  processDetails.classList.remove('visible');
+  processDetails.innerHTML = '';
+  actionButtons.classList.remove('visible');
+  if (fillExcelButton) fillExcelButton.classList.remove('visible');
+  if (fileInput) fileInput.value = '';
+  if (sendButton) sendButton.disabled = false;
+  if (excelFilePathInput) excelFilePathInput.value = '';
+  if (uploadedFilePathInput) uploadedFilePathInput.value = '';
+  if (uploadArea) {
+    uploadArea.classList.remove('hidden');
+    uploadArea.classList.remove('disabled');
+  }
+  if (fileInfo) {
+    fileInfo.classList.remove('visible');
+    fileInfo.innerHTML = '';
+  }
+}
+</script>
+
+{% endblock %}

@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% block content %}
+<h2>Dispatch Item</h2>
+<form method="post">
+    {% csrf_token %}
+    <input type="hidden" class="idem-key-field" name="idempotency_key">
+    <p>Stock Item: {{ notification.logistic_department.stock_item }}</p>
+    <p>Quantity: {{ notification.logistic_department.quantity }}</p>
+    <p>From Location: {{ notification.logistic_department.from_location }}</p>
+    <label for="quantity">Quantity to Dispatch:</label>
+    <input type="number" name="quantity" id="quantity" max="{{ notification.logistic_department.quantity }}" required>
+    <button type="submit">Dispatch</button>
+</form>
+{% endblock %}

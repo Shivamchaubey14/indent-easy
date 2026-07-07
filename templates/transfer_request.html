@@ -1,0 +1,17 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+</head>
+<body>
+    {% for transfer in transfers %}
+    <p>{{ transfer.product.name }} - {{ transfer.quantity }} units</p>
+    <p>From: {{ transfer.from_user.user.username }}</p>
+    <button onclick="location.href='{% url 'handle_transfer_request' transfer.id 'approve' %}'">✅ Approve</button>
+    <button onclick="location.href='{% url 'handle_transfer_request' transfer.id 'reject' %}'">❌ Reject</button>
+{% endfor %}
+
+</body>
+</html>

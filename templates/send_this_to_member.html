@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div> <h3 class="text-center fw-bold mb-4">Send this to Member</h3></div>
+<div class="container mt-4">
+    <form method="post" action="#">
+        {% csrf_token %}
+        <div class="table-responsive">
+            <table class="table table-bordered mt-3">
+                <thead>
+                    <tr>
+                        <th>Member Code</th>
+                        <th>Member Name</th>
+                        <th>Member Place</th>
+                        <th>Product</th>
+                        <th>Quantity</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <!-- Table row for member details and product -->
+                    <tr>
+                        <td>
+                            <input type="text" class="form-control" name="member_code" placeholder="Enter Member Code" required>
+                        </td>
+                        <td>
+                            <input type="text" class="form-control" name="member_name" placeholder="Enter Member Name" required>
+                        </td>
+                        <td>
+                            <input type="text" class="form-control" name="member_place" placeholder="Enter Member Place" required>
+                        </td>
+                        <td>
+                            <input type="text" class="form-control" name="product" placeholder="Enter Product Name" required>
+                        </td>
+                        <td>
+                            <input type="number" class="form-control" name="quantity" placeholder="Enter Quantity" required>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+        <div class="text-center mt-3">
+            <button type="submit" class="btn btn-primary">Create Bill</button>
+        </div>
+    </form>
+</div>
+{% endblock %}

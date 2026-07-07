@@ -1,0 +1,147 @@
+{% extends "base.html" %} {% block content %} {% load custom_filters %}
+<div class="container mt-4">
+  <div class="row g-4">
+    <div class="col-md-12">
+      <div class="main-card h-100 shadow rounded">
+        <div class="card-body">
+          <div class="text-center mb-3">
+            <h3 class="fw-bold">Your Orders</h3>
+          </div>
+          <table class="table table-bordered">
+            <thead>
+              <tr>
+                <th>S.No.</th>
+                <th>Vendor</th>
+                <th>Product</th>
+                <th>Quantity</th>
+                <th>Created At</th>
+                <th>Status</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for order in orders %}
+              <tr>
+                <td>{{ forloop.counter }}</td>
+                <td>{{ order.vendor }}</td>
+                <td>{{ order.product }}</td>
+                <td>{{ order.quantity }}</td>
+                <td>{{ order.created_at }}</td>
+                <td>{{ order.status }}</td>
+                <td>
+                  <a
+                    href="{% url 'doGRN' %}"
+                    class="btn btn-sm btn-success ms-2"
+                  >
+                    DO GRN
+                  </a>
+                </td>
+              </tr>
+              {% empty %}
+              <tr>
+                <td colspan="6" class="text-center">No orders found.</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+          <div class="pagination-container">
+            <nav aria-label="Page navigation">
+              <ul class="pagination justify-content-center">
+                {% if page_obj.has_previous %}
+                <li class="page-item">
+                  <a
+                    class="page-link"
+                    href="?page={{ page_obj.previous_page_number }}"
+                    aria-label="Previous"
+                  >
+                    <span aria-hidden="true">&laquo;</span>
+                  </a>
+                </li>
+                {% endif %} {% for page in page_obj.paginator.page_range %}
+                <li
+                  class="page-item {% if page == page_obj.number %}active{% endif %}"
+                >
+                  <a class="page-link" href="?page={{ page }}">{{ page }}</a>
+                </li>
+                {% endfor %} {% if page_obj.has_next %}
+                <li class="page-item">
+                  <a
+                    class="page-link"
+                    href="?page={{ page_obj.next_page_number }}"
+                    aria-label="Next"
+                  >
+                    <span aria-hidden="true">&raquo;</span>
+                  </a>
+                </li>
+                {% endif %}
+              </ul>
+            </nav>
+          </div>
+          <div class="text-center mt-3">
+            <button
+              type="button"
+              class="btn btn-primary"
+              data-bs-toggle="modal"
+              data-bs-target="#inventoryModal"
+            >
+              View Inventory
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+<div
+  class="modal fade"
+  id="inventoryModal"
+  tabindex="-1"
+  aria-labelledby="inventoryModalLabel"
+  aria-hidden="true"
+>
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="inventoryModalLabel">Your Inventory</h5>
+        <button
+          type="button"
+          class="btn-close"
+          data-bs-dismiss="modal"
+          aria-label="Close"
+        ></button>
+      </div>
+      <div class="modal-body">
+        <table class="table table-bordered">
+          <tbody>
+            {% for inventory in inventory_items %}
+            <tr>
+              <td>{{ forloop.counter }}</td>
+              <td>{{ inventory.product }}</td>
+              <td>{{ inventory.quantity }}</td>
+              <td>
+                <a
+                  href="{% url 'send-to-mcc' %}"
+                  class="btn btn-sm btn-success ms-2"
+                >
+                  SEND THIS TO MCC
+                </a>
+                <a
+                  href="{% url 'send-to-member' %}"
+                  class="btn btn-sm btn-success ms-2"
+                >
+                  SEND THIS TO MEMBER
+                </a>
+              </td>
+            </tr>
+            {% empty %}
+            <tr>
+              <td colspan="4" class="text-center">No inventory found.</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

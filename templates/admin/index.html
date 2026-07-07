@@ -1,0 +1,22 @@
+{% extends "admin/index.html" %}
+
+{% block content %}
+  <div class="dashboard-module">
+    <h3><a href="{% url 'admin:upload-sql' %}">Upload SQL File</a></h3>
+    
+    <p>Execute SQL files directly from the admin interface.</p>
+    <button style="background-color: #4325f0; color: white; padding: 10px 20px; border: none; border-radius: 5px; cursor: pointer; margin-top: 10px; margin-bottom: 10px;">
+      <a href="{% url 'admin:list-media-files' %}" style="color: white; text-decoration: none;">CLICK TO SEE CHAALANS AND GRNS</a>
+    </button>
+    <button style="background-color: #4325f0; color: white; padding: 10px 20px; border: none; border-radius: 5px; cursor: pointer; margin-top: 10px; margin-bottom: 10px;">
+      <a href="{% url 'custom_admin:edit-choices' %}" style="color: white; text-decoration: none;">CLICK TO ADD CHOICES</a>
+    </button>
+    <button style="background-color: #4325f0; color: white; padding: 10px 20px; border: none; border-radius: 5px; cursor: pointer; margin-top: 10px; margin-bottom: 10px;">
+      <a href="{% url 'custom_admin:download-backup' %}" style="color: white; text-decoration: none;">DOWNLOAD DATABASE BACKUP</a>
+    </button>
+    <button style="background-color: #4325f0; color: white; padding: 10px 20px; border: none; border-radius: 5px; cursor: pointer; margin-top: 10px; margin-bottom: 10px;">
+      <a href="{% url 'custom_admin:inventory_by_location' %}" style="color: white; text-decoration: none;">VIEW INVENTORY BY LOCATION</a>
+    </button>
+  </div>
+  {{ block.super }}
+{% endblock %}

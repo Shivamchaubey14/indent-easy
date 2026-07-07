@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Stock Transfer Note</title>
+    <style>
+        /* Repeated running header on EVERY page via CSS Paged Media.
+           The top margin reserves room for it; @top-center pulls in the
+           element flagged with position: running(stnHeader). */
+        @page {
+            size: A4;
+            /* top margin holds the running header, bottom margin holds the
+               running footer (transporter + signatures) — both repeat on
+               every page. */
+            margin: 150px 40px 210px 40px;
+            @top-center {
+                content: element(stnHeader);
+            }
+            @bottom-center {
+                content: element(stnFooter);
+                vertical-align: top;
+            }
+        }
+
+        body {
+            font-family: Arial, sans-serif;
+            font-size: 12px;            /* matches GRN PDF body */
+            margin: 0;
+            padding: 0;
+            color: #000;
+            background-color: #fff;
+        }
+
+        /* ---- Running header (logo + company), shown on each page ---- */
+        .running-header {
+            position: running(stnHeader);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-bottom: 2px solid black;
+            padding-bottom: 8px;
+            width: 100%;
+        }
+        .running-header .logo {
+            width: 70px;
+            height: 70px;
+            object-fit: contain;
+            margin-right: 18px;
+        }
+        .running-header .header-text {
+            text-align: center;
+        }
+        .running-header .header-text h1 {
+            font-size: 18px;            /* matches GRN PDF h1 */
+            margin: 0;
+            text-transform: uppercase;
+        }
+        .running-header .header-text .addr {
+            font-size: 10px;
+            margin: 3px 0 0;
+        }
+        .running-header .header-text .cin {
+            font-size: 11px;
+            margin: 2px 0 0;
+        }
+        .running-header .header-text .gst {
+            font-size: 11px;
+            margin: 2px 0 0;
+            font-weight: bold;
+        }
+
+        /* ---- Document body ---- */
+        .stn-title {
+            font-size: 20px;            /* matches GRN PDF title */
+            font-weight: bold;
+            text-align: center;
+            margin: 0 0 14px;
+            text-transform: uppercase;
+        }
+
+        .meta-row {
+            display: flex;
+            justify-content: space-between;
+            font-size: 12px;
+            margin-bottom: 8px;
+        }
+
+        .details {
+            font-size: 12px;
+            padding: 8px 0;
+            border-top: 1px solid black;
+            border-bottom: 1px solid black;
+            margin-bottom: 6px;
+        }
+        .details-row {
+            display: flex;
+            justify-content: space-between;
+        }
+        .details-column {
+            width: 48%;
+        }
+        .details-column.right {
+            text-align: right;
+        }
+        .details-column p {
+            margin: 2px 0 0;
+        }
+
+        /* ---- Items table — matches GRN PDF (10px font, 4px padding).
+           thead repeats automatically on each page in WeasyPrint. ---- */
+        .items-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 16px;
+            font-size: 10px;
+            border: 1px solid black;
+        }
+        .items-table th {
+            border: 1px solid black;
+            padding: 4px;
+            text-align: center;
+            background-color: #f2f2f2;
+        }
+        .items-table td {
+            border: 1px solid black;
+            padding: 4px;
+            text-align: center;
+        }
+
+        /* ---- Running footer (transporter + signatures): repeats on EVERY
+           page via @bottom-center. Sized to fit the page bottom margin. ---- */
+        .running-footer {
+            position: running(stnFooter);
+            /* Explicit width = A4 width (793.7px) minus L+R margins (80px),
+               so the footer fills the page instead of shrinking to the
+               auto-sized margin box (which caused heavy text wrapping). */
+            width: 713px;
+        }
+        .transporter {
+            font-size: 11px;
+            padding: 6px 0;
+            border-top: 1px solid black;
+            border-bottom: 1px solid black;
+        }
+        .transporter .details-row {
+            margin-bottom: 4px;
+        }
+        .transporter .details-row:last-child {
+            margin-bottom: 0;
+        }
+
+        .signature-section {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 14px;
+            font-size: 11px;
+        }
+        .signature-box {
+            width: 30%;
+            text-align: center;
+        }
+        .signature-box img {
+            width: 72px;
+            height: 72px;
+            object-fit: contain;
+        }
+        .signature-box .signature-line {
+            width: 100%;
+            height: 1px;
+            background-color: black;
+            margin-top: 40px;
+        }
+        .signature-box p {
+            margin: 5px 0 0;
+            font-weight: bold;
+        }
+        .signature-box .name {
+            font-weight: normal;
+            font-size: 10px;
+        }
+    </style>
+</head>
+<body>
+    <!-- Running header: rendered on every page through @top-center -->
+    <div class="running-header">
+        <img src="{{ logo_url }}" alt="Company Logo" class="logo">
+        <div class="header-text">
+            <h1>{{ company_name }}</h1>
+            <p class="addr">GORAKHNATH COMPLEX, FIRST FLOOR LEFT SIDE, PRAYAGRAJ ROAD, NEAR AWADH UNIVERSITY AYODHYA, AYODHYA, 224001</p>
+            <p class="cin">CIN: U01100UP2016PTC082671</p>
+            <p class="gst">GST N.O. - 09AAXCS0900R1ZJ</p>
+        </div>
+    </div>
+
+    <!-- Running footer: declared early so it appears on EVERY page (a running
+         element only populates its margin box from the page it is first seen).
+         Rendered via @bottom-center. -->
+    <div class="running-footer">
+        <div class="transporter">
+            <div class="details-row">
+                <div class="details-column"><strong>Transporter Name:</strong> {{ transporter_name }}</div>
+                <div class="details-column right"><strong>Vehicle Number:</strong> {{ vehicle_number }}</div>
+            </div>
+            <div class="details-row">
+                <div class="details-column"><strong>Driver's Name:</strong> {{ driver_name }}</div>
+                <div class="details-column right"><strong>Driver's Contact:</strong> {{ driver_contact }}</div>
+            </div>
+        </div>
+
+        <div class="signature-section">
+            <div class="signature-box">
+                {% if prepared_by_signature %}
+                <img src="{{ prepared_by_signature }}" alt="Prepared by Signature">
+                {% else %}
+                <div class="signature-line"></div>
+                {% endif %}
+                <p>Prepared By</p>
+                {% if grn_by %}<div class="name">{{ grn_by }}</div>{% endif %}
+            </div>
+            <div class="signature-box">
+                {% if checked_by_signature %}
+                <img src="{{ checked_by_signature }}" alt="Checked by Signature">
+                {% else %}
+                <div class="signature-line"></div>
+                {% endif %}
+                <p>Checked By</p>
+            </div>
+            <div class="signature-box">
+                {% if approved_by_stamp %}
+                <img src="{{ approved_by_stamp }}" alt="Approved by Stamp">
+                {% else %}
+                <div class="signature-line"></div>
+                {% endif %}
+                <p>Approved By</p>
+            </div>
+        </div>
+    </div>
+
+    <p class="stn-title">Stock Transfer Note</p>
+
+    <div class="meta-row">
+        <div><strong>Date:</strong> {{ today_date }}</div>
+        <div><strong>STN No:</strong> {{ stn_number }}</div>
+    </div>
+
+    <div class="details">
+        <div class="details-row">
+            <div class="details-column">
+                <div><strong>From Location:</strong> {{ from_location }}</div>
+                <div><strong>Detail Address:</strong><p>{{ from_address }}</p></div>
+            </div>
+            <div class="details-column right">
+                <div><strong>To Location:</strong> {{ to_location }}</div>
+                <div><strong>Detail Address:</strong><p>{{ to_address }}</p></div>
+            </div>
+        </div>
+    </div>
+
+    <table class="items-table">
+        <thead>
+            <tr>
+                <th style="width: 12%;">S. No.</th>
+                <th>Stock Item</th>
+                <th style="width: 18%;">Quantity</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for item in items %}
+            <tr>
+                <td>{{ forloop.counter }}</td>
+                <td>{{ item.stock_item }}</td>
+                <td>{{ item.quantity }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</body>
+</html>

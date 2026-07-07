@@ -1,0 +1,526 @@
+{% extends "base.html" %} 
+{% block content %}
+
+<div class="success-animation-container">
+  <div class="success-animation-content">
+    <!-- Animated Checkmark -->
+    <div class="success-animation-icon">
+      <svg
+        class="animated-checkmark"
+        xmlns="http://www.w3.org/2000/svg"
+        viewBox="0 0 52 52"
+      >
+        <circle class="checkmark-circle" cx="26" cy="26" r="25" fill="none" />
+        <path class="checkmark-check" fill="none" d="M16 26l7 7 13-13" />
+      </svg>
+    </div>
+    
+    <!-- Success Message -->
+    <div class="success-message">
+      <h2 class="success-title">Indent Raised Successfully!</h2>
+      <p class="success-subtitle">Your request has been submitted and is being processed</p>
+    </div>
+    
+    <!-- Progress Indicator -->
+    <div class="redirect-progress">
+      <div class="progress-bar">
+        <div class="progress-fill"></div>
+      </div>
+      <p class="redirect-text">Redirecting to your indents...</p>
+    </div>
+    
+    <!-- Action Buttons -->
+    <div class="success-actions">
+      <a href="{% url 'create-an-indent' %}" class="btn btn-secondary">
+        <i class="fas fa-plus"></i>
+        Create Another Indent
+      </a>
+      <a href="{% url 'view-requests' %}" class="btn btn-primary">
+        <i class="fas fa-list"></i>
+        View My Indents
+      </a>
+    </div>
+  </div>
+</div>
+
+<script>
+  // Redirect to the orders page after 3 seconds
+  setTimeout(() => {
+    window.location.href = "{% url 'view-requests' %}";
+  }, 3000);
+</script>
+
+<style>
+  /* Color System Variables */
+  :root {
+    --color-primary: #313647;
+    --color-primary-dark: #252936;
+    --color-secondary: #435663;
+    --color-secondary-light: #516a7a;
+    --color-accent: #A3B087;
+    --color-accent-light: #b5c49b;
+    --color-accent-dark: #8f9d77;
+    --color-background: #FFF8D4;
+    --color-background-light: #fffef9;
+    --color-warning: #EA5B6F;
+    --color-warning-light: #f07a8a;
+    --color-text-primary: #1a1f2e;
+    --color-text-secondary: #5a6876;
+    --color-text-muted: #8a96a1;
+    --color-border: rgba(67, 86, 99, 0.1);
+    --color-border-light: rgba(67, 86, 99, 0.05);
+    --color-shadow: rgba(49, 54, 71, 0.08);
+    --color-shadow-heavy: rgba(49, 54, 71, 0.15);
+    --border-radius-sm: 8px;
+    --border-radius-md: 12px;
+    --border-radius-lg: 16px;
+    --border-radius-xl: 24px;
+    --transition-standard: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    --shadow-sm: 0 2px 8px var(--color-shadow);
+    --shadow-md: 0 4px 16px var(--color-shadow);
+    --shadow-lg: 0 8px 32px var(--color-shadow-heavy);
+    --shadow-elevated: 0 12px 48px rgba(49, 54, 71, 0.12);
+  }
+
+  /* Success Animation Container */
+  .success-animation-container {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: calc(100vh - 90px);
+    background: linear-gradient(135deg, 
+      rgba(255, 248, 212, 0.3) 0%, 
+      rgba(163, 176, 135, 0.15) 50%, 
+      rgba(67, 86, 99, 0.05) 100%);
+    padding: 2rem;
+    font-family: 'Lexend', sans-serif;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .success-animation-container::before {
+    content: '';
+    position: absolute;
+    top: -50%;
+    right: -50%;
+    width: 100%;
+    height: 100%;
+    background: radial-gradient(circle at 70% 30%, 
+      rgba(163, 176, 135, 0.08) 0%, 
+      transparent 50%);
+    z-index: 0;
+  }
+
+  .success-animation-content {
+    background: linear-gradient(135deg, 
+      var(--color-background-light) 0%, 
+      rgba(255, 255, 255, 0.95) 100%);
+    border-radius: var(--border-radius-xl);
+    box-shadow: var(--shadow-elevated);
+    padding: 3.5rem 3rem;
+    text-align: center;
+    max-width: 520px;
+    width: 100%;
+    border: 1px solid var(--color-border);
+    position: relative;
+    z-index: 1;
+    animation: fadeInUp 0.6s cubic-bezier(0.23, 1, 0.32, 1) forwards;
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+  }
+
+  /* Animated Checkmark */
+  .success-animation-icon {
+    margin-bottom: 2rem;
+    position: relative;
+  }
+
+  .animated-checkmark {
+    width: 120px;
+    height: 120px;
+    display: block;
+    stroke-width: 2.5;
+    stroke: var(--color-accent);
+    stroke-miterlimit: 10;
+    margin: 0 auto;
+    filter: drop-shadow(0 8px 24px rgba(163, 176, 135, 0.25));
+  }
+
+  .checkmark-circle {
+    stroke-dasharray: 166;
+    stroke-dashoffset: 166;
+    stroke-width: 2.5;
+    stroke-miterlimit: 10;
+    fill: rgba(163, 176, 135, 0.05);
+    stroke: var(--color-accent);
+    animation: stroke 0.6s cubic-bezier(0.65, 0, 0.45, 1) forwards;
+  }
+
+  .checkmark-check {
+    transform-origin: 50% 50%;
+    stroke-dasharray: 48;
+    stroke-dashoffset: 48;
+    stroke: var(--color-accent);
+    animation: 
+      stroke 0.3s cubic-bezier(0.65, 0, 0.45, 1) 0.8s forwards,
+      scale 0.2s cubic-bezier(0.68, -0.55, 0.265, 1.55) 1.1s both;
+  }
+
+  @keyframes stroke {
+    100% {
+      stroke-dashoffset: 0;
+    }
+  }
+
+  @keyframes scale {
+    0% {
+      transform: scale(0.9);
+      opacity: 0;
+    }
+    70% {
+      transform: scale(1.1);
+    }
+    100% {
+      transform: scale(1);
+      opacity: 1;
+    }
+  }
+
+  @keyframes fadeInUp {
+    from {
+      opacity: 0;
+      transform: translate3d(0, 40px, 0) scale(0.95);
+    }
+    to {
+      opacity: 1;
+      transform: translate3d(0, 0, 0) scale(1);
+    }
+  }
+
+  /* Success Message */
+  .success-message {
+    margin-bottom: 2.5rem;
+    padding: 0 1rem;
+  }
+
+  .success-title {
+    font-size: 2rem;
+    font-weight: 700;
+    color: var(--color-primary);
+    margin-bottom: 1rem;
+    animation: fadeIn 0.5s cubic-bezier(0.4, 0, 0.2, 1) 0.4s both;
+    letter-spacing: -0.5px;
+    line-height: 1.3;
+  }
+
+  .success-subtitle {
+    font-size: 1.05rem;
+    color: var(--color-text-secondary);
+    line-height: 1.6;
+    animation: fadeIn 0.5s cubic-bezier(0.4, 0, 0.2, 1) 0.6s both;
+    max-width: 380px;
+    margin: 0 auto;
+    font-weight: 400;
+  }
+
+  @keyframes fadeIn {
+    from {
+      opacity: 0;
+      transform: translateY(10px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  /* Progress Bar */
+  .redirect-progress {
+    margin-bottom: 2.5rem;
+    animation: fadeIn 0.5s cubic-bezier(0.4, 0, 0.2, 1) 0.8s both;
+  }
+
+  .progress-bar {
+    width: 100%;
+    height: 6px;
+    background: var(--color-border-light);
+    border-radius: 100px;
+    overflow: hidden;
+    margin-bottom: 1rem;
+    position: relative;
+  }
+
+  .progress-bar::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: linear-gradient(90deg, 
+      transparent 0%, 
+      rgba(255, 255, 255, 0.4) 50%, 
+      transparent 100%);
+    animation: shimmer 2s infinite;
+  }
+
+  .progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, 
+      var(--color-accent) 0%, 
+      var(--color-accent-light) 50%, 
+      var(--color-accent) 100%);
+    border-radius: 100px;
+    width: 0%;
+    animation: progressFill 3s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+    position: relative;
+    z-index: 2;
+    box-shadow: 0 2px 8px rgba(163, 176, 135, 0.3);
+  }
+
+  @keyframes progressFill {
+    0% {
+      width: 0%;
+    }
+    100% {
+      width: 100%;
+    }
+  }
+
+  @keyframes shimmer {
+    0% {
+      transform: translateX(-100%);
+    }
+    100% {
+      transform: translateX(100%);
+    }
+  }
+
+  .redirect-text {
+    font-size: 0.95rem;
+    color: var(--color-text-muted);
+    margin: 0;
+    font-weight: 500;
+    letter-spacing: 0.3px;
+  }
+
+  /* Action Buttons */
+  .success-actions {
+    display: flex;
+    gap: 1.25rem;
+    justify-content: center;
+    flex-wrap: wrap;
+    animation: fadeIn 0.5s cubic-bezier(0.4, 0, 0.2, 1) 1s both;
+  }
+
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.75rem;
+    padding: 1rem 2rem;
+    border-radius: var(--border-radius-md);
+    font-weight: 600;
+    text-decoration: none;
+    transition: var(--transition-standard);
+    font-size: 0.95rem;
+    border: none;
+    cursor: pointer;
+    font-family: 'Lexend', sans-serif;
+    letter-spacing: 0.3px;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .btn::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, 
+      transparent, 
+      rgba(255, 255, 255, 0.2), 
+      transparent);
+    transition: left 0.7s ease;
+  }
+
+  .btn:hover::after {
+    left: 100%;
+  }
+
+  .btn-primary {
+    background: linear-gradient(135deg, 
+      var(--color-primary) 0%, 
+      var(--color-secondary) 100%);
+    color: white;
+    box-shadow: var(--shadow-md);
+  }
+
+  .btn-primary:hover {
+    transform: translateY(-3px);
+    box-shadow: var(--shadow-lg);
+    background: linear-gradient(135deg, 
+      var(--color-primary-dark) 0%, 
+      var(--color-secondary-light) 100%);
+  }
+
+  .btn-primary:active {
+    transform: translateY(-1px);
+    box-shadow: var(--shadow-md);
+  }
+
+  .btn-secondary {
+    background: transparent;
+    color: var(--color-secondary);
+    border: 2px solid rgba(67, 86, 99, 0.2);
+    box-shadow: 0 2px 8px rgba(67, 86, 99, 0.08);
+  }
+
+  .btn-secondary:hover {
+    background: rgba(163, 176, 135, 0.08);
+    border-color: var(--color-accent);
+    transform: translateY(-3px);
+    box-shadow: var(--shadow-md);
+    color: var(--color-primary);
+  }
+
+  .btn-secondary:active {
+    transform: translateY(-1px);
+  }
+
+  .btn i {
+    font-size: 1.1em;
+    transition: transform 0.3s ease;
+  }
+
+  .btn:hover i {
+    transform: translateX(2px);
+  }
+
+  /* Responsive Design */
+  @media (max-width: 768px) {
+    .success-animation-container {
+      padding: 1.5rem;
+      min-height: calc(100vh - 80px);
+    }
+    
+    .success-animation-content {
+      padding: 2.5rem 2rem;
+      border-radius: var(--border-radius-lg);
+    }
+    
+    .success-title {
+      font-size: 1.75rem;
+    }
+    
+    .success-subtitle {
+      font-size: 1rem;
+    }
+    
+    .animated-checkmark {
+      width: 100px;
+      height: 100px;
+    }
+    
+    .btn {
+      padding: 0.875rem 1.75rem;
+      font-size: 0.9rem;
+    }
+  }
+
+  @media (max-width: 576px) {
+    .success-animation-container {
+      padding: 1rem;
+    }
+    
+    .success-animation-content {
+      padding: 2rem 1.5rem;
+      border-radius: var(--border-radius-md);
+    }
+    
+    .success-title {
+      font-size: 1.5rem;
+      margin-bottom: 0.75rem;
+    }
+    
+    .success-subtitle {
+      font-size: 0.95rem;
+      line-height: 1.5;
+    }
+    
+    .success-actions {
+      flex-direction: column;
+      gap: 1rem;
+    }
+    
+    .btn {
+      width: 100%;
+      justify-content: center;
+      padding: 0.875rem 1.5rem;
+    }
+    
+    .animated-checkmark {
+      width: 90px;
+      height: 90px;
+    }
+    
+    .redirect-progress {
+      margin-bottom: 2rem;
+    }
+  }
+
+  @media (max-width: 380px) {
+    .success-animation-content {
+      padding: 1.75rem 1.25rem;
+    }
+    
+    .success-title {
+      font-size: 1.35rem;
+    }
+    
+    .success-subtitle {
+      font-size: 0.9rem;
+    }
+  }
+
+  /* Dark mode support */
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --color-primary: #3d445e;
+      --color-secondary: #5a7385;
+      --color-accent: #a9bc93;
+      --color-background-light: #1a1d2a;
+      --color-text-primary: #f0f2f5;
+      --color-text-secondary: #c8d0d7;
+      --color-text-muted: #8a96a1;
+      --color-border: rgba(255, 255, 255, 0.1);
+      --color-border-light: rgba(255, 255, 255, 0.05);
+    }
+    
+    .success-animation-container {
+      background: linear-gradient(135deg, 
+        rgba(26, 29, 42, 0.8) 0%, 
+        rgba(58, 65, 94, 0.4) 100%);
+    }
+    
+    .success-animation-content {
+      background: linear-gradient(135deg, 
+        rgba(38, 42, 58, 0.95) 0%, 
+        rgba(48, 54, 77, 0.9) 100%);
+      border-color: rgba(255, 255, 255, 0.08);
+    }
+    
+    .btn-secondary {
+      border-color: rgba(255, 255, 255, 0.15);
+      color: var(--color-text-secondary);
+    }
+    
+    .btn-secondary:hover {
+      background: rgba(255, 255, 255, 0.05);
+    }
+  }
+</style>
+
+{% endblock %}

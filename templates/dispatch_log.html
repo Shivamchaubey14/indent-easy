@@ -1,0 +1,79 @@
+{% extends "base.html" %}
+{% block title %}Dispatch Log{% endblock %}
+{% block content %}
+<div class="text-center">
+    <h2 class="fw-bold mb-4">Dispatch Log</h2>
+</div>
+
+<!-- Search Box -->
+<div class="container mb-4">
+    <div class="w-50 d-flex justify-content-center">
+        <form id="searchForm" class="d-flex w-100" method="GET" action="{% url 'dispatch_log_book' %}">
+          <div class="input-group">
+            <input
+              type="search"
+              id="searchInput"
+              name="search"
+              class="form-control rounded-pill"
+              placeholder="Search by Stock Item, From/To Location, Dispatched By, or Date..."
+              value="{{ search_query|default:'' }}"
+              style="
+                border-radius: 30px;
+                padding: 10px 15px;
+                margin-bottom: 10px;
+                margin-top: 10px;
+                border-right-width: 2;
+              "
+            />
+            <button
+              class="btn btn-primary"
+              type="submit"
+              id="searchButton"
+              style="
+                border-radius: 30px;
+                padding: 10px 20px;
+                margin-left: 5px;
+              "
+            >
+              Search
+            </button>
+          </div>
+        </form>
+      </div>
+</div>
+
+<div class="container mt-4">
+    <div class="table-responsive">
+        <table class="table table-bordered">
+            <thead>
+                <tr>
+                    <th>S.No</th>
+                    <th>Stock Item</th>
+                    <th>Quantity</th>
+                    <th>From Location</th>
+                    <th>To Location</th>
+                    <th>Dispatched By</th>
+                    <th>Dispatched At</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for log in dispatch_logs %}
+                <tr>
+                    <td>{{ forloop.counter }}</td>
+                    <td>{{ log.logistic_department.stock_item }}</td>
+                    <td>{{ log.quantity }}</td>
+                    <td>{{ log.logistic_department.from_location }}</td>
+                    <td>{{ log.logistic_department.to_location }}</td>
+                    <td>{{ log.dispatched_by.get_full_name }}</td>
+                    <td>{{ log.dispatched_at|date:"d-m-Y H:i:s" }}</td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="7" class="text-center">No dispatch logs found.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

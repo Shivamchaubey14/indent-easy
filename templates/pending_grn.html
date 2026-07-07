@@ -1,0 +1,80 @@
+{% extends "base.html" %}
+{% block content %}
+
+<head>
+    <meta charset="UTF-8">
+    <title>Pending GRNs</title>
+    <style>
+        .centered-table {
+            margin: auto;
+            width: 80%;
+            border-collapse: separate;
+            border-spacing: 0;
+            border: 1px solid #ddd;
+            border-radius: 10px;
+            overflow: hidden;
+        }
+        .centered-table th, .centered-table td {
+            padding: 10px;
+            text-align: center;
+        }
+        .centered-table th {
+            background-color: #f2f2f2;
+        }
+        .centered-table tbody tr:nth-child(even) {
+            background-color: #f9f9f9;
+        }
+        .centered-table tbody tr:hover {
+            background-color: #f1f1f1;
+        }
+        .centered-table button {
+            background-color: #007bff;
+            color: white;
+            border: none;
+            padding: 5px 10px;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        .centered-table button:hover {
+            background-color: #0056b3;
+        }
+    </style>
+</head>
+<body>
+    <h1 class="text-center">Pending GRNs</h1>
+    <div class="container mt-5">
+        <table class="centered-table">
+            <thead>
+                <tr>
+                    <th>PO Number</th>
+                    <th>Stock Item</th>
+                    <th>Quantity Ordered</th>
+                    <th>Remaining Quantity</th>
+                    <th>Action</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for grn in pending_grns %}
+                    {% if grn.quantity_remaining > 0 %}
+                        <tr>
+                            <td>{{ grn.po_number }}</td>
+                            <td>{{ grn.stock_item }}</td>
+                            <td>{{ grn.quantity_ordered }}</td>
+                            <td>{{ grn.quantity_remaining }}</td>
+                            <td> 
+                                <a href="{% url 'do-grn' grn.po_number %}" class="btn btn-primary" style="text-decoration: none">
+                                    DO GRN
+                                </a>
+                            </td>
+                        </tr>
+                    {% endif %}
+                {% empty %}
+                    <tr>
+                        <td colspan="5">No pending GRNs found.</td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</body>
+{% endblock %}

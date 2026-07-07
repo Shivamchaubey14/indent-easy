@@ -1,0 +1,259 @@
+{% extends "base.html" %}
+{% block content %}
+
+<div class="layout-container">
+  <!-- Sidebar -->
+  <aside class="sidebar">
+    <div class="sidebar-content">
+      <div class="user-welcome">
+        <div class="welcome-header">
+          <h1 class="welcome-title">Hello! <span class="wave-emoji">👋</span></h1>
+          <p class="user-name">{{ request.user.first_name }} {{ request.user.last_name }}</p>
+          <div class="user-details">
+            <span class="detail-badge"><i class="fas fa-id-badge"></i> {{ request.user.employee_code }}</span>
+            <span class="detail-badge"><i class="fas fa-map-marker-alt"></i> {{ request.user.location }}</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="quick-actions">
+        <h3 class="section-title">Quick Actions</h3>
+        <a href="{% url 'incoming_stns' %}" class="action-btn active" style="text-decoration:none;">
+          <i class="fas fa-inbox"></i><span>Incoming STNs</span>
+        </a>
+        <a href="{% url 'create_stn' %}" class="action-btn" style="text-decoration:none;">
+          <i class="fas fa-truck-loading"></i><span>Create Stock Transfer Note</span>
+        </a>
+        <a href="{% url 'view_stns' %}" class="action-btn" style="text-decoration:none;">
+          <i class="fas fa-file-pdf"></i><span>View Your STN</span>
+        </a>
+        <a href="{% url 'view_inventory' %}" class="action-btn" style="text-decoration:none;">
+          <i class="fas fa-cube"></i><span>View Inventory</span>
+        </a>
+        <a href="{% url 'create-an-indent' %}" class="action-btn" style="text-decoration:none;">
+          <i class="fas fa-plus-circle"></i><span>Create an Indent</span>
+        </a>
+        <a href="{% url 'view-requests' %}" class="action-btn" style="text-decoration:none;">
+          <i class="fas fa-clipboard-list"></i><span>View Your Indents</span>
+        </a>
+      </div>
+    </div>
+  </aside>
+
+  <!-- Main Content -->
+  <main class="main-content">
+    <div class="page-header">
+      <div class="header-content">
+        <div class="header-text">
+          <h1 class="page-title"><i class="fas fa-inbox"></i> Incoming Stock Transfers</h1>
+          <p class="page-subtitle">Transfers sent to {{ request.user.location }} — receive them to add the items to your inventory</p>
+        </div>
+      </div>
+    </div>
+
+    {% if messages %}
+    <div class="msg-stack">
+      {% for message in messages %}
+      <div class="msg {{ message.tags }}"><i class="fas fa-info-circle"></i> {{ message }}</div>
+      {% endfor %}
+    </div>
+    {% endif %}
+
+    <!-- Filter / tabs -->
+    <div class="filter-card">
+      <form method="get" class="filter-form">
+        <div class="tabs">
+          <a class="tab {% if show == 'pending' %}active{% endif %}" href="?show=pending">
+            <i class="fas fa-clock"></i> Pending {% if pending_count %}<span class="tab-badge">{{ pending_count }}</span>{% endif %}
+          </a>
+          <a class="tab {% if show == 'received' %}active{% endif %}" href="?show=received"><i class="fas fa-check"></i> Received</a>
+          <a class="tab {% if show == 'all' %}active{% endif %}" href="?show=all"><i class="fas fa-list"></i> All</a>
+        </div>
+        <div class="search-inline">
+          <input type="hidden" name="show" value="{{ show }}" />
+          <input type="text" name="search" value="{{ search }}" placeholder="Search STN number…" />
+          <button type="submit" class="btn btn-primary"><i class="fas fa-search"></i> Search</button>
+        </div>
+      </form>
+    </div>
+
+    <!-- Table -->
+    <div class="table-wrapper">
+      <div class="table-container">
+        <table class="modern-table">
+          <thead>
+            <tr>
+              <th>STN No.</th>
+              <th>From Location</th>
+              <th>Date</th>
+              <th>Items</th>
+              <th>Status</th>
+              <th>Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for stn in stns %}
+            <tr>
+              <td><span class="req-number">{{ stn.stn_number }}</span></td>
+              <td>{{ stn.from_location }}</td>
+              <td>
+                <div class="datetime-cell">
+                  <span class="date-text">{{ stn.created_at|date:"d M Y" }}</span>
+                  <span class="time-text">{{ stn.created_at|date:"h:i A" }}</span>
+                </div>
+              </td>
+              <td>{{ stn.items.count }}</td>
+              <td>
+                {% if stn.is_received %}
+                <span class="status-badge received"><i class="fas fa-check-circle"></i> Received</span>
+                {% if stn.grn_number %}<div class="grn-no">{{ stn.grn_number }}</div>{% endif %}
+                {% else %}
+                <span class="status-badge pending"><i class="fas fa-clock"></i> Pending</span>
+                {% endif %}
+              </td>
+              <td>
+                <div class="row-actions">
+                  {% if stn.is_received %}
+                  <a class="btn-dl" href="{% url 'download_stn_grn_pdf' stn.stn_number %}"><i class="fas fa-file-pdf"></i> STN GRN PDF</a>
+                  <a class="btn-grn" href="{% url 'stn_grn_detail' stn.stn_number %}"><i class="fas fa-clipboard-check"></i> View GRN</a>
+                  {% if stn.proof %}
+                  <a class="btn-proof" href="{{ stn.proof.url }}" target="_blank"><i class="fas fa-paperclip"></i> Proof</a>
+                  {% endif %}
+                  {% else %}
+                  <a class="btn-dl" href="{% url 'download_stn_pdf' stn.stn_number %}"><i class="fas fa-file-pdf"></i> STN</a>
+                  <a class="btn-receive" href="{% url 'receive_stn' stn.stn_number %}"><i class="fas fa-inbox"></i> Receive / GRN</a>
+                  {% endif %}
+                </div>
+              </td>
+            </tr>
+            {% empty %}
+            <tr>
+              <td colspan="6">
+                <div class="empty-state">
+                  <i class="fas fa-inbox"></i>
+                  <p>No incoming transfers{% if show == 'pending' %} pending{% endif %}.</p>
+                </div>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+
+      {% if page_obj.paginator.num_pages > 1 %}
+      <div class="pagination-bar">
+        {% if page_obj.has_previous %}
+        <a class="page-link" href="?page={{ page_obj.previous_page_number }}&show={{ show }}&search={{ search }}"><i class="fas fa-chevron-left"></i> Prev</a>
+        {% endif %}
+        <span class="page-info">Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span>
+        {% if page_obj.has_next %}
+        <a class="page-link" href="?page={{ page_obj.next_page_number }}&show={{ show }}&search={{ search }}">Next <i class="fas fa-chevron-right"></i></a>
+        {% endif %}
+      </div>
+      {% endif %}
+    </div>
+  </main>
+</div>
+
+<style>
+  :root {
+    --primary-dark: #313647; --primary-light: #435663; --accent-green: #A3B087;
+    --accent-red: #EA5B6F; --accent-yellow: #FFF8D4; --text-dark: #2c3e50;
+    --text-light: #7f8c8d; --border-color: #e9ecef; --success: #28a745; --danger: #dc3545;
+  }
+  * { box-sizing: border-box; }
+  body { font-family: 'Lexend', sans-serif; color: var(--text-dark); background: #fff; }
+  .layout-container { display: flex; min-height: calc(100vh - 90px); background: #fff; align-items: stretch; }
+
+  .sidebar { width: 320px; background: var(--primary-dark); color: #fff; padding: 2rem 1.5rem; box-shadow: 2px 0 20px rgba(0,0,0,.1); border-radius: 0 20px 20px 0; position: sticky; top: 90px; min-height: calc(100vh - 90px); overflow-y: auto; flex-shrink: 0; margin-top: 40px; margin-left: 10px; }
+  .sidebar-content { display: flex; flex-direction: column; gap: 2rem; }
+  .user-welcome { text-align: center; padding-bottom: 1.5rem; border-bottom: 1px solid rgba(255,255,255,.1); }
+  .welcome-title { font-size: 1.5rem; font-weight: 600; margin-bottom: .5rem; color: var(--accent-green); }
+  .wave-emoji { display: inline-block; animation: wave 1.5s ease-in-out infinite; }
+  @keyframes wave { 0%,100%{transform:rotate(0)} 25%{transform:rotate(15deg)} 75%{transform:rotate(-10deg)} }
+  .user-name { font-size: 1.1rem; color: var(--accent-yellow); font-weight: 500; margin-bottom: 1rem; }
+  .user-details { display: flex; flex-direction: column; gap: .5rem; align-items: center; }
+  .detail-badge { display: inline-flex; align-items: center; gap: .5rem; padding: .4rem .8rem; background: rgba(163,176,135,.1); border-radius: 20px; font-size: .85rem; color: rgba(255,255,255,.9); }
+  .detail-badge i { color: var(--accent-green); }
+  .quick-actions { display: flex; flex-direction: column; gap: .75rem; }
+  .section-title { font-size: 1.1rem; color: var(--accent-yellow); margin-bottom: .5rem; font-weight: 500; }
+  .action-btn { display: flex; align-items: center; gap: .75rem; padding: .875rem 1rem; background: rgba(163,176,135,.1); color: var(--accent-yellow); text-decoration: none; border-radius: 10px; transition: all .3s ease; border: 1px solid rgba(163,176,135,.2); }
+  .action-btn:hover { background: rgba(163,176,135,.2); color: #fff; transform: translateX(5px); }
+  .action-btn.active { background: var(--accent-green); color: var(--primary-dark); font-weight: 600; }
+  .action-btn.active i { color: var(--primary-dark); }
+  .action-btn i { color: var(--accent-green); font-size: 1.1rem; }
+  .action-btn span { flex: 1; }
+
+  .main-content { flex: 1; background: #fff; padding: 2rem; min-height: calc(100vh - 90px); display: flex; flex-direction: column; gap: 1.5rem; }
+  .page-header { background: linear-gradient(135deg, var(--accent-green) 0%, #8a9975 100%); border-radius: 20px; padding: 1.5rem 2rem; box-shadow: 0 8px 32px rgba(163,176,135,.2); border: 2px solid #000; }
+  .header-text { text-align: center; }
+  .page-title { font-size: 2rem; font-weight: 700; color: #313647; margin-bottom: .5rem; display: flex; align-items: center; justify-content: center; gap: .75rem; }
+  .page-title i { font-size: 1.75rem; }
+  .page-subtitle { font-size: 1rem; color: #313647; }
+
+  .msg-stack { display: flex; flex-direction: column; gap: .5rem; }
+  .msg { padding: .85rem 1.1rem; border-radius: 8px; font-weight: 500; display: flex; align-items: center; gap: .5rem; }
+  .msg.success { background: rgba(40,167,69,.12); color: #1e7e34; border-left: 4px solid var(--success); }
+  .msg.error { background: rgba(234,91,111,.12); color: #8a2330; border-left: 4px solid var(--accent-red); }
+  .msg.info { background: rgba(23,162,184,.12); color: #0c5460; border-left: 4px solid #17a2b8; }
+
+  .filter-card { background: #fff; border: 2px solid #000; border-radius: 16px; padding: 1.1rem 1.5rem; box-shadow: 0 6px 22px rgba(49,54,71,.08); }
+  .filter-form { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem; }
+  .tabs { display: flex; gap: .5rem; flex-wrap: wrap; }
+  .tab { display: inline-flex; align-items: center; gap: .4rem; padding: .55rem 1rem; border-radius: 8px; text-decoration: none; color: var(--text-dark); background: #f1f3f5; font-weight: 600; font-size: .9rem; }
+  .tab.active { background: var(--primary-dark); color: #fff; }
+  .tab-badge { background: var(--accent-red); color: #fff; border-radius: 12px; padding: 0 .5rem; font-size: .75rem; }
+  .search-inline { display: flex; gap: .5rem; }
+  .search-inline input { border: 2px solid var(--border-color); border-radius: 8px; padding: .6rem; font-size: .9rem; min-width: 200px; font-family: 'Lexend', sans-serif; }
+  .search-inline input:focus { outline: none; border-color: var(--accent-green); }
+
+  .btn { display: inline-flex; align-items: center; gap: .5rem; padding: .6rem 1.1rem; border: none; border-radius: 8px; font-weight: 600; font-size: .9rem; cursor: pointer; text-decoration: none; }
+  .btn-primary { background: var(--primary-dark); color: #fff; }
+  .btn-primary:hover { background: var(--primary-light); }
+
+  .table-wrapper { background: linear-gradient(135deg, var(--accent-green) 0%, #8a9975 100%); border-radius: 16px; border: 2px solid #000; box-shadow: 0 8px 32px rgba(163,176,135,.2); overflow: hidden; }
+  .table-container { overflow-x: auto; background: rgba(255,255,255,.95); }
+  .modern-table { width: 100%; border-collapse: collapse; }
+  .modern-table thead { background: var(--primary-dark); }
+  .modern-table th { background: var(--primary-dark); color: #fff; padding: 1rem; font-weight: 600; text-align: left; font-size: .9rem; white-space: nowrap; border-bottom: 2px solid #8a9975; }
+  .modern-table td { padding: 1rem; border-bottom: 1px solid rgba(138,153,117,.2); vertical-align: middle; font-size: .9rem; background: rgba(255,255,255,.92); }
+  .modern-table tbody tr:hover td { background: #fff; }
+  .req-number { font-weight: 600; color: var(--primary-dark); }
+  .datetime-cell { display: flex; flex-direction: column; gap: .15rem; }
+  .date-text { font-weight: 500; }
+  .time-text { font-size: .82rem; color: var(--text-light); }
+  .status-badge { display: inline-flex; align-items: center; gap: .35rem; padding: .3rem .7rem; border-radius: 20px; font-size: .8rem; font-weight: 600; }
+  .status-badge.received { background: rgba(40,167,69,.15); color: #1e7e34; }
+  .status-badge.pending { background: rgba(255,193,7,.18); color: #946200; }
+  .row-actions { display: flex; gap: .5rem; align-items: center; flex-wrap: wrap; }
+  .btn-dl { background: #1d6f42; color: #fff; padding: .45rem .8rem; border-radius: 6px; text-decoration: none; font-size: .82rem; display: inline-flex; align-items: center; gap: .4rem; }
+  .btn-dl:hover { background: #155731; color: #fff; }
+  .btn-receive { background: var(--primary-dark); color: #fff; border: none; padding: .45rem .9rem; border-radius: 6px; font-size: .82rem; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: .4rem; text-decoration: none; }
+  .btn-receive:hover { background: var(--primary-light); color: #fff; }
+  .btn-grn { background: #b8860b; color: #fff; padding: .45rem .8rem; border-radius: 6px; text-decoration: none; font-size: .82rem; display: inline-flex; align-items: center; gap: .4rem; }
+  .btn-grn:hover { background: #9c7109; color: #fff; }
+  .btn-proof { background: #6c757d; color: #fff; padding: .45rem .8rem; border-radius: 6px; text-decoration: none; font-size: .82rem; display: inline-flex; align-items: center; gap: .4rem; }
+  .btn-proof:hover { background: #565e64; color: #fff; }
+  .grn-no { font-size: .75rem; color: var(--text-light); margin-top: .25rem; font-weight: 600; }
+  .empty-state { text-align: center; padding: 2.5rem; color: var(--text-light); }
+  .empty-state i { font-size: 2.5rem; opacity: .5; margin-bottom: .75rem; }
+
+  .pagination-bar { display: flex; align-items: center; justify-content: center; gap: 1rem; padding: 1.25rem; background: rgba(255,255,255,.95); }
+  .page-link { display: inline-flex; align-items: center; gap: .4rem; padding: .5rem 1rem; background: var(--primary-dark); color: #fff; border-radius: 8px; text-decoration: none; font-size: .88rem; }
+  .page-link:hover { background: var(--primary-light); color: #fff; }
+  .page-info { font-weight: 600; color: var(--primary-dark); }
+
+  @media (max-width: 1200px) {
+    .layout-container { flex-direction: column; }
+    .sidebar { width: 100%; margin: 0; border-radius: 0; position: relative; top: 0; min-height: auto; }
+  }
+  @media (max-width: 768px) {
+    .main-content { padding: 1rem; }
+    .page-title { font-size: 1.5rem; }
+    .filter-form { flex-direction: column; align-items: stretch; }
+    .modern-table { font-size: .8rem; }
+    .modern-table th, .modern-table td { padding: .5rem; }
+  }
+</style>
+
+{% endblock %}

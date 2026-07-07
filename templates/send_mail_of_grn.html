@@ -1,0 +1,131 @@
+{% extends "base.html" %}
+
+{% block title %}GRN Submission{% endblock %}
+
+{% block content %}
+<div class="container">
+    {% if message %}
+        <div class="alert alert-info text-center">
+            {{ message }}
+        </div>
+    {% else %}
+        <div class="row justify-content-center">
+            {% for requisition in requisitions %}
+            <div class="col-md-12 mb-4">
+                <form class="card" method="post" enctype="multipart/form-data" action="{% url 'send_grn_email' %}" onsubmit="showLoader(this)">
+                    {% csrf_token %}
+                    <div class="card-header text-center bg-primary text-white fw-light">
+                        GRN Submission Mail For Received Items
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <p><span class="label fw-bold">Request No:</span> {{ requisition.requisition_number }}</p>
+                            </div>
+                            <div class="col-md-6">
+                                <p><span class="label fw-bold">Request Date:</span> {{ requisition.date_of_request }}</p>
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <p><span class="label fw-bold">Item:</span> {{ requisition.stock_item }}</p>
+                            </div>
+                            <div class="col-md-6">
+                                <p><span class="label fw-bold">Request Qty:</span> {{ requisition.quantity }}</p>
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <p><span class="label fw-bold">Received Qty:</span> {{ requisition.quantity_received }}</p>
+                            </div>
+                            <div class="col-md-6">
+                                <p><span class="label fw-bold">PO Number:</span> {{ requisition.po_number }}</p>
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <label for="remarks_{{ requisition.id }}" class="form-label fw-bold">Remarks:</label>
+                            <input type="text" class="form-control" id="remarks_{{ requisition.id }}" name="remarks" value="{{ requisition.remark }}">
+                        </div>
+                        
+                        <div class="row">
+                            <div class="col-md-6">
+                                <p><span class="label fw-bold">Employee Name:</span> {{ user.get_full_name }}</p>
+                            </div>
+                            <div class="col-md-6">
+                                <p><span class="label fw-bold">Employee Code:</span> {{ user.employee_code }}</p>
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <p><span class="label fw-bold">Department:</span> {{ user.department }}</p>
+                            </div>
+                            <div class="col-md-6">
+                                <p><span class="label fw-bold">Location:</span> {{ user.location }}</p>
+                            </div>
+                        </div>
+                        
+                        <input type="hidden" name="request_no" value="{{ requisition.requisition_number }}">
+                        <input type="hidden" name="request_date" value="{{ requisition.date_of_request }}">
+                        <input type="hidden" name="item" value="{{ requisition.stock_item }}">
+                        <input type="hidden" name="request_qty" value="{{ requisition.quantity }}">
+                        <input type="hidden" name="received_qty" value="{{ requisition.quantity_received }}">
+                        <input type="hidden" name="po_number" value="{{ requisition.po_number }}">
+                        <input type="hidden" name="employee_name" value="{{ user.get_full_name }}">
+                        <input type="hidden" name="employee_code" value="{{ user.employee_code }}">
+                        <input type="hidden" name="department" value="{{ user.department }}">
+                        <input type="hidden" name="location" value="{{ user.location }}">
+                        
+                        <div class="mb-3">
+                            <label for="chaalan_file_{{ requisition.id }}" class="form-label fw-bold">Upload Chalan:</label>
+                            <input type="file" class="file-input form-control" id="chaalan_file_{{ requisition.id }}" name="chaalan_file">
+                        </div>
+                        <div class="mb-3">
+                            <label for="grn_report_{{ requisition.id }}" class="form-label fw-bold">Upload GRN:</label>
+                            <input type="file" class="file-input form-control" id="grn_report_{{ requisition.id }}" name="grn_report">
+                        </div>
+                        <button type="submit" class="btn btn-primary w-100">CLICK TO SEND MAIL</button>
+                        <div class="d-flex justify-content-center mt-3">
+                            <div class="spinner-border text-primary loader" role="status" style="display: none;">
+                                <span class="visually-hidden">Loading...</span>
+                            </div>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <script>
+                // Log the value of the remarks field to the console
+                console.log("Remarks for requisition {{ requisition.requisition_number }}: {{ requisition.remark }}");
+
+                function showLoader(form) {
+                    const button = form.querySelector('button[type="submit"]');
+                    const loader = form.querySelector('.loader');
+                    button.disabled = true;
+                    loader.style.display = 'block';
+                }
+            </script>
+            {% endfor %}
+        </div>
+    {% endif %}
+</div>
+
+<style>
+  .card {
+    margin: 20px;
+    border-radius: 15px; /* Rounded corners */
+  }
+  .loader {
+    border: 8px solid #f3f3f3;
+    border-radius: 50%;
+    border-top: 8px solid #3498db;
+    width: 40px;
+    height: 40px;
+    animation: spin 2s linear infinite;
+    margin: 20px auto;
+  }
+
+  @keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+  }
+</style>
+{% endblock %}

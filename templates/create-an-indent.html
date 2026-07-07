@@ -1,0 +1,3355 @@
+{% extends "base.html" %} {% block content %}
+
+<div class="layout-container">
+  <!-- Mobile Header with Hamburger Menu -->
+  <div class="mobile-header">
+    <button class="hamburger-menu" id="hamburgerMenu">
+      <span class="hamburger-line"></span>
+      <span class="hamburger-line"></span>
+      <span class="hamburger-line"></span>
+    </button>
+    <div class="mobile-header-title">
+      <i class="fas fa-pencil-square"></i>
+      <span>Create New Indent</span>
+    </div>
+    <div class="mobile-header-spacer"></div>
+  </div>
+
+  <!-- Sidebar Overlay -->
+  <div class="sidebar-overlay" id="sidebarOverlay"></div>
+
+  <!-- Sidebar -->
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-header">
+      <h2 class="sidebar-logo">Menu</h2>
+      <button class="sidebar-close" id="sidebarClose">
+        <i class="fas fa-times"></i>
+      </button>
+    </div>
+    <div class="sidebar-content">
+      <!-- User Welcome Section -->
+      <div class="user-welcome">
+        <div class="welcome-header">
+          <h1 class="welcome-title">
+            Hello!
+            <span class="shake-emoji">👋</span>
+          </h1>
+          <p class="user-name">
+            {{request.user.first_name}} {{request.user.last_name}}
+          </p>
+        </div>
+      </div>
+
+      <!-- Quick Actions -->
+      <h4 class="sidebar-section-title">Quick Actions</h4>
+      <div class="quick-actions">
+        <a href="{% url 'advance-sale' %}" class="action-btn">
+          <i class="fas fa-exclamation-triangle"></i>
+          <span class="btn-text">Advance Sale</span>
+        </a>
+
+        <a href="{% url 'advance-sale' %}" class="action-btn">
+          <i class="fas fa-history"></i>
+          <span class="btn-text">Transaction History</span>
+        </a>
+
+        <a href="{% url 'dispatch_notifications' %}" class="action-btn">
+          <i class="fas fa-bell"></i>
+          <span class="btn-text">Dispatch Notifications</span>
+        </a>
+
+        <a href="{% url 'export_excel_view' %}" class="action-btn">
+          <i class="fas fa-download"></i>
+          <span class="btn-text">Download Excel</span>
+        </a>
+
+        <!-- Updated: Download Opening & Closing Excel with inline loader -->
+        <div class="action-btn-wrapper" id="downloadOpeningClosingWrapper">
+          <a href="#" class="action-btn" id="downloadOpeningClosingBtn">
+            <i class="fas fa-file-excel"></i>
+            <span class="btn-text">Download Opening & Closing Excel Sheet</span>
+          </a>
+          <div class="inline-loader" id="inlineLoader" style="display: none;">
+            <div class="small-spinner"></div>
+            <span class="loader-text">Generating...</span>
+          </div>
+        </div>
+
+        <a href="{% url 'location_balance_view' %}" class="action-btn">
+          <i class="fa fa-cash-register"></i>
+          <span class="btn-text">Opening Closing Balance</span>
+        </a>
+
+        <a href="{% url 'location_stock_report' %}" class="action-btn">
+          <i class="fas fa-warehouse"></i>
+          <span class="btn-text">My Sale &amp; Stock Report</span>
+        </a>
+
+        <a href="{% url 'pod_dashboard' %}" class="action-btn">
+          <i class="fas fa-file-upload"></i>
+          <span class="btn-text">Upload POD</span>
+        </a>
+
+        <a href="{% url 'view_inventory' %}" class="action-btn">
+          <i class="fas fa-cube"></i>
+          <span class="btn-text">View Inventory</span>
+        </a>
+
+        <a href="{% url 'view-requests' %}" class="action-btn">
+          <i class="fas fa-pencil-square"></i>
+          <span class="btn-text">View Your Indents</span>
+        </a>
+
+        <a href="{% url 'create_stn' %}" class="action-btn">
+          <i class="fas fa-truck-loading"></i>
+          <span class="btn-text">Create Stock Transfer Note</span>
+        </a>
+
+        <a href="{% url 'view_stns' %}" class="action-btn">
+          <i class="fas fa-file-pdf"></i>
+          <span class="btn-text">View Your STN</span>
+        </a>
+
+        <!-- NEW: Added View Your GRN's section -->
+        <div class="action-btn-wrapper" id="viewGrnsWrapper">
+          <a href="#" class="action-btn" id="viewGrnsBtn">
+            <i class="fas fa-file-invoice"></i>
+            <span class="btn-text">View Your GRN's</span>
+          </a>
+        </div>
+
+        <a href="{% url 'view_pods' %}" class="action-btn">
+          <i class="fas fa-atlas"></i>
+          <span class="btn-text">View Your POD's</span>
+        </a>
+
+        <a href="{% url 'view_others_inventory' %}" class="action-btn">
+          <i class="fas fa-window-restore"></i>
+          <span class="btn-text">View Other's Inventory</span>
+        </a>
+        <!-- Add more quick actions here if needed -->
+      </div>
+
+      <!-- Information Section -->
+      <div class="info-section">
+        <h3 class="info-title">Quick Info</h3>
+        <div class="info-item">
+          <i class="fas fa-user"></i>
+          <span>Employee Code: {{ request.user.employee_code }}</span>
+        </div>
+        <div class="info-item">
+          <i class="fas fa-building"></i>
+          <span>Department: {{ request.user.department }}</span>
+        </div>
+        <div class="info-item">
+          <i class="fas fa-map-marker-alt"></i>
+          <span>Location: {{ request.user.location }}</span>
+        </div>
+        <div class="info-item">
+          <i class="fas fa-door-closed"></i>
+          <span>SAP Plant Code: {{ request.user.plant }}</span>
+        </div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- Main Content -->
+  <main class="main-content">
+    <!-- Form Header -->
+    <div class="form-header">
+      <h2 class="form-title">
+        <i class="fas fa-pencil-square"></i>
+        <span class="form-title-text">Create New Indent</span>
+      </h2>
+      <p class="form-subtitle">
+        Fill out the form below to create a new indent request
+      </p>
+    </div>
+
+    {% if error_message %}
+    <div class="alert alert-danger" role="alert">
+      <i class="fas fa-exclamation-triangle"></i>
+      {{ error_message }}
+    </div>
+    {% endif %}
+
+    <!-- Indent Form -->
+    <div class="form-container">
+      <form method="post" id="purchaseRequestForm" class="indent-form">
+        {% csrf_token %}
+        <input type="hidden" class="idem-key-field" name="idempotency_key">
+
+        <!-- General Information -->
+        <div class="form-section">
+          <h3 class="section-title">
+            <i class="fas fa-info-circle"></i>
+            <span class="section-title-text">General Information</span>
+          </h3>
+          <div class="info-grid">
+            <div class="info-field">
+              <label class="field-label">Department</label>
+              <input
+                type="text"
+                class="form-control readonly-field"
+                name="department"
+                value="{{ request.user.department }}"
+                readonly
+                required
+              />
+            </div>
+            <div class="info-field">
+              <label class="field-label">Employee Name</label>
+              <input
+                type="text"
+                class="form-control readonly-field"
+                name="employee_name"
+                value="{{ request.user.first_name }} {{ request.user.last_name }}"
+                readonly
+                required
+              />
+            </div>
+            <div class="info-field">
+              <label class="field-label">Employee Code</label>
+              <input
+                type="text"
+                class="form-control readonly-field"
+                name="employee_code"
+                value="{{ request.user.employee_code }}"
+                readonly
+                required
+              />
+            </div>
+            <div class="info-field">
+              <label class="field-label">Location</label>
+              <input
+                type="text"
+                class="form-control readonly-field"
+                name="location"
+                value="{{ request.user.location }}"
+                readonly
+                required
+              />
+            </div>
+          </div>
+        </div>
+
+        <!-- Product Order Section -->
+        <div class="form-section">
+          <h3 class="section-title">
+            <i class="fas fa-boxes"></i>
+            <span class="section-title-text">Product Details</span>
+          </h3>
+
+          <!-- Bulk Excel Upload: raise an indent for many products at once -->
+          <div class="excel-import-box">
+            <div class="excel-import-head">
+              <i class="fas fa-file-excel"></i>
+              <div>
+                <strong>Raise indent by Excel</strong>
+                <p>
+                  Download the sheet, enter a <b>Quantity</b> (and optional
+                  <b>Remark</b>) against the products you need, then upload it to
+                  load those products into the table below for review.
+                </p>
+              </div>
+            </div>
+
+            <div class="excel-import-actions">
+              <a
+                href="{% url 'download_indent_template' %}"
+                class="btn-excel btn-excel-download"
+              >
+                <i class="fas fa-download"></i> Download Indent Excel
+              </a>
+
+              <label class="excel-date-field">
+                <span>Expected Delivery Date (for uploaded items)</span>
+                <input type="date" id="bulkDeliveryDate" class="form-control" />
+              </label>
+
+              <input
+                type="file"
+                id="indentExcelFile"
+                accept=".xlsx,.xls"
+                hidden
+              />
+              <button
+                type="button"
+                id="chooseIndentExcelBtn"
+                class="btn-excel btn-excel-choose"
+              >
+                <i class="fas fa-folder-open"></i>
+                <span id="indentExcelFileName">Choose file…</span>
+              </button>
+              <button
+                type="button"
+                id="uploadIndentExcelBtn"
+                class="btn-excel btn-excel-upload"
+              >
+                <i class="fas fa-upload"></i> Upload &amp; Load Products
+              </button>
+              <span
+                class="excel-import-spinner"
+                id="indentExcelSpinner"
+                style="display: none"
+              >
+                <span class="spinner"></span> Reading…
+              </span>
+            </div>
+
+            <div
+              class="excel-import-errors"
+              id="indentExcelErrors"
+              style="display: none"
+            ></div>
+          </div>
+
+          <div class="table-container">
+            <table class="product-table" id="productTable">
+              <thead>
+                <tr>
+                  <th>BAGS</th>
+                  <th>Stock Item</th>
+                  <th>Quantity</th>
+                  <th>Expected Delivery Date</th>
+                  <th>Remark</th>
+                  <th>Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>
+                    <select class="form-select" name="uom[]" required>
+                      <option value="" disabled selected>Select UOM</option>
+                      {% for uom, _ in uom_choices %}
+                      <option value="{{ uom }}">{{ uom }}</option>
+                      {% endfor %}
+                    </select>
+                  </td>
+                  <td>
+                    <select class="form-select" name="stock_item[]" required>
+                      <option value="" disabled selected>
+                        Select Stock Item
+                      </option>
+                      {% for item in stock_items %}
+                      <option value="{{ item.id }}" data-name="{{ item.name }}">
+                        {{ item.name }}
+                      </option>
+                      {% endfor %}
+                    </select>
+                    <input
+                      type="hidden"
+                      name="stock_item_name[]"
+                      class="stock-item-name"
+                      value=""
+                    />
+                  </td>
+                  <td>
+                    <input
+                      type="number"
+                      class="form-control"
+                      name="quantity[]"
+                      placeholder="Enter Quantity"
+                      required
+                    />
+                  </td>
+                  <td>
+                    <input
+                      type="date"
+                      class="form-control"
+                      name="date[]"
+                      placeholder="Enter Expected Delivery Date"
+                      required
+                    />
+                  </td>
+                  <td>
+                    <!-- Enhanced Remark Field -->
+                    <div class="remark-container">
+                      <select class="form-select remark-dropdown">
+                        <option value="" selected>Select predefined remark (optional)</option>
+                        <option value="Please Don't Mail To Vendor">Please Don't Mail To Vendor</option>
+                      </select>
+                      <input
+                        type="text"
+                        class="form-control remark-input"
+                        name="remark[]"
+                        placeholder="Enter custom remark"
+                      />
+                    </div>
+                  </td>
+                  <td>
+                    <button type="button" class="btn-remove remove-row">
+                      <i class="fas fa-trash"></i>
+                    </button>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+
+            <div class="table-actions">
+              <button type="button" id="addRow" class="btn-add">
+                <i class="fas fa-plus"></i>
+                <span class="btn-add-text">Add Another Product</span>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Submit Section -->
+        <div class="submit-section">
+          <button type="submit" class="btn-submit" id="submitIndentBtn">
+            <i class="fas fa-paper-plane"></i>
+            <span class="btn-submit-text">Submit Indent</span>
+          </button>
+          <div class="loader" id="loader">
+            <div class="spinner"></div>
+            <span>Processing...</span>
+          </div>
+        </div>
+      </form>
+      
+      <!-- NEW: GRN/Chalan Document Viewer Section -->
+      <div class="document-card-section" id="grnViewerSection" style="display: none; margin-top: 30px;">
+        <div class="card-header" id="grnViewerCardHeader">
+          <div class="header-content">
+            <h3 class="section-title">
+              <i class="fas fa-file-invoice"></i>
+              <span class="section-title-text">Your GRN & Chalan Documents</span>
+            </h3>
+            <p class="section-subtitle">View your GRN and chalan files by date range</p>
+          </div>
+          <button class="toggle-btn" id="toggleGrnViewerCard">
+            <i class="fas fa-chevron-down"></i>
+          </button>
+        </div>
+        
+        <div class="card-body" id="grnViewerCardBody" style="display: none;">
+          <div class="search-form-container">
+            <form id="grnFilterForm" class="modern-form">
+              <div class="form-grid">
+                <div class="form-group">
+                  <label for="grnFromDate">
+                    <i class="fas fa-calendar-alt"></i>
+                    From Date
+                  </label>
+                  <input type="date" class="form-control" id="grnFromDate" name="fromDate" required>
+                </div>
+                
+                <div class="form-group">
+                  <label for="grnToDate">
+                    <i class="fas fa-calendar-alt"></i>
+                    To Date
+                  </label>
+                  <input type="date" class="form-control" id="grnToDate" name="toDate" required>
+                </div>
+                
+                <div class="form-group">
+                  <label>&nbsp;</label>
+                  <button type="submit" class="btn-primary full-width" id="searchGrnBtn" style="margin-bottom: 18px;">
+                    <i class="fas fa-search"></i>
+                    <span class="btn-text">Search Documents</span>
+                  </button>
+                </div>
+              </div>
+            </form>
+          </div>
+
+          <!-- Document Results Section -->
+          <div class="results-section" id="grnResults" style="display: none;">
+            <div class="section-header">
+              <h3 class="section-title" style="margin-left: 10px;">
+                <i class="fas fa-folder-open"></i>
+                <span class="section-title-text">Your Document Results</span>
+              </h3>
+              <p class="section-subtitle" style="margin-left: 10px;">Found <span id="userFileCount">0</span> documents matching your criteria</p>
+            </div>
+
+            <div class="documents-grid">
+              <!-- GRN Files Card -->
+              <div class="document-card">
+                <div class="card-header grn-header">
+                  <i class="fas fa-file-invoice"></i>
+                  <h4 style="color: #313647;">Your GRN Files</h4>
+                  <span class="file-count" id="userGrnCount">0</span>
+                </div>
+                <div class="card-body">
+                  <button class="btn-secondary full-width mb-3" onclick="toggleUserFiles('userGrnFiles')">
+                    <i class="fas fa-eye"></i>
+                    <span class="btn-text">View Your GRN Files</span>
+                  </button>
+                  <div id="userGrnFiles" class="file-list" style="display: none;">
+                    <ul id="userGrnFilesList" class="file-items"></ul>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Chaalan/Invoice Files Card -->
+              <div class="document-card">
+                <div class="card-header chaalan-header">
+                  <i class="fas fa-receipt"></i>
+                  <h4 style="color: #313647;">Your Chaalan/Invoice Files</h4>
+                  <span class="file-count" id="userChalanCount">0</span>
+                </div>
+                <div class="card-body">
+                  <button class="btn-secondary full-width mb-3" onclick="toggleUserFiles('userChalanFiles')">
+                    <i class="fas fa-eye"></i>
+                    <span class="btn-text">View Your Chalan Files</span>
+                  </button>
+                  <div id="userChalanFiles" class="file-list" style="display: none;">
+                    <ul id="userChalanFilesList" class="file-items"></ul>
+                  </div>
+                </div>
+              </div>
+
+              <!-- GRN Against STN Files Card -->
+              <div class="document-card">
+                <div class="card-header stn-header">
+                  <i class="fas fa-file-contract"></i>
+                  <h4 style="color: #313647;">Your GRN Against STN Files</h4>
+                  <span class="file-count" id="userStnCount">0</span>
+                </div>
+                <div class="card-body">
+                  <button class="btn-secondary full-width mb-3" onclick="toggleUserFiles('userStnFiles')">
+                    <i class="fas fa-eye"></i>
+                    <span class="btn-text">View Your STN Files</span>
+                  </button>
+                  <div id="userStnFiles" class="file-list" style="display: none;">
+                    <ul id="userStnFilesList" class="file-items"></ul>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<!-- Notification Toast Container -->
+<div id="notificationContainer" class="notification-container">
+  <!-- Notifications will appear here -->
+</div>
+
+<!-- Include Select2 for Dropdowns -->
+<link
+  href="https://cdnjs.cloudflare.com/ajax/libs/select2/4.0.13/css/select2.min.css"
+  rel="stylesheet"
+/>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/select2/4.0.13/js/select2.min.js"></script>
+
+<style>
+  /* Layout Styles */
+  :root {
+    --primary-dark: #313647;
+    --primary-light: #435663;
+    --accent-green: #a3b087;
+    --accent-red: #ea5b6f;
+    --accent-yellow: #fff8d4;
+    --text-dark: #2c3e50;
+    --text-light: #7f8c8d;
+    --bg-light: #f8f9fa;
+    --border-color: #e9ecef;
+    --success: #28a745;
+    --warning: #ffc107;
+    --danger: #dc3545;
+    --info: #17a2b8;
+  }
+
+  .layout-container {
+    display: flex;
+    min-height: calc(100vh - 90px);
+    background: white;
+    font-family: "Lexend", sans-serif;
+    align-items: stretch;
+    position: relative;
+  }
+
+  /* Mobile Header */
+  .mobile-header {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 60px;
+    background: var(--primary-dark);
+    color: white;
+    padding: 0 1rem;
+    z-index: 1000;
+    align-items: center;
+    justify-content: space-between;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+  }
+
+  .hamburger-menu {
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    padding: 0.5rem;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    width: 40px;
+    height: 40px;
+    justify-content: center;
+    align-items: center;
+  }
+
+  .hamburger-line {
+    display: block;
+    width: 25px;
+    height: 3px;
+    background: white;
+    border-radius: 3px;
+    transition: all 0.3s ease;
+  }
+
+  .hamburger-menu.active .hamburger-line:nth-child(1) {
+    transform: translateY(9px) rotate(45deg);
+  }
+
+  .hamburger-menu.active .hamburger-line:nth-child(2) {
+    opacity: 0;
+  }
+
+  .hamburger-menu.active .hamburger-line:nth-child(3) {
+    transform: translateY(-9px) rotate(-45deg);
+  }
+
+  .mobile-header-title {
+    font-size: 1.1rem;
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  .mobile-header-title i {
+    color: var(--accent-green);
+  }
+
+  .mobile-header-spacer {
+    width: 40px;
+  }
+
+  /* Sidebar Overlay */
+  .sidebar-overlay {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.5);
+    z-index: 999;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+    pointer-events: none;
+  }
+
+  .sidebar-overlay.active {
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  /* Sidebar Styles */
+  .sidebar {
+    width: 320px;
+    background: var(--primary-dark);
+    color: white;
+    padding: 2rem 1.5rem;
+    box-shadow: 2px 0 20px rgba(0, 0, 0, 0.1);
+    border-radius: 0 20px 20px 0;
+    position: sticky;
+    top: 90px;
+    height: auto;
+    min-height: calc(100vh - 90px);
+    overflow-y: auto;
+    flex-shrink: 0;
+    margin-top: 40px;
+    margin-left: 10px;
+    transition: transform 0.3s ease;
+  }
+
+  .sidebar-header {
+    display: none;
+    padding-bottom: 1rem;
+    margin-bottom: 1rem;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .sidebar-logo {
+    font-size: 1.25rem;
+    font-weight: 600;
+    color: var(--accent-green);
+    margin: 0;
+  }
+
+  .sidebar-close {
+    background: transparent;
+    border: none;
+    color: white;
+    font-size: 1.25rem;
+    cursor: pointer;
+    padding: 0.5rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    transition: background 0.3s ease;
+  }
+
+  .sidebar-close:hover {
+    background: rgba(255, 255, 255, 0.1);
+  }
+
+  .sidebar-content {
+    display: flex;
+    flex-direction: column;
+    gap: 2rem;
+    height: 100%;
+  }
+
+  .sidebar-section-title {
+    font-size: 1.1rem;
+    color: var(--accent-yellow);
+    margin-bottom: 0.5rem;
+    font-weight: 500;
+  }
+
+  /* User Welcome Section */
+  .user-welcome {
+    text-align: center;
+    padding-bottom: 1.5rem;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  }
+
+  .welcome-header h1 {
+    font-size: 1.5rem;
+    font-weight: 600;
+    margin-bottom: 0.5rem;
+    color: var(--accent-green);
+  }
+
+  .user-name {
+    font-size: 1.1rem;
+    color: var(--accent-yellow);
+    font-weight: 500;
+  }
+
+  /* Notifications Section */
+  .notifications-section {
+    padding: 1rem 0;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  }
+
+  .notifications-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .notifications-title {
+    font-size: 1.1rem;
+    font-weight: 500;
+    color: var(--accent-yellow);
+    margin: 0;
+  }
+
+  .notification-bell-container {
+    position: relative;
+  }
+
+  #notificationBell {
+    font-size: 1.3rem;
+    color: var(--accent-red);
+    cursor: pointer;
+    transition: transform 0.3s ease;
+  }
+
+  #notificationBell:hover {
+    transform: scale(1.1);
+  }
+
+  .badge {
+    position: absolute;
+    top: -8px;
+    right: -8px;
+    background: var(--accent-red);
+    color: white;
+    border-radius: 50%;
+    padding: 4px 8px;
+    font-size: 0.7rem;
+    font-weight: 600;
+  }
+
+  /* Quick Actions */
+  .quick-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+
+  .action-btn-wrapper {
+    position: relative;
+    border-radius: 8px;
+    overflow: hidden;
+  }
+
+  .action-btn {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.75rem 1rem;
+    background: rgba(163, 176, 135, 0.1);
+    color: var(--accent-yellow);
+    text-decoration: none;
+    border-radius: 8px;
+    transition: all 0.3s ease;
+    border: 1px solid rgba(163, 176, 135, 0.2);
+    position: relative;
+    width: 100%;
+  }
+
+  .action-btn:hover {
+    background: rgba(163, 176, 135, 0.2);
+    color: white;
+    transform: translateX(5px);
+    text-decoration: none;
+  }
+
+  .action-btn i {
+    color: var(--accent-green);
+    flex-shrink: 0;
+  }
+
+  .btn-text {
+    flex-grow: 1;
+    white-space: normal;
+    word-break: break-word;
+  }
+
+  /* Inline Loader Styles */
+  .inline-loader {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(49, 54, 71, 0.95);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    border-radius: 8px;
+    z-index: 10;
+    color: white;
+  }
+
+  .small-spinner {
+    width: 20px;
+    height: 20px;
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    border-top: 2px solid var(--accent-green);
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+    flex-shrink: 0;
+  }
+
+  .loader-text {
+    font-size: 0.9rem;
+    font-weight: 500;
+    color: var(--accent-yellow);
+  }
+
+  /* Info Section */
+  .info-section {
+    padding-top: 1rem;
+    flex-grow: 1;
+  }
+
+  .info-title {
+    font-size: 1.1rem;
+    color: var(--accent-yellow);
+    margin-bottom: 1rem;
+    font-weight: 500;
+  }
+
+  .info-item {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.5rem 0;
+    color: rgba(255, 255, 255, 0.9);
+    font-size: 0.9rem;
+  }
+
+  .info-item i {
+    color: var(--accent-green);
+    width: 16px;
+  }
+
+  /* Main Content Styles */
+  .main-content {
+    flex: 1;
+    background: #ffffff;
+    padding: 2rem;
+    overflow-y: auto;
+    min-height: calc(100vh - 90px);
+    display: flex;
+    flex-direction: column;
+    transition: margin-left 0.3s ease;
+  }
+
+  .form-header {
+    text-align: center;
+    margin-bottom: 2rem;
+    color: var(--primary-dark);
+    background-color: var(--accent-green);
+    border-radius: 16px;
+    border: 2px solid black;
+    padding-top: 20px;
+  }
+
+  .form-title {
+    font-size: 2rem;
+    color: var(--primary-dark);
+    font-weight: 700;
+    margin-bottom: 0.5rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+  }
+
+  .form-title i {
+    font-size: 1.75rem;
+  }
+
+  .form-subtitle {
+    font-size: 1rem;
+    color: var(--primary-dark);
+    font-weight: 400;
+  }
+
+  /* Form Container */
+  .form-container {
+    background: var(--accent-green);
+    border-radius: 16px;
+    border: 2px solid black;
+    padding: 2rem;
+    box-shadow: 0 8px 32px rgba(49, 54, 71, 0.1);
+    flex-grow: 1;
+  }
+
+  /* Form Sections */
+  .form-section {
+    margin-bottom: 2rem;
+    padding-bottom: 1.5rem;
+    border-bottom: 1px solid #e9ecef;
+  }
+
+  .section-title {
+    font-size: 1.3rem;
+    font-weight: 600;
+    color: var(--primary-dark);
+    margin-bottom: 1.5rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+  }
+
+  .section-title i {
+    color: #293b02;
+  }
+
+  /* Info Grid */
+  .info-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 1rem;
+  }
+
+  .info-field {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .field-label {
+    font-weight: 500;
+    color: #435663;
+    margin-bottom: 0.5rem;
+    font-size: 0.9rem;
+  }
+
+  /* Enhanced: Readonly Fields Styling */
+  .readonly-field {
+    background-color: #FFFFFF !important;
+    border-color: #e9ecef !important;
+    cursor: default !important;
+  }
+
+  .readonly-field:focus {
+    box-shadow: none !important;
+    border-color: #e9ecef !important;
+    outline: none !important;
+  }
+
+  /* Enhanced: Remark Field Container */
+  .remark-container {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  /* FIXED: Remark Dropdown - Now matches form-select styling */
+  .remark-dropdown {
+    height: 44px;
+    padding: 0.75rem;
+    font-size: 0.9rem;
+    line-height: 1.2;
+    border: 1px solid #d1d5db;
+    border-radius: 8px;
+    color: #6b7280;
+    background-color: #ffffff;
+    transition: all 0.2s ease;
+  }
+
+  .remark-dropdown:focus {
+    border-color: var(--accent-green);
+    box-shadow: 0 0 0 2px rgba(163, 176, 135, 0.1);
+    outline: none;
+  }
+
+  .remark-dropdown:hover {
+    background-color: white;
+  }
+
+  .remark-input {
+    border-radius: 8px;
+    font-size: 0.9rem;
+    height: 44px;
+    padding: 0.75rem;
+    border: 2px solid #e9ecef;
+  }
+
+  .remark-input:focus {
+    border-color: var(--accent-green);
+    box-shadow: 0 0 0 3px rgba(163, 176, 135, 0.1);
+  }
+
+  /* Table Styles - FIXED SECTION */
+  .table-container {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .product-table {
+    width: 100%;
+    border-collapse: collapse;
+    background: white;
+    border-radius: 8px;
+    overflow: hidden;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  }
+
+  .product-table th {
+    background: var(--primary-dark);
+    color: white;
+    padding: 1rem;
+    font-weight: 500;
+    text-align: left;
+    font-size: 0.9rem;
+    border-bottom: none;
+    white-space: nowrap;
+  }
+
+  .product-table td {
+    padding: 1rem;
+    border-bottom: 1px solid #e9ecef;
+    vertical-align: top;
+    min-width: 150px;
+  }
+
+  .product-table tr {
+    height: auto;
+  }
+
+  .product-table tr:last-child td {
+    border-bottom: none;
+  }
+
+  .product-table tr:hover {
+    background: #f8f9fa;
+  }
+
+  /* Form Controls */
+  .form-control,
+  .form-select {
+    border: 2px solid #e9ecef;
+    border-radius: 8px;
+    padding: 0.75rem;
+    font-size: 0.9rem;
+    transition: all 0.3s ease;
+    font-family: "Lexend", sans-serif;
+    width: 100%;
+  }
+
+  .form-control:focus,
+  .form-select:focus {
+    outline: none;
+    border-color: var(--accent-green);
+    box-shadow: 0 0 0 3px rgba(163, 176, 135, 0.1);
+  }
+
+  /* Buttons */
+  .btn-remove {
+    background: var(--accent-red);
+    color: white;
+    border: none;
+    border-radius: 6px;
+    padding: 0.5rem;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    margin: 0 auto;
+  }
+
+  .btn-remove:hover {
+    background: #d94a5e;
+    transform: scale(1.05);
+  }
+
+  .table-actions {
+    text-align: center;
+    margin-top: 1.5rem;
+  }
+
+  .btn-add {
+    background: #435663;
+    color: white;
+    border: none;
+    border-radius: 8px;
+    padding: 0.75rem 1.5rem;
+    cursor: pointer;
+    font-weight: 500;
+    transition: all 0.3s ease;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  .btn-add:hover {
+    background: var(--primary-dark);
+    transform: translateY(-2px);
+  }
+
+  /* Submit Section */
+  .submit-section {
+    text-align: center;
+    padding-top: 1.5rem;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1rem;
+  }
+
+  .btn-submit {
+    background: linear-gradient(135deg, #435663 0%, var(--primary-dark) 100%);
+    color: white;
+    border: none;
+    border-radius: 12px;
+    padding: 1rem 2.5rem;
+    font-size: 1.1rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.75rem;
+    box-shadow: 0 4px 15px rgba(49, 54, 71, 0.3);
+  }
+
+  .btn-submit:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(49, 54, 71, 0.4);
+  }
+
+  .btn-submit:disabled {
+    opacity: 0.7;
+    cursor: not-allowed;
+    transform: none;
+  }
+
+  /* Loader */
+  .loader {
+    display: none;
+    align-items: center;
+    gap: 0.75rem;
+    color: #435663;
+    font-weight: 500;
+  }
+
+  .spinner {
+    width: 20px;
+    height: 20px;
+    border: 2px solid var(--accent-green);
+    border-top: 2px solid transparent;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+  }
+
+  @keyframes spin {
+    0% {
+      transform: rotate(0deg);
+    }
+    100% {
+      transform: rotate(360deg);
+    }
+  }
+
+  /* Alert */
+  .alert {
+    border-radius: 8px;
+    border: none;
+    padding: 1rem 1.5rem;
+    margin-bottom: 2rem;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+  }
+
+  .alert-danger {
+    background: rgba(234, 91, 111, 0.1);
+    color: var(--accent-red);
+    border-left: 4px solid var(--accent-red);
+  }
+
+  /* Animations */
+  @keyframes hand-shake {
+    0% {
+      transform: rotate(0deg);
+    }
+    25% {
+      transform: rotate(15deg);
+    }
+    50% {
+      transform: rotate(-10deg);
+    }
+    75% {
+      transform: rotate(15deg);
+    }
+    100% {
+      transform: rotate(0deg);
+    }
+  }
+
+  .shake-emoji {
+    animation: hand-shake 1.5s ease-in-out infinite;
+    display: inline-block;
+  }
+
+  /* NEW: Document Viewer Styles (adapted from finance dashboard) */
+  .document-card-section {
+    background: linear-gradient(135deg, #ffffff 0%, #ffffff 100%);
+    border-radius: 16px;
+    border: 2px solid black;
+    box-shadow: 0 8px 32px rgba(163, 176, 135, 0.2);
+    overflow: hidden;
+    transition: all 0.3s ease;
+    min-height: 80px;
+  }
+
+  .card-header {
+    background: linear-gradient(135deg, var(--accent-green) 0%, #8a9975 100%);
+    padding: 1.5rem 2rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    cursor: pointer;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+    backdrop-filter: blur(10px);
+  }
+
+  .card-header .header-content {
+    text-align: left;
+    flex: 1;
+  }
+
+  .card-header .section-title {
+    color: var(--primary-dark);
+    margin: 0 0 0.5rem 0;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    font-size: 1.3rem;
+    font-weight: 700;
+    flex-wrap: wrap;
+  }
+
+  .card-header .section-title i {
+    color: var(--accent-green);
+  }
+
+  .section-subtitle {
+    color: var(--primary-dark);
+    margin: 0;
+    font-size: 1rem;
+  }
+
+  .toggle-btn {
+    background: var(--primary-dark);
+    color: white;
+    border: none;
+    border-radius: 8px;
+    padding: 0.75rem;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+
+  .toggle-btn:hover {
+    background: #435663;
+    transform: scale(1.05);
+  }
+
+  .toggle-btn i {
+    transition: transform 0.3s ease;
+  }
+
+  .toggle-btn.active i {
+    transform: rotate(180deg);
+  }
+
+  .card-body {
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(10px);
+    overflow: visible;
+  }
+
+  /* Search Form */
+  .search-form-container {
+    padding: 2rem;
+  }
+
+  .modern-form {
+    width: 100%;
+  }
+
+  .form-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 1.5rem;
+    align-items: end;
+  }
+
+  .form-group {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
+  .form-group label {
+    font-weight: 600;
+    color: #2c3e50;
+    font-size: 0.9rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+  }
+
+  .form-group label i {
+    color: var(--accent-green);
+  }
+
+  .btn-primary, .btn-secondary {
+    padding: 0.875rem 1.5rem;
+    border: none;
+    border-radius: 10px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    font-size: 0.95rem;
+    width: 100%;
+  }
+
+  .btn-primary {
+    background: var(--primary-dark);
+    color: white;
+  }
+
+  .btn-primary:hover {
+    background: #435663;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(49, 54, 71, 0.3);
+  }
+
+  .btn-secondary {
+    background: #31694E;
+    color: white;
+  }
+
+  .btn-secondary:hover {
+    background: #2a5d44;
+    transform: translateY(-2px);
+  }
+
+  .full-width {
+    width: 100%;
+  }
+
+  /* Documents Grid */
+  .documents-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+    gap: 1.5rem;
+    padding: 2rem;
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(10px);
+  }
+
+  .document-card {
+    background: linear-gradient(135deg, var(--accent-green) 0%, #8a9975 100%);
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+    border: 1px solid #e9ecef;
+    transition: all 0.3s ease;
+  }
+
+  .document-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.15);
+  }
+
+  .document-card .card-header {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 1.5rem;
+    color: white;
+    font-weight: 600;
+    cursor: default;
+    flex-wrap: wrap;
+  }
+
+  .document-card .card-header i {
+    font-size: 1.5rem;
+  }
+
+  .document-card .card-header h4 {
+    margin: 0;
+    flex: 1;
+    font-size: 1.1rem;
+  }
+
+  .grn-header {
+    background: linear-gradient(135deg, var(--accent-green) 0%, #8a9975 100%);
+  }
+
+  .chaalan-header {
+    background: linear-gradient(135deg, var(--accent-green) 0%, #8a9975 100%);
+  }
+
+  .stn-header {
+    background: linear-gradient(135deg, var(--accent-green) 0%, #8a9975 100%);
+  }
+
+  .file-count {
+    background: rgba(255, 255, 255, 0.2);
+    padding: 0.25rem 0.75rem;
+    border-radius: 20px;
+    font-size: 0.9rem;
+    font-weight: 700;
+  }
+
+  .document-card .card-body {
+    padding: 1.5rem;
+    background: linear-gradient(135deg, var(--accent-green) 0%, #8a9975 100%);
+    max-height: none;
+  }
+
+  /* File List */
+  .file-list {
+    max-height: none;
+    overflow-y: visible;
+  }
+
+  .file-items {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+  }
+
+  .file-items li {
+    padding: 1rem;
+    border-bottom: 1px solid #e9ecef;
+    transition: all 0.3s ease;
+  }
+
+  .file-items li:last-child {
+    border-bottom: none;
+  }
+
+  .file-items li:hover {
+    background: #f8f9fa;
+  }
+
+  .file-items a {
+    color: #2c3e50;
+    text-decoration: none;
+    font-weight: 500;
+    display: block;
+    transition: color 0.3s ease;
+    word-break: break-word;
+  }
+
+  .file-items a:hover {
+    color: var(--accent-green);
+  }
+
+  .empty-state {
+    text-align: center;
+    padding: 2rem;
+    color: #7f8c8d;
+  }
+
+  .empty-state i {
+    font-size: 3rem;
+    margin-bottom: 1rem;
+    opacity: 0.5;
+  }
+
+  /* Results Container */
+  .results-container {
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(10px);
+    border-radius: 0 0 16px 16px;
+  }
+
+  .results-header {
+    padding: 1.5rem 2rem;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+    background: rgba(255, 255, 255, 0.8);
+  }
+
+  .results-header h4 {
+    margin: 0;
+    color: var(--primary-dark);
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+  }
+
+  .location-name {
+    color: var(--accent-green);
+    font-weight: 700;
+  }
+
+  /* File item styles */
+  .file-item-with-chaalan {
+    padding: 1rem;
+    border-bottom: 1px solid #e9ecef;
+    background: #f8f9fa;
+    margin-bottom: 0.5rem;
+    border-radius: 8px;
+    border-left: 4px solid #2c5f2d;
+  }
+
+  .file-link a {
+    color: #2c5f2d;
+    font-weight: 600;
+    text-decoration: none;
+    display: block;
+    margin-bottom: 0.5rem;
+    word-break: break-word;
+  }
+
+  .chaalan-link {
+    margin-top: 0.5rem;
+    padding-left: 1.5rem;
+    border-left: 2px solid #8a9975;
+  }
+
+  .chaalan-file-link {
+    color: #8a9975 !important;
+    font-size: 0.9rem;
+    text-decoration: none;
+    display: block;
+    word-break: break-word;
+  }
+
+  .chaalan-file-link:hover {
+    color: #2c5f2d !important;
+  }
+
+  .no-chaalan {
+    color: var(--danger);
+    font-size: 0.85rem;
+    margin-top: 0.5rem;
+    padding-left: 1.5rem;
+  }
+
+  .timestamp-match {
+    color: var(--success);
+    font-size: 0.8rem;
+    margin-top: 0.25rem;
+    padding-left: 1.5rem;
+    font-style: italic;
+  }
+
+  .file-item-with-chaalan:hover {
+    background: #e8f5e8;
+    transform: translateY(-1px);
+    transition: all 0.3s ease;
+  }
+
+  .chalan-with-grn {
+    background: #e8f5e8;
+    border-left: 4px solid var(--success);
+  }
+
+  .chalan-standalone {
+    background: #f8f9fa;
+    border-left: 4px solid #6c757d;
+  }
+
+  .grn-association {
+    font-size: 0.8rem;
+    color: var(--success);
+    margin-top: 0.25rem;
+    font-style: italic;
+    word-break: break-word;
+  }
+
+  /* Modal Styles */
+  .modal-dialog {
+    margin: 1rem;
+  }
+
+  .modal-content {
+    border-radius: 12px;
+    border: none;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+  }
+
+  .modal-header {
+    background: linear-gradient(135deg, var(--primary-dark) 0%, #435663 100%);
+    color: white;
+    padding: 1rem 1.5rem;
+    border-bottom: 2px solid var(--accent-green);
+  }
+
+  .modal-title {
+    font-size: 1.25rem;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  .modal-body {
+    padding: 1.5rem;
+    max-height: 60vh;
+    overflow-y: auto;
+  }
+
+  .modal-footer {
+    padding: 1rem 1.5rem;
+    border-top: 1px solid #e9ecef;
+  }
+
+  .btn-close {
+    filter: brightness(0) invert(1);
+  }
+
+  /* Notification Toast Styles */
+  .notification-container {
+    position: fixed;
+    top: 100px;
+    right: 20px;
+    z-index: 9999;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    max-width: 350px;
+    width: calc(100% - 40px);
+  }
+
+  .notification-toast {
+    background: white;
+    border-radius: 8px;
+    padding: 15px 20px;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.15);
+    border-left: 4px solid var(--accent-green);
+    animation: slideIn 0.3s ease-out;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .notification-toast.success {
+    border-left-color: var(--success);
+  }
+
+  .notification-toast.error {
+    border-left-color: var(--danger);
+  }
+
+  .notification-toast.info {
+    border-left-color: var(--info);
+  }
+
+  .notification-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 8px;
+  }
+
+  .notification-title {
+    font-weight: 600;
+    font-size: 1rem;
+    color: var(--primary-dark);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .notification-title i {
+    color: var(--accent-green);
+  }
+
+  .notification-close {
+    background: none;
+    border: none;
+    color: #666;
+    cursor: pointer;
+    font-size: 1rem;
+    padding: 0;
+    width: 20px;
+    height: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .notification-close:hover {
+    color: var(--primary-dark);
+  }
+
+  .notification-message {
+    font-size: 0.9rem;
+    color: #666;
+    line-height: 1.4;
+  }
+
+  .notification-progress {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    height: 3px;
+    background: var(--accent-green);
+    width: 100%;
+    animation: progressBar 5s linear forwards;
+  }
+
+  .notification-toast.success .notification-progress {
+    background: var(--success);
+  }
+
+  .notification-toast.error .notification-progress {
+    background: var(--danger);
+  }
+
+  @keyframes slideIn {
+    from {
+      transform: translateX(100%);
+      opacity: 0;
+    }
+    to {
+      transform: translateX(0);
+      opacity: 1;
+    }
+  }
+
+  @keyframes slideOut {
+    from {
+      transform: translateX(0);
+      opacity: 1;
+    }
+    to {
+      transform: translateX(100%);
+      opacity: 0;
+    }
+  }
+
+  @keyframes progressBar {
+    from {
+      width: 100%;
+    }
+    to {
+      width: 0%;
+    }
+  }
+
+  /* NEW: Fix for GRN date fields - ensure they don't have min attribute */
+  #grnFromDate, #grnToDate {
+    min: none !important;
+  }
+
+  /* =========== RESPONSIVE DESIGN IMPROVEMENTS ============== */
+  
+  /* Desktop */
+  @media (max-width: 1200px) {
+    .sidebar {
+      width: 280px;
+    }
+    
+    .form-title {
+      font-size: 1.75rem;
+    }
+    
+    .form-title i {
+      font-size: 1.5rem;
+    }
+  }
+
+  /* Tablet */
+  @media (max-width: 992px) {
+    .layout-container {
+      flex-direction: column;
+    }
+
+    .mobile-header {
+      display: flex;
+    }
+
+    .main-content {
+      padding: 1.5rem;
+      margin-top: 60px;
+      min-height: calc(100vh - 150px);
+    }
+
+    .sidebar {
+      position: fixed;
+      top: 0;
+      left: 0;
+      bottom: 0;
+      width: 300px;
+      max-width: 85%;
+      z-index: 1001;
+      margin: 0;
+      border-radius: 0 20px 20px 0;
+      transform: translateX(-100%);
+      transition: transform 0.3s ease;
+      min-height: 100vh;
+      height: 100vh;
+      padding-top: 1rem;
+    }
+
+    .sidebar.active {
+      transform: translateX(0);
+    }
+
+    .sidebar-header {
+      display: flex;
+    }
+
+    .sidebar-overlay.active {
+      display: block;
+    }
+
+    .info-grid {
+      grid-template-columns: 1fr;
+    }
+    
+    .documents-grid {
+      grid-template-columns: 1fr;
+    }
+
+    .form-grid {
+      grid-template-columns: 1fr;
+    }
+
+    .card-header {
+      padding: 1.5rem;
+      flex-wrap: wrap;
+    }
+
+    .card-header .section-title {
+      font-size: 1.2rem;
+    }
+
+    .section-subtitle {
+      font-size: 0.9rem;
+    }
+  }
+
+  /* Mobile Landscape */
+  @media (max-width: 768px) {
+    .main-content {
+      padding: 1rem;
+    }
+
+    .form-header {
+      padding: 1rem;
+    }
+
+    .form-title {
+      font-size: 1.5rem;
+    }
+
+    .form-title-text {
+      font-size: 1.25rem;
+    }
+
+    .form-title i {
+      font-size: 1.25rem;
+    }
+
+    .form-subtitle {
+      font-size: 0.9rem;
+    }
+
+    .form-container {
+      padding: 1.5rem;
+    }
+
+    .section-title {
+      font-size: 1.2rem;
+    }
+
+    .section-title-text {
+      font-size: 1.1rem;
+    }
+
+    .product-table {
+      font-size: 0.85rem;
+    }
+
+    .product-table th,
+    .product-table td {
+      padding: 0.75rem;
+    }
+
+    .product-table th {
+      font-size: 0.8rem;
+    }
+
+    .btn-add {
+      width: 100%;
+      justify-content: center;
+    }
+
+    .btn-add-text {
+      font-size: 0.9rem;
+    }
+
+    .btn-submit {
+      padding: 0.875rem 2rem;
+      font-size: 1rem;
+    }
+
+    .btn-submit-text {
+      font-size: 0.95rem;
+    }
+
+    .btn-primary, .btn-secondary {
+      padding: 0.75rem 1rem;
+      font-size: 0.9rem;
+    }
+
+    .inline-loader {
+      gap: 8px;
+      padding: 0 8px;
+    }
+    
+    .loader-text {
+      font-size: 0.8rem;
+    }
+    
+    .documents-grid {
+      grid-template-columns: 1fr;
+      padding: 1rem;
+    }
+    
+    .search-form-container {
+      padding: 1.5rem;
+    }
+
+    .form-grid {
+      grid-template-columns: 1fr;
+      gap: 1rem;
+    }
+
+    .document-card .card-header {
+      padding: 1rem;
+    }
+
+    .document-card .card-header h4 {
+      font-size: 1rem;
+    }
+
+    .document-card .card-body {
+      padding: 1rem;
+    }
+
+    .file-count {
+      font-size: 0.8rem;
+      padding: 0.2rem 0.5rem;
+    }
+
+    .empty-state i {
+      font-size: 2.5rem;
+    }
+
+    .empty-state div {
+      font-size: 0.9rem;
+    }
+
+    .modal-dialog {
+      margin: 0.5rem;
+    }
+
+    .modal-body {
+      padding: 1rem;
+    }
+
+    .notification-container {
+      top: 80px;
+      max-width: 300px;
+    }
+  }
+
+  /* Mobile Portrait */
+  @media (max-width: 576px) {
+    .main-content {
+      padding: 0.75rem;
+    }
+
+    .form-header {
+      padding: 0.75rem;
+    }
+
+    .form-title {
+      font-size: 1.25rem;
+    }
+
+    .form-title-text {
+      font-size: 1.1rem;
+    }
+
+    .form-title i {
+      font-size: 1rem;
+    }
+
+    .form-subtitle {
+      font-size: 0.85rem;
+    }
+
+    .form-container {
+      padding: 1rem;
+    }
+
+    .section-title {
+      font-size: 1.1rem;
+    }
+
+    .section-title-text {
+      font-size: 1rem;
+    }
+
+    .info-grid {
+      gap: 0.75rem;
+    }
+
+    .info-field {
+      margin-bottom: 0.5rem;
+    }
+
+    .field-label {
+      font-size: 0.85rem;
+    }
+
+    .product-table th,
+    .product-table td {
+      padding: 0.5rem;
+      min-width: 120px;
+    }
+
+    .product-table th {
+      font-size: 0.75rem;
+    }
+
+    .form-control,
+    .form-select,
+    .remark-dropdown,
+    .remark-input {
+      padding: 0.5rem;
+      font-size: 0.85rem;
+      height: 38px;
+    }
+
+    .remark-container {
+      gap: 6px;
+    }
+
+    .btn-remove {
+      width: 32px;
+      height: 32px;
+    }
+
+    .btn-remove i {
+      font-size: 0.9rem;
+    }
+
+    .btn-add {
+      padding: 0.5rem 1rem;
+    }
+
+    .btn-add i {
+      font-size: 0.9rem;
+    }
+
+    .btn-add-text {
+      font-size: 0.85rem;
+    }
+
+    .btn-submit {
+      padding: 0.75rem 1.5rem;
+      font-size: 0.95rem;
+    }
+
+    .btn-submit i {
+      font-size: 0.9rem;
+    }
+
+    .btn-submit-text {
+      font-size: 0.9rem;
+    }
+
+    .btn-primary, .btn-secondary {
+      padding: 0.6rem 0.75rem;
+      font-size: 0.85rem;
+    }
+
+    .btn-text {
+      font-size: 0.85rem;
+    }
+
+    .card-header {
+      padding: 1rem;
+    }
+
+    .card-header .section-title {
+      font-size: 1.1rem;
+    }
+
+    .card-header .section-title i {
+      font-size: 1rem;
+    }
+
+    .section-subtitle {
+      font-size: 0.8rem;
+    }
+
+    .toggle-btn {
+      padding: 0.5rem;
+    }
+
+    .toggle-btn i {
+      font-size: 0.9rem;
+    }
+
+    .search-form-container {
+      padding: 1rem;
+    }
+
+    .form-group label {
+      font-size: 0.85rem;
+    }
+
+    .documents-grid {
+      padding: 0.5rem;
+      gap: 1rem;
+    }
+
+    .document-card .card-header {
+      padding: 0.75rem;
+    }
+
+    .document-card .card-header i {
+      font-size: 1.25rem;
+    }
+
+    .document-card .card-header h4 {
+      font-size: 0.9rem;
+    }
+
+    .document-card .card-body {
+      padding: 0.75rem;
+    }
+
+    .file-items li {
+      padding: 0.75rem;
+    }
+
+    .file-items a {
+      font-size: 0.85rem;
+    }
+
+    .grn-association {
+      font-size: 0.75rem;
+    }
+
+    .no-chaalan {
+      font-size: 0.75rem;
+    }
+
+    .timestamp-match {
+      font-size: 0.7rem;
+    }
+
+    .empty-state {
+      padding: 1rem;
+    }
+
+    .empty-state i {
+      font-size: 2rem;
+    }
+
+    .empty-state div {
+      font-size: 0.8rem;
+    }
+
+    .modal-header {
+      padding: 0.75rem 1rem;
+    }
+
+    .modal-title {
+      font-size: 1.1rem;
+    }
+
+    .modal-body {
+      padding: 0.75rem;
+    }
+
+    .modal-footer {
+      padding: 0.75rem 1rem;
+    }
+
+    .notification-container {
+      top: 70px;
+      right: 10px;
+      max-width: 280px;
+      width: calc(100% - 20px);
+    }
+
+    .notification-toast {
+      padding: 12px 15px;
+    }
+
+    .notification-title {
+      font-size: 0.9rem;
+    }
+
+    .notification-message {
+      font-size: 0.8rem;
+    }
+  }
+
+  /* Small Mobile */
+  @media (max-width: 375px) {
+    .form-title {
+      font-size: 1.1rem;
+    }
+
+    .form-title-text {
+      font-size: 1rem;
+    }
+
+    .section-title {
+      font-size: 1rem;
+    }
+
+    .section-title-text {
+      font-size: 0.9rem;
+    }
+
+    .mobile-header-title {
+      font-size: 1rem;
+    }
+
+    .mobile-header-title span {
+      display: none;
+    }
+
+    .product-table th,
+    .product-table td {
+      padding: 0.4rem;
+      min-width: 100px;
+    }
+
+    .product-table th {
+      font-size: 0.7rem;
+    }
+
+    .form-control,
+    .form-select,
+    .remark-dropdown,
+    .remark-input {
+      padding: 0.4rem;
+      font-size: 0.8rem;
+      height: 34px;
+    }
+
+    .btn-add i {
+      font-size: 0.8rem;
+    }
+
+    .btn-add-text {
+      font-size: 0.8rem;
+    }
+
+    .document-card .card-header h4 {
+      font-size: 0.85rem;
+    }
+
+    .file-count {
+      font-size: 0.7rem;
+      padding: 0.15rem 0.4rem;
+    }
+
+    .file-items a {
+      font-size: 0.8rem;
+    }
+
+    .grn-association {
+      font-size: 0.7rem;
+    }
+  }
+
+  /* Touch-friendly improvements */
+  @media (hover: none) and (pointer: coarse) {
+    .action-btn:hover,
+    .btn-add:hover,
+    .btn-submit:hover,
+    .btn-primary:hover,
+    .btn-secondary:hover,
+    .toggle-btn:hover,
+    .btn-remove:hover {
+      transform: none;
+    }
+
+    .action-btn:active,
+    .btn-add:active,
+    .btn-submit:active,
+    .btn-primary:active,
+    .btn-secondary:active,
+    .toggle-btn:active,
+    .btn-remove:active {
+      transform: scale(0.98);
+    }
+
+    .form-control,
+    .form-select,
+    .remark-dropdown,
+    .remark-input {
+      font-size: 16px;
+    }
+
+    .action-btn,
+    .btn-add,
+    .btn-submit,
+    .btn-primary,
+    .btn-secondary,
+    .toggle-btn,
+    .btn-remove {
+      min-height: 44px;
+    }
+
+    .btn-remove {
+      width: 44px;
+      height: 44px;
+    }
+
+    .hamburger-menu {
+      min-height: 44px;
+      min-width: 44px;
+    }
+  }
+
+  /* Print styles */
+  @media print {
+    .mobile-header,
+    .sidebar,
+    .sidebar-overlay,
+    .action-btn,
+    .btn-add,
+    .btn-remove,
+    .btn-submit,
+    .btn-primary,
+    .btn-secondary,
+    .toggle-btn,
+    .document-card-section,
+    .notification-container,
+    .modal {
+      display: none !important;
+    }
+
+    .layout-container {
+      display: block;
+    }
+
+    .main-content {
+      padding: 0;
+      margin: 0;
+    }
+
+    .form-container {
+      border: 1px solid #000;
+      box-shadow: none;
+    }
+
+    .form-header {
+      border: 1px solid #000;
+    }
+
+    .product-table th {
+      background: #f0f0f0 !important;
+      color: #000 !important;
+    }
+
+    .product-table td {
+      background: #fff !important;
+    }
+  }
+
+  /* =========== RAISE INDENT BY EXCEL ============== */
+  .excel-import-box {
+    background: #ffffff;
+    border: 2px dashed var(--primary-dark);
+    border-radius: 12px;
+    padding: 1.25rem;
+    margin-bottom: 1.5rem;
+  }
+
+  .excel-import-head {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.85rem;
+    margin-bottom: 1rem;
+  }
+
+  .excel-import-head > i {
+    font-size: 1.75rem;
+    color: #1d6f42;
+    flex-shrink: 0;
+  }
+
+  .excel-import-head strong {
+    color: var(--primary-dark);
+    font-size: 1.05rem;
+  }
+
+  .excel-import-head p {
+    margin: 0.15rem 0 0;
+    color: var(--text-light);
+    font-size: 0.85rem;
+    line-height: 1.4;
+  }
+
+  .excel-import-actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    gap: 0.75rem;
+  }
+
+  .btn-excel {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.7rem 1.1rem;
+    border: none;
+    border-radius: 8px;
+    font-weight: 600;
+    font-size: 0.9rem;
+    cursor: pointer;
+    text-decoration: none;
+    transition: all 0.25s ease;
+  }
+
+  .btn-excel-download {
+    background: #1d6f42;
+    color: #fff;
+  }
+
+  .btn-excel-download:hover {
+    background: #155731;
+    color: #fff;
+    transform: translateY(-2px);
+  }
+
+  .btn-excel-choose {
+    background: #e9ecef;
+    color: var(--primary-dark);
+    max-width: 240px;
+  }
+
+  .btn-excel-choose span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .btn-excel-upload {
+    background: var(--primary-dark);
+    color: #fff;
+  }
+
+  .btn-excel-upload:hover {
+    background: #435663;
+    transform: translateY(-2px);
+  }
+
+  .btn-excel-upload:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    transform: none;
+  }
+
+  .excel-date-field {
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+    font-size: 0.8rem;
+    color: var(--primary-dark);
+    font-weight: 600;
+  }
+
+  .excel-date-field input {
+    min-width: 190px;
+  }
+
+  .excel-import-spinner {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    color: var(--primary-dark);
+    font-weight: 500;
+  }
+
+  .excel-import-errors {
+    margin-top: 1rem;
+    background: rgba(234, 91, 111, 0.08);
+    border-left: 4px solid var(--accent-red);
+    border-radius: 8px;
+    padding: 0.85rem 1rem;
+    color: #8a2330;
+    font-size: 0.85rem;
+  }
+
+  .excel-import-errors ul {
+    margin: 0.4rem 0 0;
+    padding-left: 1.2rem;
+  }
+</style>
+
+<script>
+  $(document).ready(function () {
+    console.log("🚀 Create Indent Page Document Ready");
+    
+    // Initialize Tooltip
+    $('[data-bs-toggle="tooltip"]').tooltip();
+
+    // Set min date and default date for the INDENT FORM date input fields only
+    const today = new Date();
+    const twoDaysLater = new Date(today);
+    twoDaysLater.setDate(twoDaysLater.getDate() + 2);
+    const minDate = twoDaysLater.toISOString().split("T")[0];
+
+    // Set the default value and min attribute for INDENT FORM date fields only
+    $('input[name="date[]"]').each(function () {
+      $(this).val(minDate);
+      $(this).attr("min", minDate);
+    });
+
+    // Set default dates for GRN search (NO min date restriction)
+    const firstDay = new Date(today.getFullYear(), today.getMonth(), 1);
+    const lastDay = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+    
+    $('#grnFromDate').val(firstDay.toISOString().split('T')[0]);
+    $('#grnToDate').val(lastDay.toISOString().split('T')[0]);
+    
+    // REMOVE min attribute from GRN search date fields to allow past dates
+    $('#grnFromDate').removeAttr('min');
+    $('#grnToDate').removeAttr('min');
+    
+    console.log("📅 Default GRN search dates set (no min restriction):", {
+        fromDate: $('#grnFromDate').val(),
+        toDate: $('#grnToDate').val()
+    });
+
+    // =========== HAMBURGER MENU FUNCTIONALITY ==============
+    const hamburgerMenu = $('#hamburgerMenu');
+    const sidebar = $('#sidebar');
+    const sidebarOverlay = $('#sidebarOverlay');
+    const sidebarClose = $('#sidebarClose');
+
+    function openSidebar() {
+      sidebar.addClass('active');
+      sidebarOverlay.addClass('active');
+      hamburgerMenu.addClass('active');
+      $('body').css('overflow', 'hidden');
+    }
+
+    function closeSidebar() {
+      sidebar.removeClass('active');
+      sidebarOverlay.removeClass('active');
+      hamburgerMenu.removeClass('active');
+      $('body').css('overflow', '');
+    }
+
+    hamburgerMenu.on('click', openSidebar);
+    sidebarClose.on('click', closeSidebar);
+    sidebarOverlay.on('click', closeSidebar);
+
+    // Close sidebar on window resize if in desktop view
+    $(window).on('resize', function() {
+      if ($(window).width() > 992) {
+        closeSidebar();
+        $('body').css('overflow', '');
+      }
+    });
+
+    // Initialize Select2
+    $(".searchable-dropdown").select2({
+      placeholder: "Select an option",
+      allowClear: true,
+    });
+
+    // Enhanced: Remark Dropdown Functionality
+    function setupRemarkField(row) {
+      const dropdown = row.find('.remark-dropdown');
+      const input = row.find('.remark-input');
+      
+      // Dropdown change handler
+      dropdown.on('change', function() {
+        const selectedValue = $(this).val();
+        if (selectedValue) {
+          input.val(selectedValue);
+          // Store original value for reference
+          input.data('dropdown-value', selectedValue);
+        }
+      });
+      
+      // Input change handler - allow manual override
+      input.on('input', function() {
+        const currentValue = $(this).val();
+        const dropdownValue = $(this).data('dropdown-value');
+        
+        // If user manually types something different from dropdown value,
+        // clear the dropdown selection
+        if (dropdownValue && currentValue !== dropdownValue) {
+          dropdown.val('');
+          $(this).removeData('dropdown-value');
+        }
+      });
+    }
+
+    // Add Row Functionality with Enhanced Remark Field
+    $("#addRow").on("click", function () {
+      const newRow = $("#productTable tbody tr:first").clone();
+      resetRow(newRow);
+      $("#productTable tbody").append(newRow);
+
+      // Set min date and default value for the new INDENT FORM date input field
+      newRow.find('input[name="date[]"]').val(minDate).attr("min", minDate);
+
+      // Initialize Select2 for new dropdowns
+      newRow.find(".searchable-dropdown").select2({
+        placeholder: "Select an option",
+        allowClear: true,
+      });
+
+      // Setup remark field functionality for new row
+      setupRemarkField(newRow);
+    });
+
+    // Remove Row Functionality
+    $("#productTable").on("click", ".remove-row", function () {
+      if ($("#productTable tbody tr").length > 1) {
+        $(this).closest("tr").remove();
+      } else {
+        alert("You need at least one product row.");
+      }
+    });
+
+    function resetRow(row) {
+      row.find("input").val("");
+      row.find("select").val("").trigger("change");
+      // Clear remark dropdown and input
+      row.find('.remark-dropdown').val('');
+      row.find('.remark-input').val('').removeData('dropdown-value');
+    }
+
+    // UOM Change Handler
+    $("#productTable").on("change", 'select[name="uom[]"]', function () {
+      const uom = $(this).val();
+      const stockItemSelect = $(this)
+        .closest("tr")
+        .find('select[name="stock_item[]"]');
+
+      fetchStockItemsForUOM(uom, stockItemSelect);
+    });
+
+    function fetchStockItemsForUOM(uom, stockItemSelect) {
+      if (uom) {
+        $.ajax({
+          url: "{% url 'get_products_by_uom_for_purchase' %}",
+          method: "GET",
+          data: { uom: uom },
+          success: function (response) {
+            console.log(response);
+            stockItemSelect
+              .empty()
+              .append(
+                '<option value="" disabled selected>Select Stock Item</option>'
+              );
+            response.products.forEach((product) => {
+              stockItemSelect.append(
+                `<option value="${product.id}" data-name="${product.name}">${product.name}</option>`
+              );
+            });
+          },
+          error: function () {
+            alert("Failed to fetch stock items for the selected UOM.");
+          },
+        });
+      }
+    }
+
+    // Stock Item Change Handler
+    $("#productTable").on("change", 'select[name="stock_item[]"]', function () {
+      var selectedOption = $(this).find("option:selected");
+      var stockItemName = selectedOption.data("name");
+      console.log(stockItemName);
+      if (stockItemName) {
+        $(this).closest("tr").find(".stock-item-name").val(stockItemName);
+      } else {
+        console.log("No data-name found for this stock item.");
+      }
+    });
+
+    // Form Submission Handler
+    $("#purchaseRequestForm").on("submit", function (event) {
+      const submitButton = $("#submitIndentBtn");
+      const loader = $("#loader");
+
+      submitButton.prop("disabled", true);
+      loader.show();
+
+      return true;
+    });
+
+    // Enhanced: Setup remark field for existing rows
+    $("#productTable tbody tr").each(function() {
+      setupRemarkField($(this));
+    });
+
+    // Enhanced: Prevent readonly fields from being focused
+    $('.readonly-field').on('focus', function(e) {
+      $(this).blur();
+    });
+
+    // Download Opening & Closing Excel Handler
+    $("#downloadOpeningClosingBtn").on("click", function(e) {
+      e.preventDefault();
+      
+      // Show inline loader
+      $("#inlineLoader").show();
+      
+      // Disable the button temporarily
+      $(this).css('pointer-events', 'none');
+      
+      // Make AJAX request to download
+      $.ajax({
+        url: "{% url 'download_opening_closing_excel' %}",
+        method: "GET",
+        xhrFields: {
+          responseType: 'blob'
+        },
+        success: function(data, status, xhr) {
+          // Hide loader
+          $("#inlineLoader").hide();
+          
+          // Get filename from response headers
+          const filename = xhr.getResponseHeader('Content-Disposition')
+            ? xhr.getResponseHeader('Content-Disposition').split('filename=')[1].replace(/"/g, '')
+            : 'Opening_Closing_Report.xlsx';
+          
+          // Create download link
+          const blob = new Blob([data], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+          const downloadUrl = window.URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = downloadUrl;
+          a.download = filename;
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          window.URL.revokeObjectURL(downloadUrl);
+          
+          // Show success notification
+          showNotification('Success', 'Opening & Closing Excel sheet downloaded successfully!', 'success');
+          
+          // Re-enable button
+          setTimeout(() => {
+            $('#downloadOpeningClosingBtn').css('pointer-events', 'auto');
+          }, 1000);
+        },
+        error: function(xhr, status, error) {
+          // Hide loader
+          $("#inlineLoader").hide();
+          
+          // Show error notification
+          let errorMessage = 'Failed to generate Excel sheet. Please try again.';
+          if (xhr.status === 404) {
+            errorMessage = 'Excel generation service not available.';
+          } else if (xhr.status === 500) {
+            errorMessage = 'Server error occurred while generating Excel.';
+          }
+          
+          showNotification('Error', errorMessage, 'error');
+          
+          // Re-enable button
+          $('#downloadOpeningClosingBtn').css('pointer-events', 'auto');
+        },
+        complete: function() {
+          // Ensure button is re-enabled even on complete
+          setTimeout(() => {
+            $('#downloadOpeningClosingBtn').css('pointer-events', 'auto');
+          }, 1000);
+        }
+      });
+    });
+
+    // NEW: View Your GRN's Button Handler
+    $("#viewGrnsBtn").on("click", function(e) {
+      e.preventDefault();
+      console.log("📄 View Your GRN's button clicked");
+      
+      // Close sidebar on mobile after clicking
+      if ($(window).width() <= 992) {
+        closeSidebar();
+      }
+      
+      // Show the GRN viewer section
+      $('#grnViewerSection').slideDown(300, function() {
+        // After showing, toggle open the card
+        $('#toggleGrnViewerCard').click();
+        
+        // Scroll to the section
+        $('html, body').animate({
+          scrollTop: $('#grnViewerSection').offset().top - 80
+        }, 500);
+      });
+    });
+
+    // NEW: GRN Viewer Card Toggle
+    $('#toggleGrnViewerCard').on('click', function() {
+      console.log("📂 Toggling GRN viewer card");
+      const isVisible = $('#grnViewerCardBody').is(':visible');
+      
+      $('#grnViewerCardBody').slideToggle(300, function() {
+        if ($('#grnViewerCardBody').is(':visible')) {
+          console.log("✅ GRN viewer card expanded");
+          $('#toggleGrnViewerCard').addClass('active');
+          $('#toggleGrnViewerCard').find('i').removeClass('fa-chevron-down').addClass('fa-chevron-up');
+        } else {
+          console.log("📁 GRN viewer card collapsed");
+          $('#toggleGrnViewerCard').removeClass('active');
+          $('#toggleGrnViewerCard').find('i').removeClass('fa-chevron-up').addClass('fa-chevron-down');
+        }
+      });
+    });
+
+    // NEW: GRN Filter Form Submission
+    $('#grnFilterForm').on('submit', function(event) {
+      event.preventDefault();
+      console.log("🔍 GRN filter form submitted");
+      
+      // Validate date range
+      const fromDate = $('#grnFromDate').val();
+      const toDate = $('#grnToDate').val();
+      
+      if (!fromDate || !toDate) {
+        showNotification('Error', 'Please select both from and to dates.', 'error');
+        return;
+      }
+      
+      if (new Date(toDate) < new Date(fromDate)) {
+        showNotification('Error', 'To date cannot be earlier than From date.', 'error');
+        return;
+      }
+      
+      const formData = $(this).serialize();
+      // Add location parameter (using the user's location)
+      const userLocation = "{{ request.user.location }}";
+      const fullFormData = formData + '&location=' + encodeURIComponent(userLocation);
+      
+      console.log("📋 GRN search form data:", fullFormData);
+      console.log("📅 Date range:", { fromDate, toDate });
+      
+      const searchBtn = $('#searchGrnBtn');
+      const originalText = searchBtn.html();
+      searchBtn.html('<i class="fas fa-spinner fa-spin"></i> Searching...');
+      searchBtn.prop('disabled', true);
+
+      $.ajax({
+        url: "{% url 'fetch_finance_data' %}",
+        type: "GET",
+        data: fullFormData,
+        dataType: "json",
+        success: function(response) {
+          console.log("📨 GRN search response:", response);
+          
+          var grnFilesList = $('#userGrnFilesList');
+          var grnAgainstStnFilesList = $('#userStnFilesList');
+          var chalanFilesList = $('#userChalanFilesList');
+          
+          grnFilesList.empty();
+          grnAgainstStnFilesList.empty();
+          chalanFilesList.empty();
+          
+          const grnCount = response.grn_files ? response.grn_files.length : 0;
+          const linkedChalanCount = response.grn_files ? response.grn_files.filter(grnFile => grnFile.chalan_file).length : 0;
+          const stnCount = response.grn_against_stn_files ? response.grn_against_stn_files.length : 0;
+          const totalCount = grnCount + linkedChalanCount + stnCount;
+          
+          console.log(`📊 User GRN results counts: GRN=${grnCount}, Chalan=${linkedChalanCount}, STN=${stnCount}, Total=${totalCount}`);
+          
+          $('#userGrnCount').text(grnCount);
+          $('#userChalanCount').text(linkedChalanCount);
+          $('#userStnCount').text(stnCount);
+          $('#userFileCount').text(totalCount);
+          
+          // Populate GRN files (filter for current user only)
+          if (grnCount === 0) {
+            console.log("📭 No GRN files found for user");
+            grnFilesList.append('<li class="empty-state"><i class="fas fa-inbox"></i><div>No GRN files found for the selected date range</div></li>');
+          } else {
+            console.log(`📄 Adding ${grnCount} GRN files to user list`);
+            // Filter GRN files for current user only
+            const userEmployeeCode = "{{ request.user.employee_code }}";
+            const userGrnFiles = response.grn_files.filter(file => file.employee_code === userEmployeeCode);
+            
+            if (userGrnFiles.length === 0) {
+              grnFilesList.append('<li class="empty-state"><i class="fas fa-inbox"></i><div>No GRN files found for your account in the selected date range</div></li>');
+            } else {
+              userGrnFiles.forEach(function(file, index) {
+                var grnFileUrl = response.media_url + 'grns/' + file.employee_code + '/' + file.grn_file;
+                var grnFileName = file.grn_file;
+                var grnTimestamp = file.timestamp || extractTimestampFromFilename(grnFileName);
+                var formattedDate = formatTimestamp(grnTimestamp);
+                
+                console.log(`   User GRN ${index + 1}: ${grnFileName}, Date: ${formattedDate}`);
+                
+                var li = $('<li></li>').addClass('file-item-with-chaalan');
+                
+                var grnLink = $('<div></div>').addClass('file-link').append(
+                  $('<a></a>')
+                    .attr('href', grnFileUrl)
+                    .attr('target', '_blank')
+                    .html(`<i class="fas fa-file-invoice"></i> <strong>GRN</strong> - ${formattedDate} - ${grnFileName}`)
+                );
+                
+                li.append(grnLink);
+                
+                if (file.chalan_file) {
+                  li.append($('<div></div>').addClass('timestamp-match').html('<i class="fas fa-check-circle text-success"></i> Has corresponding chalan file'));
+                } else {
+                  li.append($('<div></div>').addClass('no-chaalan').html('<i class="fas fa-times-circle text-danger"></i> No corresponding chalan found'));
+                }
+                
+                grnFilesList.append(li);
+              });
+            }
+          }
+          
+          // Populate GRN Against STN files (filter for current user only)
+          if (stnCount === 0) {
+            console.log("📭 No STN files found for user");
+            grnAgainstStnFilesList.append('<li class="empty-state"><i class="fas fa-inbox"></i><div>No STN files found for the selected date range</div></li>');
+          } else {
+            console.log(`📄 Adding ${stnCount} STN files to user list`);
+            // Filter STN files for current user only
+            const userEmployeeCode = "{{ request.user.employee_code }}";
+            const userStnFiles = response.grn_against_stn_files.filter(file => file.employee_code === userEmployeeCode);
+            
+            if (userStnFiles.length === 0) {
+              grnAgainstStnFilesList.append('<li class="empty-state"><i class="fas fa-inbox"></i><div>No STN files found for your account in the selected date range</div></li>');
+            } else {
+              userStnFiles.forEach(function(file, index) {
+                var fileUrl = response.media_url + 'grn_against_stn/' + file.employee_code + '/' + file.stn_file;
+                var fileName = file.stn_file;
+                var timestamp = file.timestamp || extractTimestampFromFilename(fileName);
+                var formattedDate = formatTimestamp(timestamp);
+                
+                console.log(`   User STN ${index + 1}: ${fileName}, Date: ${formattedDate}`);
+                
+                var li = $('<li></li>').append(
+                  $('<a></a>')
+                    .attr('href', fileUrl)
+                    .attr('target', '_blank')
+                    .html(`<i class="fas fa-file-contract"></i> <strong>STN</strong> - ${formattedDate} - ${fileName}`)
+                );
+                grnAgainstStnFilesList.append(li);
+              });
+            }
+          }
+          
+          // Populate Chalan files (filter for current user only)
+          const linkedChalanFiles = response.grn_files ? response.grn_files.filter(grnFile => grnFile.chalan_file) : [];
+          
+          if (linkedChalanFiles.length === 0) {
+            console.log("📭 No linked chalan files found for user");
+            chalanFilesList.append('<li class="empty-state"><i class="fas fa-inbox"></i><div>No Chalan files linked to GRN found for the selected date range</div></li>');
+          } else {
+            console.log(`📄 Adding ${linkedChalanFiles.length} linked chalan files to user list`);
+            // Filter chalan files for current user only
+            const userEmployeeCode = "{{ request.user.employee_code }}";
+            const userChalanFiles = linkedChalanFiles.filter(grnFile => grnFile.employee_code === userEmployeeCode);
+            
+            if (userChalanFiles.length === 0) {
+              chalanFilesList.append('<li class="empty-state"><i class="fas fa-inbox"></i><div>No chalan files found for your account in the selected date range</div></li>');
+            } else {
+              userChalanFiles.forEach(function(grnFile, index) {
+                var chalanFileUrl = response.media_url + 'chalan_files/' + grnFile.employee_code + '/' + grnFile.chalan_file;
+                var chalanFileName = grnFile.chalan_file;
+                var chalanTimestamp = extractTimestampFromFilename(chalanFileName);
+                var chalanFormattedDate = formatTimestamp(chalanTimestamp);
+                
+                console.log(`   User Chalan ${index + 1}: ${chalanFileName}, Linked to GRN: ${grnFile.grn_file}`);
+                
+                var li = $('<li></li>').addClass('chalan-with-grn');
+                
+                var chalanLink = $('<a></a>')
+                  .attr('href', chalanFileUrl)
+                  .attr('target', '_blank')
+                  .html(`<i class="fas fa-receipt text-success"></i> <strong>Chalan</strong> - ${chalanFormattedDate} - ${chalanFileName}`);
+                
+                li.append(chalanLink);
+                li.append($('<div></div>').addClass('grn-association').html(`<i class="fas fa-link"></i> Linked to GRN: ${grnFile.grn_file}`));
+                
+                chalanFilesList.append(li);
+              });
+            }
+          }
+          
+          $('#grnResults').fadeIn();
+          console.log("✅ User GRN search results displayed");
+        },
+        error: function(xhr, status, error) {
+          console.error("❌ Error fetching user documents:", error);
+          showNotification('Error', 'Error fetching documents. Please try again.', 'error');
+        },
+        complete: function() {
+          console.log("📝 User GRN search request complete");
+          searchBtn.html(originalText);
+          searchBtn.prop('disabled', false);
+        }
+      });
+    });
+
+    // NEW: Date change handler for GRN search
+    $('#grnFromDate, #grnToDate').on('change', function() {
+      console.log(`📅 GRN search filter changed: ${$(this).attr('id')} = ${$(this).val()}`);
+      $('#grnResults').hide();
+    });
+
+    // Notification Function
+    function showNotification(title, message, type = 'info') {
+      const notificationContainer = $('#notificationContainer');
+      const notificationId = 'notification-' + Date.now();
+      
+      const notificationHtml = `
+        <div class="notification-toast ${type}" id="${notificationId}">
+          <div class="notification-header">
+            <div class="notification-title">
+              <i class="fas fa-${type === 'success' ? 'check-circle' : type === 'error' ? 'exclamation-circle' : 'info-circle'}"></i>
+              ${title}
+            </div>
+            <button class="notification-close" onclick="closeNotification('${notificationId}')">
+              <i class="fas fa-times"></i>
+            </button>
+          </div>
+          <div class="notification-message">
+            ${message}
+          </div>
+          <div class="notification-progress"></div>
+        </div>
+      `;
+      
+      notificationContainer.append(notificationHtml);
+      
+      // Auto remove after 5 seconds
+      setTimeout(() => {
+        closeNotification(notificationId);
+      }, 5000);
+    }
+
+    // Close Notification Function
+    window.closeNotification = function(notificationId) {
+      const notification = $('#' + notificationId);
+      if (notification.length) {
+        notification.css('animation', 'slideOut 0.3s ease-out forwards');
+        setTimeout(() => {
+          notification.remove();
+        }, 300);
+      }
+    };
+
+    // NEW: Toggle user files function
+    window.toggleUserFiles = function(id) {
+      console.log(`📂 Toggling user files for ID: ${id}`);
+      var element = $('#' + id);
+      var isVisible = element.is(':visible');
+      
+      console.log(`   Current state: ${isVisible ? 'visible' : 'hidden'}`);
+      
+      element.slideToggle(300);
+      
+      var button = element.siblings('button');
+      var icon = button.find('i');
+      if (!isVisible) {
+        icon.removeClass('fa-eye').addClass('fa-eye-slash');
+        button.find('span').text('Hide Files');
+        console.log(`   Now showing files, button text: Hide Files`);
+      } else {
+        icon.removeClass('fa-eye-slash').addClass('fa-eye');
+        button.find('span').text('View Files');
+        console.log(`   Now hiding files, button text: View Files`);
+      }
+    };
+
+    // Utility functions for timestamp extraction
+    function extractTimestampFromFilename(filename) {
+      console.log(`🔍 Extracting timestamp from filename: ${filename}`);
+      var timestampMatch = filename.match(/(\d{14})/);
+      if (timestampMatch) {
+        console.log(`   Found 14-digit timestamp: ${timestampMatch[1]}`);
+        return timestampMatch[1];
+      }
+      var dateMatch = filename.match(/(\d{8})/);
+      if (dateMatch) {
+        console.log(`   Found 8-digit date: ${dateMatch[1]}`);
+        return dateMatch[1] + '000000';
+      }
+      console.log(`   No timestamp found in filename`);
+      return null;
+    }
+
+    function formatTimestamp(timestamp) {
+      console.log(`📅 Formatting timestamp: ${timestamp}`);
+      if (!timestamp) {
+        console.log(`   No timestamp provided`);
+        return 'Unknown Date';
+      }
+      
+      if (timestamp.length === 14) {
+        var year = timestamp.substring(0, 4);
+        var month = timestamp.substring(4, 6);
+        var day = timestamp.substring(6, 8);
+        var hour = timestamp.substring(8, 10);
+        var minute = timestamp.substring(10, 12);
+        var second = timestamp.substring(12, 14);
+        const formatted = `${day}-${month}-${year} ${hour}:${minute}:${second}`;
+        console.log(`   Formatted as: ${formatted}`);
+        return formatted;
+      } else if (timestamp.length === 8) {
+        var year = timestamp.substring(0, 4);
+        var month = timestamp.substring(4, 6);
+        var day = timestamp.substring(6, 8);
+        const formatted = `${day}-${month}-${year}`;
+        console.log(`   Formatted as: ${formatted}`);
+        return formatted;
+      }
+      
+      console.log(`   Invalid timestamp length: ${timestamp.length}`);
+      return 'Invalid Date';
+    }
+
+    // =========== RAISE INDENT BY EXCEL ==============
+    // Default the bulk delivery date to today + 2 (same rule as the row date).
+    $("#bulkDeliveryDate").val(minDate).attr("min", minDate);
+
+    // Pristine copy of an empty product row, captured before any edits, so we
+    // can rebuild the table cleanly from the uploaded rows.
+    const pristineRow = $("#productTable tbody tr:first").clone();
+
+    $("#chooseIndentExcelBtn").on("click", function () {
+      $("#indentExcelFile").click();
+    });
+
+    $("#indentExcelFile").on("change", function () {
+      const f = this.files[0];
+      $("#indentExcelFileName").text(f ? f.name : "Choose file…");
+    });
+
+    $("#uploadIndentExcelBtn").on("click", function () {
+      const fileInput = document.getElementById("indentExcelFile");
+      if (!fileInput.files.length) {
+        showNotification("Error", "Please choose an Excel file first.", "error");
+        return;
+      }
+
+      const deliveryDate = $("#bulkDeliveryDate").val() || minDate;
+      const fd = new FormData();
+      fd.append("file", fileInput.files[0]);
+      fd.append(
+        "csrfmiddlewaretoken",
+        $('input[name="csrfmiddlewaretoken"]').val()
+      );
+
+      $("#indentExcelSpinner").show();
+      $("#uploadIndentExcelBtn").prop("disabled", true);
+      $("#indentExcelErrors").hide().empty();
+
+      $.ajax({
+        url: "{% url 'import_indent_excel' %}",
+        method: "POST",
+        data: fd,
+        processData: false,
+        contentType: false,
+        success: function (resp) {
+          if (!resp || !resp.success) {
+            showNotification(
+              "Error",
+              (resp && resp.error) || "Could not read the file.",
+              "error"
+            );
+            return;
+          }
+
+          loadImportedRows(resp.rows, deliveryDate);
+
+          if (resp.errors && resp.errors.length) {
+            const items = resp.errors
+              .map(function (e) {
+                return "<li>" + $("<div>").text(e).html() + "</li>";
+              })
+              .join("");
+            $("#indentExcelErrors")
+              .html(
+                '<strong><i class="fas fa-exclamation-triangle"></i> ' +
+                  resp.errors.length +
+                  " row(s) skipped:</strong><ul>" +
+                  items +
+                  "</ul>"
+              )
+              .show();
+          }
+
+          showNotification(
+            "Success",
+            resp.count + " product(s) loaded. Review and submit the indent.",
+            "success"
+          );
+
+          $("html, body").animate(
+            { scrollTop: $("#productTable").offset().top - 90 },
+            400
+          );
+        },
+        error: function (xhr) {
+          let msg = "Upload failed. Please try again.";
+          if (xhr.responseJSON && xhr.responseJSON.error) {
+            msg = xhr.responseJSON.error;
+          }
+          showNotification("Error", msg, "error");
+        },
+        complete: function () {
+          $("#indentExcelSpinner").hide();
+          $("#uploadIndentExcelBtn").prop("disabled", false);
+        },
+      });
+    });
+
+    // Rebuild the product table from the rows returned by the server. Each row
+    // is fully resolved (product id/name/uom), so no per-row AJAX is needed.
+    function loadImportedRows(rows, deliveryDate) {
+      const tbody = $("#productTable tbody");
+      tbody.empty();
+
+      if (!rows || !rows.length) {
+        const empty = pristineRow.clone();
+        resetRow(empty);
+        empty.find('input[name="date[]"]').val(minDate).attr("min", minDate);
+        tbody.append(empty);
+        setupRemarkField(empty);
+        return;
+      }
+
+      rows.forEach(function (item) {
+        const row = pristineRow.clone();
+        resetRow(row);
+
+        // UOM — make sure the value exists as an option, then select it.
+        const uomSelect = row.find('select[name="uom[]"]');
+        if (uomSelect.find('option[value="' + item.uom + '"]').length === 0) {
+          uomSelect.append(
+            $("<option></option>").val(item.uom).text(item.uom)
+          );
+        }
+        uomSelect.val(item.uom);
+
+        // Stock item — inject the resolved product as the single selected option
+        // (built via DOM so names with quotes are escaped safely).
+        const stockSelect = row.find('select[name="stock_item[]"]');
+        const opt = $("<option></option>")
+          .val(item.product_id)
+          .attr("data-name", item.name)
+          .text(item.name)
+          .prop("selected", true);
+        stockSelect.empty().append(opt);
+        // Mirror into the hidden field the server reads on submit.
+        row.find(".stock-item-name").val(item.name);
+
+        // Quantity, delivery date, remark.
+        row.find('input[name="quantity[]"]').val(item.quantity);
+        row
+          .find('input[name="date[]"]')
+          .val(deliveryDate)
+          .attr("min", minDate);
+        row.find(".remark-input").val(item.remark || "");
+
+        tbody.append(row);
+        setupRemarkField(row);
+      });
+    }
+
+    console.log("✅ Create Indent page JavaScript loaded successfully");
+  });
+</script>
+
+{% endblock %}

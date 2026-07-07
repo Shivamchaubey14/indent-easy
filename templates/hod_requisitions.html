@@ -1,0 +1,1473 @@
+{% extends "base.html" %}
+{% block content %}
+
+<div class="layout-container">
+  <!-- Sidebar -->
+  <aside class="sidebar">
+    <div class="sidebar-content">
+      <!-- User Welcome Section -->
+      <div class="user-welcome">
+        <div class="welcome-header">
+          <h1 class="welcome-title">
+            Welcome!
+            <span class="wave-emoji">👋</span>
+          </h1>
+          <p class="user-name">{{request.user.first_name}} {{request.user.last_name}}</p>
+          <div class="user-details">
+            <span class="detail-badge">
+              <i class="fas fa-id-badge"></i>
+              {{ request.user.employee_code }}
+            </span>
+            <span class="detail-badge">
+              <i class="fas fa-building"></i>
+              {{ request.user.department }}
+            </span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Stats Section -->
+      <div class="stats-section">
+        <div class="stat-card">
+          <div class="stat-icon inventory-icon">
+            <i class="fas fa-clipboard-check"></i>
+          </div>
+          <div class="stat-info">
+            <span class="stat-value" id="pendingCount">{{ page_obj.paginator.count|default:0 }}</span>
+            <span class="stat-label">Pending Approvals</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Quick Actions -->
+      <div class="quick-actions">
+        <h3 class="section-title">Quick Actions</h3>
+        <a href="{% url 'export_as_excel' %}" class="action-btn" style="text-decoration: none;">
+          <i class="fas fa-download"></i>
+          <span>Export as Excel</span>
+        </a>
+        <a href="{% url 'view_others_inventory' %}" class="action-btn" style="text-decoration: none;">
+          <i class="fas fa-window-restore"></i>
+          <span>See Others Inventory</span>
+        </a>
+      </div>
+    </div>
+  </aside>
+
+  <!-- Main Content -->
+  <main class="main-content">
+    <!-- Page Header -->
+    <div class="page-header">
+      <div class="header-content">
+        <div class="header-text">
+          <h1 class="page-title">
+            <i class="fas fa-clipboard-check"></i>
+            Indents Waiting For Your Approval
+          </h1>
+          <p class="page-subtitle">Review and approve pending indent requests</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Table Container -->
+    <div class="table-wrapper">
+      <div class="table-header-actions">
+        <div class="selected-info" id="selectedInfo" style="display: none;">
+          <i class="fas fa-check-circle"></i>
+          <span id="selectedCount">0</span> items selected for STN
+        </div>
+        <div class="table-filters">
+          <button class="filter-btn active" data-filter="all">
+            <i class="fas fa-list"></i> All
+          </button>
+          <button class="filter-btn" data-filter="pending">
+            <i class="fas fa-clock"></i> Pending
+          </button>
+          <button class="filter-btn" data-filter="approved">
+            <i class="fas fa-check"></i> Approved
+          </button>
+          <button class="filter-btn" data-filter="rejected">
+            <i class="fas fa-times"></i> Rejected
+          </button>
+        </div>
+      </div>
+
+      <div class="table-container">
+        <form id="requisitionForm" method="post" action="{% url 'process_requisitions' %}">
+          {% csrf_token %}
+          <input type="hidden" class="idem-key-field" name="idempotency_key">
+          <table class="modern-table" id="indentsTable">
+            <thead>
+              <tr>
+                <th class="checkbox-col">
+                  <input type="checkbox" id="selectAll" class="table-checkbox" />
+                </th>
+                <th>Requisition No.</th>
+                <th>Date & Time</th>
+                <th>Details</th>
+                <th>Product Info</th>
+                <th>Quantity</th>
+                <th>Expected Delivery</th>
+                <th>Status</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% if page_obj %}
+                {% for requisition in page_obj %}
+                  {% if requisition.status != "APPROVED FOR TRANSFER" %}
+                  <tr class="table-row" 
+                      id="requisition-{{ requisition.id }}"
+                      data-status="{{ requisition.status|default:'PENDING' }}">
+                    <td class="checkbox-col">
+                      {% if requisition.status != "PO GENERATED" and requisition.status != "APPROVED" and requisition.status != "REJECTED" and requisition.status != "APPROVED FOR TRANSFER" %}
+                        <input type="checkbox" 
+                               name="selected_requisitions" 
+                               value="{{ requisition.id }}" 
+                               class="table-checkbox requisition-checkbox"
+                               data-to-location="{{ requisition.location }}">
+                      {% endif %}
+                    </td>
+                    <td>
+                      <div class="requisition-number-cell">
+                        <span class="req-number">
+                          {{ requisition.requisition_number }}
+                        </span>
+                      </div>
+                    </td>
+                    <td>
+                      <div class="datetime-cell">
+                        <span class="date-text">{{ requisition.date_of_request }}</span>
+                        <span class="time-text">{{ requisition.time_of_request }}</span>
+                      </div>
+                    </td>
+                    <td>
+                      <div class="details-cell">
+                        <div class="detail-row">
+                          <i class="fas fa-user"></i>
+                          <span>{{ requisition.employee_name }}</span>
+                        </div>
+                        <div class="detail-row">
+                          <i class="fas fa-building"></i>
+                          <span>{{ requisition.department }}</span>
+                        </div>
+                        <div class="detail-row">
+                          <i class="fas fa-map-marker-alt"></i>
+                          <span>{{ requisition.location }}</span>
+                        </div>
+                      </div>
+                    </td>
+                    <td>
+                      <div class="product-cell">
+                        <div class="product-name">
+                          {% if requisition.mapped_product_name and requisition.mapped_system != 'INDENT_EASY' %}
+                            <div class="mapped-product-info">
+                              <div class="mapped-product-name">{{ requisition.mapped_product_name }}</div>
+                              <div class="original-product-name">
+                                <small class="text-muted">(Original: {{ requisition.stock_item }})</small>
+                              </div>
+                              <div class="mapping-badge">
+                                <span class="badge {% if requisition.mapped_system == 'NDDB' %}bg-warning{% else %}bg-info{% endif %}">
+                                  {{ requisition.mapped_system }}
+                                </span>
+                              </div>
+                            </div>
+                          {% else %}
+                            <div class="product-name">{{ requisition.stock_item }}</div>
+                          {% endif %}
+                        </div>
+                        {% if requisition.remark %}
+                          <div class="product-meta">
+                            <span class="remark-badge" data-bs-toggle="tooltip" title="{{ requisition.remark }}">
+                              <i class="fas fa-comment"></i> Remark
+                            </span>
+                          </div>
+                        {% endif %}
+                      </div>
+                    </td>
+                    <td>
+                      <div class="quantity-cell">
+                        <div class="qty-ordered">
+                          <span class="qty-value">{{ requisition.quantity }}</span>
+                        </div>
+                      </div>
+                    </td>
+                    <td>
+                      <span class="delivery-date">{{ requisition.expected_delivery_date }}</span>
+                    </td>
+                    <td>
+                      <div class="status-cell">
+                        {% if requisition.status == "APPROVED" %}
+                          <span class="status-badge approved">
+                            <i class="fas fa-check-circle"></i> Approved
+                          </span>
+                        {% elif requisition.status == "REJECTED" %}
+                          <span class="status-badge rejected">
+                            <i class="fas fa-times-circle"></i> Rejected
+                          </span>
+                        {% elif requisition.status == "APPROVED FOR TRANSFER" %}
+                          <span class="status-badge transfer">
+                            <i class="fas fa-exchange-alt"></i> For Transfer
+                          </span>
+                        {% elif requisition.status == "PO GENERATED" %}
+                          <span class="status-badge po-generated">
+                            <i class="fas fa-file-invoice"></i> PO Generated
+                          </span>
+                        {% else %}
+                          <span class="status-badge pending">
+                            <i class="fas fa-clock"></i> {{ requisition.status }}
+                          </span>
+                        {% endif %}
+                      </div>
+                    </td>
+                    <td>
+                      <div class="actions-cell">
+                        {% if requisition.status == "PO GENERATED" %}
+                          <div class="grn-info">
+                            <i class="fas fa-info-circle"></i>
+                            <span>No action needed</span>
+                          </div>
+                        {% elif requisition.status == "APPROVED" %}
+                          <div class="grn-info done">
+                            <i class="fas fa-check-circle"></i>
+                            <span>Approved</span>
+                          </div>
+                        {% elif requisition.status == "REJECTED" %}
+                          <div class="grn-info cancelled">
+                            <i class="fas fa-ban"></i>
+                            <span>Rejected</span>
+                          </div>
+                        {% elif requisition.status == "APPROVED FOR TRANSFER" %}
+                          <div class="grn-info done">
+                            <i class="fas fa-exchange-alt"></i>
+                            <span>Approved For Transfer</span>
+                          </div>
+                        {% else %}
+                          {% if request.user.is_hod %}
+                            <div class="action-buttons">
+                              <button class="action-btn-small approve-btn" 
+                                      data-requisition-id="{{ requisition.id }}"
+                                      data-bs-toggle="tooltip" 
+                                      title="Approve">
+                                <i class="fas fa-check"></i>
+                                <span>Approve</span>
+                              </button>
+                              <button class="action-btn-small approve-stn-btn" 
+                                      data-requisition-id="{{ requisition.id }}"
+                                      style="display: none;"
+                                      data-bs-toggle="tooltip" 
+                                      title="Approve for STN">
+                                <i class="fas fa-exchange-alt"></i>
+                                <span>STN</span>
+                              </button>
+                              <button class="action-btn-small reject-btn" 
+                                      data-requisition-id="{{ requisition.id }}"
+                                      data-bs-toggle="tooltip" 
+                                      title="Reject">
+                                <i class="fas fa-times"></i>
+                                <span>Reject</span>
+                              </button>
+                            </div>
+                          {% else %}
+                            <div class="grn-info">
+                              <i class="fas fa-info-circle"></i>
+                              <span>No Action</span>
+                            </div>
+                          {% endif %}
+                        {% endif %}
+                      </div>
+                    </td>
+                  </tr>
+                  {% endif %}
+                {% empty %}
+                  <tr>
+                    <td colspan="9" class="empty-state">
+                      <div class="empty-state-content">
+                        <i class="fas fa-inbox"></i>
+                        <h3>No Requisitions Found</h3>
+                        <p>There are no requisitions waiting for your approval.</p>
+                      </div>
+                    </td>
+                  </tr>
+                {% endfor %}
+              {% else %}
+                <tr>
+                  <td colspan="9" class="empty-state">
+                    <div class="empty-state-content">
+                      <i class="fas fa-inbox"></i>
+                      <h3>No Requisitions Found</h3>
+                      <p>There are no requisitions waiting for your approval.</p>
+                    </div>
+                  </td>
+                </tr>
+              {% endif %}
+            </tbody>
+          </table>
+        </form>
+        
+        <!-- Pagination -->
+        {% if page_obj.paginator.num_pages > 1 %}
+        <div class="pagination-container">
+          <nav>
+            <ul class="pagination">
+              {% if page_obj.has_previous %}
+                <li class="page-item">
+                  <a class="page-link" href="?page=1" aria-label="First">
+                    <span aria-hidden="true">&laquo;&laquo;</span>
+                  </a>
+                </li>
+                <li class="page-item">
+                  <a class="page-link" href="?page={{ page_obj.previous_page_number }}" aria-label="Previous">
+                    <span aria-hidden="true">&laquo;</span>
+                  </a>
+                </li>
+              {% endif %}
+              <li class="page-item disabled">
+                <span class="page-link">Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span>
+              </li>
+              {% if page_obj.has_next %}
+                <li class="page-item">
+                  <a class="page-link" href="?page={{ page_obj.next_page_number }}" aria-label="Next">
+                    <span aria-hidden="true">&raquo;</span>
+                  </a>
+                </li>
+                <li class="page-item">
+                  <a class="page-link" href="?page={{ page_obj.paginator.num_pages }}" aria-label="Last">
+                    <span aria-hidden="true">&raquo;&raquo;</span>
+                  </a>
+                </li>
+              {% endif %}
+            </ul>
+          </nav>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+  </main>
+</div>
+
+<!-- From Location Modal -->
+<div class="modal fade" id="fromLocationModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content modern-modal">
+      <div class="modal-header">
+        <h5 class="modal-title">
+          <i class="fas fa-map-marker-alt"></i>
+          Select From Location
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <p>Please select the source location for this transfer:</p>
+        <div class="form-group">
+          <label for="fromLocationDropdown">From Location</label>
+          <select id="fromLocationDropdown" class="form-control">
+            <option value="" disabled selected>SELECT A LOCATION FROM DROPDOWN</option>
+            {% for location in locations %}
+              <option value="{{ location }}">{{ location }}</option>
+            {% endfor %}
+          </select>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn-secondary" data-bs-dismiss="modal">
+          Cancel
+        </button>
+        <button type="button" class="btn-primary" id="confirmFromLocation">
+          Confirm
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
+<style>
+  :root {
+    --primary-dark: #313647;
+    --primary-light: #435663;
+    --accent-green: #A3B087;
+    --accent-red: #EA5B6F;
+    --accent-yellow: #FFF8D4;
+    --text-dark: #2c3e50;
+    --text-light: #7f8c8d;
+    --bg-light: #f8f9fa;
+    --border-color: #e9ecef;
+    --success: #28a745;
+    --warning: #ffc107;
+    --danger: #dc3545;
+    --info: #17a2b8;
+  }
+
+  /* Layout */
+  .layout-container {
+    display: flex;
+    min-height: calc(100vh - 90px);
+    background: white;
+    align-items: stretch;
+  }
+
+  /* Sidebar */
+  .sidebar {
+    width: 320px;
+    background: var(--primary-dark);
+    color: white;
+    padding: 2rem 1.5rem;
+    box-shadow: 2px 0 20px rgba(0, 0, 0, 0.1);
+    border-radius: 0 20px 20px 0;
+    position: sticky;
+    top: 90px;
+    height: auto;
+    min-height: calc(100vh - 90px);
+    overflow-y: auto;
+    flex-shrink: 0;
+    margin-top: 40px;
+    margin-left: 10px;
+  }
+
+  .sidebar-content {
+    display: flex;
+    flex-direction: column;
+    gap: 2rem;
+    height: 100%;
+  }
+
+  .user-welcome {
+    text-align: center;
+    padding-bottom: 1.5rem;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  }
+
+  .welcome-title {
+    font-size: 1.5rem;
+    font-weight: 600;
+    margin-bottom: 0.5rem;
+    color: var(--accent-green);
+  }
+
+  .wave-emoji {
+    display: inline-block;
+    animation: wave 1.5s ease-in-out infinite;
+  }
+
+  @keyframes wave {
+    0%, 100% { transform: rotate(0deg); }
+    25% { transform: rotate(15deg); }
+    75% { transform: rotate(-10deg); }
+  }
+
+  .user-name {
+    font-size: 1.1rem;
+    color: var(--accent-yellow);
+    font-weight: 500;
+    margin-bottom: 1rem;
+  }
+
+  .user-details {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    align-items: center;
+  }
+
+  .detail-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.4rem 0.8rem;
+    background: rgba(163, 176, 135, 0.1);
+    border-radius: 20px;
+    font-size: 0.85rem;
+    color: rgba(255, 255, 255, 0.9);
+  }
+
+  .detail-badge i {
+    color: var(--accent-green);
+  }
+
+  /* Stats Section */
+  .stats-section {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 1rem;
+    padding-bottom: 1.5rem;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  }
+
+  .stat-card {
+    background: rgba(163, 176, 135, 0.1);
+    padding: 1rem;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    border: 1px solid rgba(163, 176, 135, 0.2);
+  }
+
+  .stat-icon {
+    width: 48px;
+    height: 48px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.5rem;
+  }
+
+  .inventory-icon {
+    background: rgba(163, 176, 135, 0.2);
+    color: var(--accent-green);
+  }
+
+  .stat-info {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .stat-value {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: white;
+  }
+
+  .stat-label {
+    font-size: 0.75rem;
+    color: rgba(255, 255, 255, 0.7);
+  }
+
+  /* Quick Actions */
+  .quick-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+
+  .section-title {
+    font-size: 1.1rem;
+    color: var(--accent-yellow);
+    margin-bottom: 0.5rem;
+    font-weight: 500;
+  }
+
+  .action-btn {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.875rem 1rem;
+    background: rgba(163, 176, 135, 0.1);
+    color: var(--accent-yellow);
+    text-decoration: none;
+    border-radius: 10px;
+    transition: all 0.3s ease;
+    border: 1px solid rgba(163, 176, 135, 0.2);
+    position: relative;
+  }
+
+  .action-btn:hover {
+    background: rgba(163, 176, 135, 0.2);
+    color: white;
+    transform: translateX(5px);
+  }
+
+  .action-btn i {
+    color: var(--accent-green);
+    font-size: 1.1rem;
+  }
+
+  .action-btn span {
+    flex: 1;
+  }
+
+  /* Main Content */
+  .main-content {
+    flex: 1;
+    background: #ffffff;
+    padding: 2rem;
+    overflow-y: auto;
+    min-height: calc(100vh - 90px);
+    display: flex;
+    flex-direction: column;
+    gap: 2rem;
+  }
+
+  /* Page Header */
+  .page-header {
+    margin-bottom: 0;
+    background: linear-gradient(135deg, var(--accent-green) 0%, #8a9975 100%);
+    border-radius: 20px;
+    padding: 1.5rem 2rem;
+    box-shadow: 0 8px 32px rgba(163, 176, 135, 0.2);
+    border: 2px solid black;
+  }
+
+  .header-content {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+  }
+
+  .header-text {
+    text-align: center;
+  }
+
+  .page-title {
+    font-size: 2rem;
+    font-weight: 700;
+    color: #313647;
+    margin-bottom: 0.5rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.75rem;
+  }
+
+  .page-title i {
+    font-size: 1.75rem;
+  }
+
+  .page-subtitle {
+    font-size: 1rem;
+    color: #313647;
+    font-weight: 400;
+  }
+
+  /* Table Wrapper */
+  .table-wrapper {
+    background: linear-gradient(135deg, var(--accent-green) 0%, #8a9975 100%);
+    border-radius: 16px;
+    border: 2px solid black;
+    box-shadow: 0 8px 32px rgba(163, 176, 135, 0.2);
+    overflow: hidden;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-height: calc(100vh - 400px);
+  }
+
+  .table-header-actions {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1.5rem;
+    background: var(--accent-green);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+    backdrop-filter: blur(10px);
+  }
+
+  .selected-info {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    color: var(--primary-dark);
+    font-weight: 500;
+  }
+
+  .selected-info i {
+    color: var(--success);
+  }
+
+  .table-filters {
+    display: flex;
+    gap: 0.5rem;
+  }
+
+  .filter-btn {
+    padding: 0.5rem 1rem;
+    border: 2px solid transparent;
+    background: rgba(255, 255, 255, 0.8);
+    color: var(--text-dark);
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 0.9rem;
+    font-weight: 500;
+    transition: all 0.3s ease;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    backdrop-filter: blur(5px);
+  }
+
+  .filter-btn:hover {
+    background: rgba(255, 255, 255, 1);
+    transform: translateY(-2px);
+  }
+
+  .filter-btn.active {
+    background: var(--primary-dark);
+    color: white;
+    border-color: var(--primary-dark);
+  }
+
+  /* Table Container */
+  .table-container {
+    overflow-x: auto;
+    flex: 1;
+    background: var(--accent-green);
+    backdrop-filter: blur(10px);
+    border-radius: 0 0 16px 16px;
+  }
+
+  .table-container::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+
+  .table-container::-webkit-scrollbar-track {
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 4px;
+  }
+
+  .table-container::-webkit-scrollbar-thumb {
+    background: rgba(138, 153, 117, 0.6);
+    border-radius: 4px;
+  }
+
+  .table-container::-webkit-scrollbar-thumb:hover {
+    background: rgba(138, 153, 117, 0.8);
+  }
+
+  .modern-table {
+    width: 100%;
+    border-collapse: collapse;
+    background: transparent;
+  }
+
+  .modern-table thead {
+    background: var(--primary-dark);
+    position: sticky;
+    top: 0;
+    z-index: 10;
+  }
+
+  .modern-table th {
+    color:  #313647;
+    padding: 1rem;
+    font-weight: 600;
+    text-align: left;
+    font-size: 0.9rem;
+    white-space: nowrap;
+    border-bottom: 2px solid #8a9975;
+  }
+
+  .modern-table td {
+    padding: 1rem;
+    border-bottom: 1px solid rgba(138, 153, 117, 0.2);
+    vertical-align: middle;
+    font-size: 0.9rem;
+    background: rgba(255, 255, 255, 0.8);
+  }
+
+  .modern-table tbody tr {
+    transition: all 0.3s ease;
+    background: rgba(255, 255, 255, 0.8);
+  }
+
+  .modern-table tbody tr:hover {
+    background: rgba(255, 255, 255, 0.95);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(138, 153, 117, 0.2);
+  }
+
+  /* Checkbox Column */
+  .checkbox-col {
+    width: 50px;
+    text-align: center;
+  }
+
+  .table-checkbox {
+    width: 20px;
+    height: 20px;
+    cursor: pointer;
+    accent-color: var(--accent-green);
+  }
+
+  /* Cell Styles */
+  .requisition-number-cell {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+  }
+
+  .req-number {
+    font-weight: 600;
+    color: var(--primary-dark);
+    font-size: 0.95rem;
+  }
+
+  .datetime-cell {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+  }
+
+  .date-text {
+    font-weight: 500;
+    color: var(--text-dark);
+  }
+
+  .time-text {
+    font-size: 0.85rem;
+    color: var(--text-light);
+  }
+
+  .details-cell {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
+  .detail-row {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.85rem;
+  }
+
+  .detail-row i {
+    color: var(--accent-green);
+    width: 14px;
+  }
+
+  .product-cell {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
+  .product-name {
+    font-weight: 600;
+    color: var(--text-dark);
+  }
+
+  .product-meta {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+  }
+
+  .remark-badge {
+    padding: 0.25rem 0.5rem;
+    background: var(--info);
+    color: white;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    font-weight: 600;
+  }
+
+  /* Mapped Product Styles */
+  .mapped-product-info {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+  }
+
+  .mapped-product-name {
+    font-weight: 600;
+    color: var(--primary-dark);
+  }
+
+  .original-product-name {
+    font-size: 0.8rem;
+    color: var(--text-light);
+  }
+
+  .mapping-badge {
+    margin-top: 0.25rem;
+  }
+
+  .mapping-badge .badge {
+    font-size: 0.7rem;
+    padding: 0.25rem 0.5rem;
+  }
+
+  .bg-warning {
+    background-color: var(--warning) !important;
+    color: #000 !important;
+  }
+
+  .bg-info {
+    background-color: var(--info) !important;
+    color: #fff !important;
+  }
+
+  .quantity-cell {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
+  .qty-ordered, .qty-received {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  .qty-label {
+    font-size: 0.8rem;
+    color: var(--text-light);
+    font-weight: 500;
+  }
+
+  .qty-value {
+    font-weight: 700;
+    color: var(--text-dark);
+    padding: 0.25rem 0.5rem;
+    background: var(--bg-light);
+    border-radius: 4px;
+  }
+
+  .delivery-date {
+    font-weight: 500;
+    color: var(--text-dark);
+  }
+
+  /* Status Cell */
+  .status-cell {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
+  .status-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 0.75rem;
+    border-radius: 8px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    white-space: nowrap;
+  }
+
+  .status-badge.approved {
+    background: rgba(40, 167, 69, 0.1);
+    color: var(--success);
+  }
+
+  .status-badge.rejected {
+    background: rgba(220, 53, 69, 0.1);
+    color: var(--danger);
+  }
+
+  .status-badge.pending {
+    background: rgba(255, 193, 7, 0.1);
+    color: var(--warning);
+  }
+
+  .status-badge.po-generated {
+    background: rgba(23, 162, 184, 0.1);
+    color: var(--info);
+  }
+
+  .status-badge.transfer {
+    background: rgba(163, 176, 135, 0.1);
+    color: var(--accent-green);
+  }
+
+  /* Actions Cell */
+  .actions-cell {
+    min-width: 150px;
+  }
+
+  .action-buttons {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+  }
+
+  .action-btn-small {
+    padding: 0.5rem 0.75rem;
+    border: none;
+    border-radius: 8px;
+    font-size: 0.85rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    white-space: nowrap;
+  }
+
+  .action-btn-small.approve-btn {
+    background: var(--success);
+    color: white;
+  }
+
+  .action-btn-small.approve-btn:hover {
+    background: #218838;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(40, 167, 69, 0.3);
+  }
+
+  .action-btn-small.approve-stn-btn {
+    background: var(--accent-green);
+    color: white;
+  }
+
+  .action-btn-small.approve-stn-btn:hover {
+    background: #8a9975;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(138, 153, 117, 0.3);
+  }
+
+  .action-btn-small.reject-btn {
+    background: var(--danger);
+    color: white;
+  }
+
+  .action-btn-small.reject-btn:hover {
+    background: #c82333;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(220, 53, 69, 0.3);
+  }
+
+  .grn-info {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    padding: 0.5rem;
+    border-radius: 8px;
+  }
+
+  .grn-info.done {
+    background: rgba(40, 167, 69, 0.1);
+    color: var(--success);
+  }
+
+  .grn-info.cancelled {
+    background: rgba(220, 53, 69, 0.1);
+    color: var(--danger);
+  }
+
+  .grn-info i {
+    font-size: 1rem;
+  }
+
+  /* Empty State */
+  .empty-state {
+    text-align: center;
+    padding: 4rem 2rem;
+  }
+
+  .empty-state-content {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1rem;
+  }
+
+  .empty-state-content i {
+    font-size: 4rem;
+    color: var(--text-light);
+    opacity: 0.5;
+  }
+
+  .empty-state-content h3 {
+    color: var(--text-dark);
+    font-weight: 600;
+  }
+
+  .empty-state-content p {
+    color: var(--text-light);
+  }
+
+  /* Pagination */
+  .pagination-container {
+    display: flex;
+    justify-content: center;
+    padding: 1.5rem;
+    background: rgba(255, 255, 255, 0.95);
+  }
+
+  .pagination {
+    margin: 0;
+  }
+
+  .page-link {
+    color: var(--primary-dark);
+    border: 1px solid var(--border-color);
+    padding: 0.5rem 0.75rem;
+  }
+
+  .page-link:hover {
+    background: var(--accent-green);
+    color: white;
+    border-color: var(--accent-green);
+  }
+
+  .page-item.disabled .page-link {
+    color: var(--text-light);
+    background: var(--bg-light);
+  }
+
+  /* Modal Styles */
+  .modern-modal {
+    border: 2px solid black;
+    border-radius: 16px;
+    overflow: hidden;
+    background-color: #A3B087;
+  }
+
+  .modern-modal .modal-header {
+    background: linear-gradient(135deg, var(--primary-dark) 0%, var(--primary-light) 100%);
+    color: #A3B087;
+    padding: 1.5rem;
+    border: none;
+  }
+
+  .modal-backdrop {
+    background-color: transparent !important;
+  }
+
+  .modern-modal .modal-title {
+    font-size: 1.25rem;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+  }
+
+  .modern-modal .modal-body {
+    padding: 2rem;
+  }
+
+  .modern-modal .modal-footer {
+    padding: 1.5rem;
+    background: var(--bg-light);
+    border: none;
+    background-color: #A3B087;
+  }
+
+  /* Form Styles */
+  .form-group {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
+  .form-group label {
+    font-weight: 500;
+    color: var(--text-dark);
+    font-size: 0.9rem;
+  }
+
+  .form-control {
+    padding: 0.75rem;
+    border: 2px solid var(--border-color);
+    border-radius: 8px;
+    font-size: 0.9rem;
+    transition: all 0.3s ease;
+    font-family: 'Lexend', sans-serif;
+  }
+
+  .form-control:focus {
+    outline: none;
+    border-color: var(--accent-green);
+    box-shadow: 0 0 0 3px rgba(163, 176, 135, 0.1);
+  }
+
+  /* Button Styles */
+  .btn-primary, .btn-secondary {
+    padding: 0.75rem 1.5rem;
+    border: none;
+    border-radius: 8px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  .btn-primary {
+    background: var(--primary-dark);
+    color: white;
+  }
+
+  .btn-primary:hover {
+    background: var(--primary-light);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(49, 54, 71, 0.3);
+  }
+
+  .btn-secondary {
+    background: #31694E;
+    color: white;
+  }
+
+  .btn-secondary:hover {
+    background: #31694E;
+  }
+
+  /* Responsive Design */
+  @media (max-width: 1200px) {
+    .layout-container {
+      flex-direction: column;
+    }
+    
+    .sidebar {
+      width: 100%;
+      margin: 0;
+      border-radius: 0;
+      position: relative;
+      top: 0;
+      min-height: auto;
+    }
+  }
+
+  @media (max-width: 768px) {
+    .main-content {
+      padding: 1rem;
+    }
+
+    .page-header {
+      padding: 1.5rem;
+      border: 2px solid black;
+    }
+
+    .page-title {
+      font-size: 1.5rem;
+    }
+
+    .table-filters {
+      flex-wrap: wrap;
+    }
+
+    .filter-btn {
+      font-size: 0.8rem;
+      padding: 0.4rem 0.8rem;
+    }
+
+    .modern-table {
+      font-size: 0.8rem;
+    }
+
+    .modern-table th,
+    .modern-table td {
+      padding: 0.5rem;
+    }
+
+    .action-buttons {
+      flex-direction: column;
+    }
+  }
+
+  /* Loading States */
+  .spinner-border {
+    width: 1rem;
+    height: 1rem;
+    border-width: 2px;
+  }
+</style>
+
+<script>
+$(document).ready(function () {
+  // Initialize tooltips
+  $('[data-bs-toggle="tooltip"]').tooltip();
+
+  let currentRequisitionId = null;
+  let currentToLocation = null;
+
+  // Select All Checkbox
+  $("#selectAll").change(function () {
+    $(".requisition-checkbox").prop("checked", $(this).prop("checked"));
+    updateSelectedCount();
+    toggleActionButtons();
+  });
+
+  // Individual Checkbox
+  $(".requisition-checkbox").change(function () {
+    updateSelectedCount();
+    toggleActionButtons();
+  });
+
+  function updateSelectedCount() {
+    const count = $(".requisition-checkbox:checked").length;
+    if (count > 0) {
+      $("#selectedCount").text(count);
+      $("#selectedInfo").show();
+    } else {
+      $("#selectedInfo").hide();
+    }
+  }
+
+  function toggleActionButtons() {
+    $(".requisition-checkbox").each(function() {
+      const row = $(this).closest('tr');
+      const approveBtn = row.find('.approve-btn');
+      const approveStnBtn = row.find('.approve-stn-btn');
+      
+      if ($(this).is(':checked')) {
+        approveBtn.hide();
+        approveStnBtn.show();
+      } else {
+        approveBtn.show();
+        approveStnBtn.hide();
+      }
+    });
+  }
+
+  // Filter Buttons
+  $(".filter-btn").click(function () {
+    $(".filter-btn").removeClass("active");
+    $(this).addClass("active");
+
+    const filter = $(this).data("filter");
+    const rows = $("#indentsTable tbody tr");
+
+    if (filter === "all") {
+      rows.show();
+    } else {
+      rows.hide();
+      rows.each(function () {
+        const status = $(this).data("status");
+        if (filter === "pending" && status === "PENDING") {
+          $(this).show();
+        } else if (filter === "approved" && status === "APPROVED") {
+          $(this).show();
+        } else if (filter === "rejected" && status === "REJECTED") {
+          $(this).show();
+        }
+      });
+    }
+  });
+
+  function disableAllActionButtons() {
+    $('.approve-btn, .approve-stn-btn, .reject-btn').prop('disabled', true);
+  }
+
+  function enableAllActionButtons() {
+    $('.approve-btn, .approve-stn-btn, .reject-btn').prop('disabled', false);
+  }
+
+  // Approve Button
+  $('.approve-btn').on('click', function (e) {
+    e.preventDefault();
+    var clickedButton = $(this);
+    var requisitionId = clickedButton.data('requisition-id');
+    var loader = $('<div class="spinner-border spinner-border-sm text-light ms-2" role="status"><span class="visually-hidden">Loading...</span></div>');
+
+    // Disable all action buttons in the table
+    disableAllActionButtons();
+    clickedButton.append(loader);
+
+    $.ajax({
+      url: '{% url "approve_requisition" 0 %}'.replace('0', requisitionId),
+      method: 'POST',
+      data: {
+        csrfmiddlewaretoken: '{{ csrf_token }}',
+        requisition_id: requisitionId,
+        idempotency_key: window.IdemKeys.get('approve-' + requisitionId)
+      },
+      success: function (response) {
+        console.log('Requisition approved successfully:', response);
+        alert('Requisition approved and email sent successfully.');
+        location.reload();
+      },
+      error: function (xhr, status, error) {
+        console.error('Error approving requisition:', error);
+        alert('Error: ' + error);
+        enableAllActionButtons();
+        loader.remove();
+      }
+    });
+  });
+
+  // Approve STN Button
+  $('.approve-stn-btn').on('click', function (e) {
+    e.preventDefault();
+    var clickedButton = $(this);
+    var row = clickedButton.closest('tr');
+    var requisitionId = clickedButton.data('requisition-id');
+    var toLocation = row.find('.requisition-checkbox').data('to-location');
+    
+    currentRequisitionId = requisitionId;
+    currentToLocation = toLocation;
+    
+    // Show the from location modal
+    $('#fromLocationModal').modal('show');
+  });
+
+  // Confirm From Location
+  $('#confirmFromLocation').on('click', function() {
+    var fromLocation = $('#fromLocationDropdown').val();
+    
+    if (!fromLocation) {
+      alert('Please select a from location.');
+      return;
+    }
+    
+    if (fromLocation === currentToLocation) {
+      alert('From location cannot be the same as to location.');
+      return;
+    }
+    
+    var clickedButton = $('.approve-stn-btn[data-requisition-id="' + currentRequisitionId + '"]');
+    var loader = $('<div class="spinner-border spinner-border-sm text-light ms-2" role="status"><span class="visually-hidden">Loading...</span></div>');
+
+    // Disable all action buttons in the table
+    disableAllActionButtons();
+    clickedButton.append(loader);
+
+    $.ajax({
+      url: '{% url "approve_requisition" 0 %}'.replace('0', currentRequisitionId),
+      method: 'POST',
+      data: {
+        csrfmiddlewaretoken: '{{ csrf_token }}',
+        requisition_id: currentRequisitionId,
+        from_location: fromLocation,
+        idempotency_key: window.IdemKeys.get('approve-stn-' + currentRequisitionId)
+      },
+      success: function (response) {
+        console.log('Requisition approved for STN successfully:', response);
+        alert('Requisition approved for STN and email sent successfully.');
+        $('#fromLocationModal').modal('hide');
+        location.reload();
+      },
+      error: function (xhr, status, error) {
+        console.error('Error approving requisition for STN:', error);
+        alert('Error: ' + error);
+        enableAllActionButtons();
+        loader.remove();
+        $('#fromLocationModal').modal('hide');
+      }
+    });
+  });
+
+  // Reject Button
+  $('.reject-btn').on('click', function(e) {
+    e.preventDefault();
+    var clickedButton = $(this);
+    var requisitionId = clickedButton.data('requisition-id');
+    var loader = $('<div class="spinner-border spinner-border-sm text-light ms-2" role="status"><span class="visually-hidden">Loading...</span></div>');
+    
+    // Disable all action buttons when reject is clicked
+    disableAllActionButtons();
+    clickedButton.append(loader);
+    
+    $.ajax({
+      url: '{% url "reject_requisition" 0 %}'.replace('0', requisitionId),
+      method: 'POST',
+      data: {
+        csrfmiddlewaretoken: '{{ csrf_token }}',
+        requisition_id: requisitionId,
+        idempotency_key: window.IdemKeys.get('reject-' + requisitionId)
+      },
+      success: function(response) {
+        alert('Requisition rejected successfully.');
+        location.reload();
+      },
+      error: function(xhr, status, error) {
+        alert('Error: ' + error);
+        enableAllActionButtons();
+        loader.remove();
+      }
+    });
+  });
+});
+</script>
+
+{% endblock %}

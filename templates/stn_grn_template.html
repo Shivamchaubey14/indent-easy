@@ -1,0 +1,264 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Goods Receipt Note</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Roboto+Condensed:wght@400&display=swap');
+
+        @page {
+            size: A4;
+            margin: 40px;
+        }
+        body {
+            font-family: Arial, sans-serif;
+            font-size: 12px;
+            margin: 0;
+            padding: 0;
+            color: #000;
+            background-color: #fff;
+            box-sizing: border-box;
+        }
+        .page {
+            page-break-after: always;
+            width: 100%;
+            max-width: 800px;
+            margin: auto;
+            padding: 20px;
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            height: 100%;
+        }
+        .header {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding-bottom: 10px;
+            border-bottom: 2px solid black;
+        }
+        .logo {
+            width: 100px;
+            height: 100px;
+            object-fit: contain;
+            margin-right: 20px;
+        }
+        .header-text {
+            text-align: center;
+        }
+        .header-text h1 {
+            font-family: 'Roboto Condensed', sans-serif;
+            font-size: 18px;
+            margin: 0;
+            text-transform: uppercase;
+        }
+        .header-text p {
+            font-size: 14px;
+            margin-top: 5px;
+        }
+        .goods-receipt-note {
+            font-size: 20px;
+            font-weight: bold;
+            text-align: center;
+            margin: 20px 0;
+        }
+        .details {
+    margin-top: 10px;
+    font-size: 12px;
+    display: flex;
+    justify-content: space-between; /* Ensures left and right align correctly */
+    align-items: flex-start; /* Aligns both sections at the top */
+    width: 100%;
+}
+
+.details-left {
+    width: 45%; /* Adjust width to ensure alignment */
+    text-align: left;
+}
+
+.details-right {
+    width: 45%; /* Adjust width to ensure alignment */
+    text-align: right; /* Aligns text to the right side */
+}
+
+        .details-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        .details-table td {
+            padding: 5px;
+            border: none;
+            vertical-align: top; /* Ensures text aligns properly */
+        }
+        .items-table-container {
+            margin: 0 auto;
+            padding: 0 30px;
+            flex-grow: 1;
+        }
+        .items-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 10px;
+            border: 1px solid black;
+        }
+        .items-table th {
+            border: 1px solid black;
+            padding: 4px;
+            text-align: center;
+            background-color: #f2f2f2;
+        }
+        .items-table td {
+            padding: 4px;
+            text-align: center;
+            border-left: 1px solid black;
+            border-right: 1px solid black;
+        }
+        .items-table td:first-child {
+            border-left: none;
+        }
+        .items-table td:last-child {
+            border-right: none;
+        }
+        .footer {
+            margin-top: 20px;
+            text-align: center;
+            font-size: 12px;
+            width: 100%;
+        }
+        .grn-details {
+            text-align: right;
+            font-size: 12px;
+            margin-top: 20px;
+        }
+        .grn-details p {
+            margin: 5px 0;
+        }
+        .footer {
+            margin-top: 20px;
+            text-align: center;
+            font-size: 12px;
+            width: 100%;
+        }
+        .signature {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 40px;
+            margin-bottom: 60px;
+            position: relative;
+            width: 100%;
+        }
+        .signature div {
+            width: 30%;
+            text-align: center;
+            padding-top: 5px;
+        }
+    </style>
+</head>
+<body>
+    <div class="page">
+        <div>
+            <div class="header">
+                <img src="{{ logo_url }}" alt="Logo" class="logo">
+                <div class="header-text">
+                    <h1>SHWETDHARA MILK PRODUCER COMPANY LIMITED</h1>
+                    <h3>CIN: U01100UP2016PTC082671</h3>
+                    <h5>GORAKHNATH COMPLEX, FIRST FLOOR LEFT SIDE, PRAYAGRAJ ROAD, NEAR AWADH UNIVERSITY AYODHYA, AYODHYA, 224001</h5>
+                </div>
+            </div>
+            <p class="goods-receipt-note">GOODS RECEIPT NOTE</p>
+            <div class="details">
+                <!-- Left Section -->
+                <div class="details-left">
+                    <table class="details-table">
+                        <tr>
+                            <td><strong>Supplied From:</strong> {{ supplier_name }} STORE</td>
+                        </tr>
+                        <tr>
+
+                            <td><strong>STN Number:</strong> {{ stn_number }}</td>
+                        </tr>
+                        <tr>
+                            <td><strong>STN Date:</strong> {{ stn_date}}</td>
+                        </tr>
+                    </table>
+                </div>
+                <!-- Right Section -->
+                <div class="details-right">
+                    <table class="details-table">
+                        <tr>
+                            <td><strong>GRN Number:</strong> {{ grn_entries.0.grn_number }}</td>
+                        </tr>
+                        <tr>
+                            <td><strong>GRN Date:</strong> {{ grn_date }}</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Received Location:</strong> {{ grn_entries.0.location }} STORE</td>
+                        </tr>
+                    </table>
+                </div>
+            </div>
+
+            <div class="items-table-container" style="margin-top: 40px;">
+                <table class="items-table">
+                    <thead>
+                        <tr>
+                            <th>S. No.</th>
+                            <th>Item Description</th>
+                            <th>Ordered Quantity</th>
+                            <th>Delivered Quantity</th>
+                            <th>Rejected</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for grn in grn_entries %}
+                        <tr>
+                            <td>{{ forloop.counter }}</td>
+                            <td>{{ grn.stock_item }}</td>
+                            <td>{{ grn.quantity_ordered }}</td>
+                            <td>{{ grn.quantity_received }}</td>
+                            <td>{{ grn.quantity_rejected }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <div>
+            <div class="footer">
+                <p>All technical, qualitative, and economic parameters were checked and found as per requirement.</p>
+            </div>
+
+            <div class="signature">
+                <div>
+                    {% if prepared_by_signature %}
+                        <img src="{{ prepared_by_signature }}" alt="Prepared By Signature" style="width: 100px; height: 100px;">
+                    {% else %}
+                        <p>No Signature Available</p>
+                    {% endif %}
+                    <p>Prepared By</p>
+                </div>
+                <div>
+                    {% if checked_by_signature %}
+                        <img src="{{ checked_by_signature }}" alt="Checked By Signature" style="width: 100px; height: 100px;">
+                    {% else %}
+                        <p>No Signature Available</p>
+                    {% endif %}
+                    <p>Checked By</p>
+                </div>
+                <div>
+                    {% if approved_by_stamp %}
+                        <img src="{{ approved_by_stamp }}" alt="Approved By Stamp" style="width: 100px; height: 100px;">
+                    {% else %}
+                        <p>No Stamp Available</p>
+                    {% endif %}
+                    <p>Approved By</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

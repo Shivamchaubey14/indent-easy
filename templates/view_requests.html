@@ -1,0 +1,2449 @@
+{% extends "base.html" %} 
+{% load custom_filters %} 
+{% block content %}
+
+<div class="layout-container">
+  <!-- Sidebar -->
+  <aside class="sidebar">
+    <div class="sidebar-content">
+      <!-- User Welcome Section -->
+      <div class="user-welcome">
+        <div class="welcome-header">
+          <h1 class="welcome-title">
+            Hello!
+            <span class="wave-emoji">👋</span>
+          </h1>
+          <p class="user-name">{{request.user.first_name}} {{request.user.last_name}}</p>
+          <div class="user-details">
+            <span class="detail-badge">
+              <i class="fas fa-id-badge"></i>
+              {{ request.user.employee_code }}
+            </span>
+            <span class="detail-badge">
+              <i class="fas fa-building"></i>
+              {{ request.user.department }}
+            </span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Stats Section -->
+      <div class="stats-section">
+        <div class="stat-card">
+          <div class="stat-icon inventory-icon">
+            <i class="fas fa-boxes"></i>
+          </div>
+          <div class="stat-info">
+            <span class="stat-value" id="inventoryCount">0</span>
+            <span class="stat-label">Inventory Items</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Quick Actions -->
+      <div class="quick-actions">
+        <h3 class="section-title">Quick Actions</h3>
+        <a href="{% url 'advance-sale' %}" class="action-btn" style="text-decoration: none;">
+          <i class="fas fa-plus-circle"></i>
+          <span>Advance Sale</span>
+        </a>
+        <a href="{% url 'create-an-indent' %}" class="action-btn" style="text-decoration: none;">
+          <i class="fas fa-plus-circle"></i>
+          <span>Create New Indent</span>
+        </a>
+        <a href="{% url 'view_inventory' %}" class="action-btn" style="text-decoration: none;">
+          <i class="fas fa-cube"></i>
+          <span>View Inventory</span>
+        </a>
+        <a href="{% url 'dispatch_notifications' %}" class="action-btn" style="text-decoration: none;">
+          <i class="fas fa-truck"></i>
+          <span>Dispatch Notifications</span>
+          <span class="action-badge" id="dispatchBadge">0</span>
+        </a>
+        <a href="{% url 'view_others_inventory' %}" class="action-btn" style="text-decoration: none;">
+          <i class="fas fa-window-restore"></i>
+          <span>Other's Inventory</span>
+        </a>
+        <a href="{% url 'export_excel_view' %}" class="action-btn" style="text-decoration: none;">
+          <i class="fas fa-download"></i>
+          <span>Export to Excel</span>
+        </a>
+      </div>
+    </div>
+  </aside>
+
+  <!-- Main Content -->
+  <main class="main-content">
+    <!-- Page Header -->
+    <div class="page-header">
+      <div class="header-content">
+        <div class="header-text">
+          <h1 class="page-title">
+            <i class="fas fa-clipboard-list"></i>
+            Your Indents
+          </h1>
+          <p class="page-subtitle">Manage and track all your indent requests</p>
+        </div>
+        
+        <!-- Search Bar -->
+        <div class="search-container">
+          <form id="searchForm" method="get">
+            <div class="search-wrapper">
+              <i class="fas fa-search search-icon"></i>
+              <input
+                type="text"
+                id="searchInput"
+                name="search"
+                class="search-input"
+                placeholder="Search indents by requisition number, item..."
+                value="{{ search_query|default:'' }}"
+              />
+              <button class="search-btn" type="submit">
+                Search
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+
+    <!-- Table Container -->
+    <div class="table-wrapper">
+      <div class="table-header-actions">
+        <div class="selected-info" id="selectedInfo" style="display: none;">
+          <i class="fas fa-check-circle"></i>
+          <span id="selectedCount">0</span> items selected
+        </div>
+        <div class="table-filters">
+          <button class="filter-btn active" data-filter="all">
+            <i class="fas fa-list"></i> All
+          </button>
+          <button class="filter-btn" data-filter="pending">
+            <i class="fas fa-clock"></i> Pending
+          </button>
+          <button class="filter-btn" data-filter="approved">
+            <i class="fas fa-check"></i> Approved
+          </button>
+          <button class="filter-btn" data-filter="po-generated">
+            <i class="fas fa-file-alt"></i> PO Generated
+          </button>
+        </div>
+      </div>
+
+      <div class="table-container">
+        <table class="modern-table" id="indentsTable">
+          <thead>
+            <tr>
+              <th class="checkbox-col">
+                <input type="checkbox" id="selectAll" class="table-checkbox" />
+              </th>
+              <th>Requisition No.</th>
+              <th>Date & Time</th>
+              <th>Details</th>
+              <th>Product Info</th>
+              <th>Quantity</th>
+              <th>Expected Delivery</th>
+              <th>Status</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="resultsTableBody">
+            {% if requisitions %}
+              {% for requisition in requisitions %}
+                <tr class="{% if requisition.grn_cancelled %}grn-cancelled{% endif %} table-row" 
+                    id="requisition-{{ requisition.id }}"
+                    data-status="{{ requisition.status|default:'PENDING' }}">
+                  <td class="checkbox-col">
+                    {% if requisition.status == "PO GENERATED" and not requisition.grn_done and not requisition.grn_cancelled %}
+                    <input
+                      type="checkbox"
+                      class="table-checkbox requisition-checkbox"
+                      name="po_generated_checkbox"
+                      value="{{ requisition.id }}"
+                      data-vendor="{{ requisition.vendor|default:'' }}"
+                      data-po-number="{{ requisition.po_number }}"
+                      data-stock-item="{{ requisition.stock_item }}"
+                      data-uom="{{ requisition.uom }}"
+                      data-ordered-quantity="{{ requisition.quantity }}"
+                      data-requisition-number="{{ requisition.requisition_number }}"
+                    />
+                    {% endif %}
+                  </td>
+                  <td>
+                    <div class="requisition-number-cell">
+                      <span class="req-number {% if requisition.grn_cancelled %}cancelled{% endif %}">
+                        {{ requisition.requisition_number }}
+                      </span>
+                      {% if requisition.grn_cancelled %}
+                        <span class="cancelled-badge">Cancelled</span>
+                      {% endif %}
+                    </div>
+                  </td>
+                  <td>
+                    <div class="datetime-cell">
+                      <span class="date-text">{{ requisition.date_of_request }}</span>
+                      <span class="time-text">{{ requisition.time_of_request }}</span>
+                    </div>
+                  </td>
+                  <td>
+                    <div class="details-cell">
+                      <div class="detail-row">
+                        <i class="fas fa-user"></i>
+                        <span>{{ requisition.employee_name }}</span>
+                      </div>
+                      <div class="detail-row">
+                        <i class="fas fa-building"></i>
+                        <span>{{ requisition.department }}</span>
+                      </div>
+                      <div class="detail-row">
+                        <i class="fas fa-map-marker-alt"></i>
+                        <span>{{ requisition.location }}</span>
+                      </div>
+                    </div>
+                  </td>
+                  <td>
+                    <div class="product-cell">
+                      <div class="product-name">{{ requisition.stock_item }}</div>
+                      <div class="product-meta">
+                        <span class="uom-badge">{{ requisition.uom }}</span>
+                        {% if requisition.remark %}
+                          <span class="remark-badge" data-bs-toggle="tooltip" title="{{ requisition.remark }}">
+                            <i class="fas fa-comment"></i>Remark
+                          </span>
+                        {% endif %}
+                      </div>
+                    </div>
+                  </td>
+                  <td>
+                    <div class="quantity-cell">
+                      <div class="qty-ordered">
+                        <span class="qty-label">Ordered:</span>
+                        <span class="qty-value">{{ requisition.quantity }}</span>
+                      </div>
+                      {% if requisition.quantities_received %}
+                        <div class="qty-received">
+                          <span class="qty-label">Received:</span>
+                          {% for entry in requisition.quantities_received %}
+                            <span class="qty-value received">{{ entry.quantity }}</span>
+                          {% endfor %}
+                        </div>
+                      {% endif %}
+                    </div>
+                  </td>
+                  <td>
+                    <span class="delivery-date">{{ requisition.expected_delivery_date }}</span>
+                  </td>
+                  <td>
+                    <div class="status-cell">
+                      {% if requisition.grn_cancelled %}
+                        <span class="status-badge cancelled">
+                          <i class="fas fa-ban"></i> GRN Cancelled
+                        </span>
+                      {% elif requisition.status == "APPROVED" %}
+                        <span class="status-badge approved">
+                          <i class="fas fa-check-circle"></i> Approved
+                        </span>
+                      {% elif requisition.status == "REJECTED" %}
+                        <span class="status-badge rejected">
+                          <i class="fas fa-times-circle"></i> Rejected
+                        </span>
+                      {% elif requisition.status == "APPROVED FOR TRANSFER" %}
+                        <span class="status-badge transfer">
+                          <i class="fas fa-exchange-alt"></i> For Transfer
+                        </span>
+                        <span class="stn-number">{{ requisition.stn_number }}</span>
+                      {% elif requisition.status == "PO GENERATED" %}
+                        <span class="status-badge po-generated">
+                          <i class="fas fa-file-invoice"></i> PO Generated
+                        </span>
+                        <span class="po-number">
+                          {% if requisition.po_number %}
+                            {{ requisition.po_number|split_po_number }}
+                          {% else %}
+                            To be generated
+                          {% endif %}
+                        </span>
+                      {% else %}
+                        <span class="status-badge pending">
+                          <i class="fas fa-clock"></i> {{ requisition.status }}
+                        </span>
+                      {% endif %}
+                    </div>
+                  </td>
+                  <td>
+                    <div class="actions-cell">
+                      {% if requisition.grn_cancelled %}
+                        <div class="grn-info cancelled">
+                          <i class="fas fa-ban"></i>
+                          <span>Cancelled</span>
+                          {% if requisition.grn_cancelled_by %}
+                            <small>by {{ requisition.grn_cancelled_by.first_name }}</small>
+                          {% endif %}
+                        </div>
+                      {% elif requisition.grn_done %}
+                        <div class="grn-info done">
+                          <i class="fas fa-check-circle"></i>
+                          <span>GRN Done</span>
+                          {% for entry in requisition.quantities_received %}
+                            <small>by {{ entry.employee_name }}</small>
+                          {% endfor %}
+                        </div>
+                      {% elif requisition.status == "PO GENERATED" %}
+                        <div class="action-buttons">
+                          <button class="action-btn-small do-grn-btn" data-bs-toggle="tooltip" title="Process GRN">
+                            <i class="fas fa-clipboard-check"></i>
+                            <span>Do GRN</span>
+                          </button>
+                          <button class="action-btn-small cancel-grn-btn" 
+                                  data-requisition-id="{{ requisition.id }}"
+                                  data-bs-toggle="tooltip" 
+                                  title="Cancel GRN">
+                            <i class="fas fa-ban"></i>
+                            <span>Cancel</span>
+                          </button>
+                        </div>
+                      {% elif requisition.status == "APPROVED FOR TRANSFER" %}
+                        <a href="{% url 'do_grn_against_stn' requisition.stn_number %}" 
+                           class="action-btn-small primary">
+                          <i class="fas fa-clipboard-check"></i>
+                          <span>GRN via STN</span>
+                        </a>
+                      {% elif requisition.status not in "APPROVED,REJECTED,PO GENERATED,APPROVED FOR TRANSFER" %}
+                        <div class="action-buttons">
+                          <button class="action-btn-small edit-btn" 
+                                  data-id="{{ requisition.id }}"
+                                  data-bs-toggle="tooltip" 
+                                  title="Edit">
+                            <i class="fas fa-edit"></i>
+                          </button>
+                          <button class="action-btn-small delete-btn" 
+                                  data-id="{{ requisition.id }}"
+                                  data-bs-toggle="tooltip" 
+                                  title="Delete">
+                            <i class="fas fa-trash"></i>
+                          </button>
+                        </div>
+                      {% endif %}
+                    </div>
+                  </td>
+                </tr>
+              {% endfor %}
+            {% else %}
+              <tr>
+                <td colspan="9" class="empty-state">
+                  <div class="empty-state-content">
+                    <i class="fas fa-inbox"></i>
+                    <h3>No Indents Found</h3>
+                    <p>You haven't created any indents yet or no results match your search.</p>
+                  </div>
+                </td>
+              </tr>
+            {% endif %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </main>
+</div>
+
+<!-- MODALS -->
+
+<!-- Cancel GRN Modal -->
+<div class="modal fade" id="cancelGrnModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content modern-modal">
+      <div class="modal-header">
+        <h5 class="modal-title">
+          <i class="fas fa-exclamation-triangle"></i>
+          Cancel GRN
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <p>Are you sure you want to cancel GRN for this requisition?</p>
+        <p class="warning-text">
+          <i class="fas fa-info-circle"></i>
+          This action cannot be undone.
+        </p>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn-secondary" data-bs-dismiss="modal">
+          Cancel
+        </button>
+        <button type="button" class="btn-danger" id="confirmCancelGrnButton">
+          Yes, Cancel GRN
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- GRN Modal -->
+<div id="grnModal" class="modal fade" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-xl modal-dialog-scrollable">
+    <div class="modal-content modern-modal">
+      <div class="modal-header">
+        <h5 class="modal-title">
+          <i class="fas fa-clipboard-check"></i>
+          Process GRN
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <div class="grn-form">
+          <!-- PO and Chalan Details -->
+          <div class="form-row">
+            <div class="form-group">
+              <label for="poNumber">
+                <i class="fas fa-file-invoice"></i>
+                P.O Number (SAP Format)
+              </label>
+              <input
+                type="text"
+                class="form-control"
+                id="poNumber"
+                placeholder="Enter 10-digit SAP PO Number (e.g., 4500000001)"
+                pattern="[0-9]{10}"
+                title="Please enter a 10-digit SAP PO number"
+                readonly
+              />
+              <div class="form-text">
+                <i class="fas fa-info-circle"></i>
+                PO Number is automatically populated from selected requisitions
+              </div>
+              <div id="poNumberError" class="error-message"></div>
+            </div>
+            <div class="form-group">
+              <label for="chalanNumber">
+                <i class="fas fa-receipt"></i>
+                Chalan/Invoice Number
+              </label>
+              <input type="text" class="form-control" id="chalanNumber" />
+            </div>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label for="chalanDate">
+                <i class="fas fa-calendar"></i>
+                Chalan/Invoice Date
+              </label>
+              <input type="date" class="form-control" id="chalanDate" required />
+            </div>
+            <div class="form-group">
+              <label for="chalanFile">
+                <i class="fas fa-paperclip"></i>
+                Chalan/Invoice File
+              </label>
+              <input type="file" class="form-control" id="chalanFile" accept="image/*,.pdf,.doc,.docx"/>
+              <div id="chalanFileError" class="error-message"></div>
+            </div>
+          </div>
+
+          <!-- Approval Mail Upload (Hidden by default) -->
+          <div class="form-row d-none" id="uploadApprovalRow">
+            <div class="form-group full-width">
+              <label for="approvalMailFile">
+                <i class="fas fa-envelope"></i>
+                Upload Approval Mail
+              </label>
+              <input type="file" class="form-control" id="approvalMailFile" accept="image/*,.pdf,.doc,.docx" />
+            </div>
+          </div>
+
+          <input type="hidden" id="requisitionNumbers" />
+
+          <!-- Stock Items Table -->
+          <div class="grn-table-wrapper">
+            <h6 class="section-subtitle">
+              <i class="fas fa-boxes"></i>
+              Fill Data To Do A GRN
+            </h6>
+            <table class="grn-table">
+              <thead>
+                <tr>
+                  <th>Requisition</th>
+                  <th>UOM</th>
+                  <th>Stock Item</th>
+                  <th>Ordered Quantity</th>
+                  <th>Received Quantity</th>
+                  <th>Rejected Quantity</th>
+                </tr>
+              </thead>
+              <tbody id="stockItemsTableBody"></tbody>
+            </table>
+          </div>
+
+          <div id="quantityError" class="alert-danger d-none">
+            <i class="fas fa-exclamation-triangle"></i>
+            <strong>Received quantity cannot exceed 10% of the ordered quantity.</strong>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn-secondary" data-bs-dismiss="modal">
+          Cancel
+        </button>
+        <button type="button" class="btn-warning d-none" id="approvalButton">
+          <i class="fas fa-envelope"></i>
+          Send Approval Mail
+        </button>
+        <button type="button" class="btn-primary" id="submitGRN">
+          <i class="fas fa-check"></i>
+          Submit GRN
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Edit Modal -->
+<div id="editModal" class="modal fade" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content modern-modal">
+      <div class="modal-header">
+        <h5 class="modal-title">
+          <i class="fas fa-edit"></i>
+          Edit Requisition
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <form id="editForm">
+          {% csrf_token %}
+          <input type="hidden" id="requisitionId" name="requisitionId" />
+          <div class="form-group">
+            <label for="bags">Bags</label>
+            <input type="text" class="form-control" id="bags" name="bags" />
+          </div>
+          <div class="form-group">
+            <label for="stockItem">Stock Item</label>
+            <input type="text" class="form-control" id="stockItem" name="stockItem" />
+          </div>
+          <div class="form-group">
+            <label for="quantity">Quantity</label>
+            <input type="number" class="form-control" id="quantity" name="quantity" />
+          </div>
+          <div class="form-group">
+            <label for="date">Expected Delivery Date</label>
+            <input type="date" class="form-control" id="date" name="date" />
+          </div>
+          <div class="form-group">
+            <label for="remark">Remark</label>
+            <textarea class="form-control" id="remark" name="remark" rows="3"></textarea>
+          </div>
+        </form>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn-secondary" data-bs-dismiss="modal">
+          Cancel
+        </button>
+        <button type="button" class="btn-primary" id="saveChangesButton">
+          <i class="fas fa-save"></i>
+          Save Changes
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Delete Confirmation Modal -->
+<div class="modal fade" id="deleteConfirmationModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content modern-modal">
+      <div class="modal-header">
+        <h5 class="modal-title">
+          <i class="fas fa-trash"></i>
+          Confirm Delete
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <p>Are you sure you want to delete this requisition?</p>
+        <p class="warning-text">
+          <i class="fas fa-info-circle"></i>
+          This action cannot be undone.
+        </p>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn-secondary" data-bs-dismiss="modal">
+          Cancel
+        </button>
+        <button type="button" class="btn-danger" id="confirmDeleteButton">
+          Yes, Delete
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Image Preview Modals -->
+<div id="chalanModal" class="modal fade" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-centered">
+    <div class="modal-content modern-modal">
+      <div class="modal-header">
+        <h5 class="modal-title">Chalan/Invoice Preview</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body" id="chalanModalContainer"></div>
+    </div>
+  </div>
+</div>
+
+<div id="approvalModal" class="modal fade" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-centered">
+    <div class="modal-content modern-modal">
+      <div class="modal-header">
+        <h5 class="modal-title">Approval Mail Preview</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body" id="approvalModalContainer"></div>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
+<style>
+  :root {
+    --primary-dark: #313647;
+    --primary-light: #435663;
+    --accent-green: #A3B087;
+    --accent-red: #EA5B6F;
+    --accent-yellow: #FFF8D4;
+    --text-dark: #2c3e50;
+    --text-light: #7f8c8d;
+    --bg-light: #f8f9fa;
+    --border-color: #e9ecef;
+    --success: #28a745;
+    --warning: #ffc107;
+    --danger: #dc3545;
+    --info: #17a2b8;
+}
+
+  * {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+  }
+
+  body {
+    font-family: 'Lexend', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    color: var(--text-dark);
+    background: white;
+  }
+
+  /* Layout */
+  .layout-container {
+    display: flex;
+    min-height: calc(100vh - 90px);
+    background: white;
+    align-items: stretch;
+  }
+
+  /* Sidebar */
+  .sidebar {
+    width: 320px;
+    background: var(--primary-dark);
+    color: white;
+    padding: 2rem 1.5rem;
+    box-shadow: 2px 0 20px rgba(0, 0, 0, 0.1);
+    border-radius: 0 20px 20px 0;
+    position: sticky;
+    top: 90px;
+    height: auto;
+    min-height: calc(100vh - 90px);
+    overflow-y: auto;
+    flex-shrink: 0;
+    margin-top: 40px;
+    margin-left: 10px;
+  }
+
+  .sidebar-content {
+    display: flex;
+    flex-direction: column;
+    gap: 2rem;
+    height: 100%;
+  }
+
+  .user-welcome {
+    text-align: center;
+    padding-bottom: 1.5rem;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  }
+
+  .welcome-title {
+    font-size: 1.5rem;
+    font-weight: 600;
+    margin-bottom: 0.5rem;
+    color: var(--accent-green);
+  }
+
+  .wave-emoji {
+    display: inline-block;
+    animation: wave 1.5s ease-in-out infinite;
+  }
+
+  @keyframes wave {
+    0%, 100% { transform: rotate(0deg); }
+    25% { transform: rotate(15deg); }
+    75% { transform: rotate(-10deg); }
+  }
+
+  .user-name {
+    font-size: 1.1rem;
+    color: var(--accent-yellow);
+    font-weight: 500;
+    margin-bottom: 1rem;
+  }
+
+  .user-details {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    align-items: center;
+  }
+
+  .detail-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.4rem 0.8rem;
+    background: rgba(163, 176, 135, 0.1);
+    border-radius: 20px;
+    font-size: 0.85rem;
+    color: rgba(255, 255, 255, 0.9);
+  }
+
+  .detail-badge i {
+    color: var(--accent-green);
+  }
+
+  /* Stats Section */
+  .stats-section {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+    padding-bottom: 1.5rem;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  }
+
+  .stat-card {
+    background: rgba(163, 176, 135, 0.1);
+    padding: 1rem;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    border: 1px solid rgba(163, 176, 135, 0.2);
+  }
+
+  .stat-icon {
+    width: 48px;
+    height: 48px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.5rem;
+  }
+
+  .inventory-icon {
+    background: rgba(163, 176, 135, 0.2);
+    color: var(--accent-green);
+  }
+
+  .notification-icon {
+    background: rgba(234, 91, 111, 0.2);
+    color: var(--accent-red);
+  }
+
+  .stat-info {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .stat-value {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: white;
+  }
+
+  .stat-label {
+    font-size: 0.75rem;
+    color: rgba(255, 255, 255, 0.7);
+  }
+
+  /* Quick Actions */
+  .quick-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+
+  .section-title {
+    font-size: 1.1rem;
+    color: var(--accent-yellow);
+    margin-bottom: 0.5rem;
+    font-weight: 500;
+  }
+
+  .action-btn {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.875rem 1rem;
+    background: rgba(163, 176, 135, 0.1);
+    color: var(--accent-yellow);
+    text-decoration: none;
+    border-radius: 10px;
+    transition: all 0.3s ease;
+    border: 1px solid rgba(163, 176, 135, 0.2);
+    position: relative;
+  }
+
+  .action-btn:hover {
+    background: rgba(163, 176, 135, 0.2);
+    color: white;
+    transform: translateX(5px);
+  }
+
+  .action-btn i {
+    color: var(--accent-green);
+    font-size: 1.1rem;
+  }
+
+  .action-btn span {
+    flex: 1;
+  }
+
+  .action-badge {
+    background: var(--accent-red);
+    color: white;
+    padding: 0.25rem 0.5rem;
+    border-radius: 12px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    min-width: 24px;
+    text-align: center;
+  }
+
+  /* Main Content */
+  .main-content {
+    flex: 1;
+    background: #ffffff;
+    padding: 2rem;
+    overflow-y: auto;
+    min-height: calc(100vh - 90px);
+    display: flex;
+    flex-direction: column;
+    gap: 2rem;
+}
+
+  /* Page Header */
+  .page-header {
+    margin-bottom: 0;
+    background: linear-gradient(135deg, var(--accent-green) 0%, #8a9975 100%);
+    border-radius: 20px;
+    padding: 1.5rem 2rem;
+    box-shadow: 0 8px 32px rgba(163, 176, 135, 0.2);
+    border: 2px solid black
+
+}
+
+  .header-content {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+  }
+
+  .header-text {
+    text-align: center;
+  }
+
+  .page-title {
+    font-size: 2rem;
+    font-weight: 700;
+    color: #313647;
+    margin-bottom: 0.5rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.75rem;
+  }
+
+  .page-title i {
+    font-size: 1.75rem;
+  }
+
+  .page-subtitle {
+    font-size: 1rem;
+    color: #313647;
+    font-weight: 400;
+  }
+
+  /* Search Container */
+  .search-container {
+    width: 100%;
+    max-width: none;
+    margin: 0;
+    padding: 0 20px;
+  }
+
+
+  .search-wrapper {
+    position: relative;
+    display: flex;
+    align-items: center;
+    background: white;
+    border-radius: 50px;
+    overflow: hidden;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+    width: 100%;
+    border: 2px solid transparent;
+    transition: all 0.3s ease;
+  }
+  .search-wrapper:focus-within {
+    border-color: var(--accent-green);
+    box-shadow: 0 4px 20px rgba(163, 176, 135, 0.3);
+  }
+
+  .search-icon {
+    position: absolute;
+    left: 1.25rem;
+    color: var(--text-light);
+    font-size: 1rem;
+    z-index: 2;
+  }
+
+  .search-input {
+    flex: 1;
+    border: none;
+    padding: 1rem 1rem 1rem 3rem;
+    font-size: 0.95rem;
+    outline: none;
+    font-family: 'Lexend', sans-serif;
+    border-radius: 50px 0 0 50px;
+    background: transparent;
+    min-width: 0; /* Ensure flexbox works properly */
+  }
+
+  .search-input::placeholder {
+    color: var(--text-light);
+  }
+
+  .search-btn {
+    background: var(--primary-dark);
+    color: white;
+    border: none;
+    padding: 1rem 2rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    border-radius: 0 50px 50px 0;
+    white-space: nowrap;
+    flex-shrink: 0; /* Prevent button from shrinking */
+    position: relative;
+} 
+
+  .search-btn:hover {
+    background: var(--primary-light);
+    transform: translateY(-1px);
+}
+
+.search-btn::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 50%;
+    transform: translateY(-50%);
+    height: 60%;
+    width: 1px;
+    background: rgba(255, 255, 255, 0.3);
+}
+
+  /* Table Wrapper */
+  .table-wrapper {
+    background: linear-gradient(135deg, var(--accent-green) 0%, #8a9975 100%);
+    border-radius: 16px;
+    border: 2px solid black;
+    box-shadow: 0 8px 32px rgba(163, 176, 135, 0.2);
+    overflow: hidden;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-height: calc(100vh - 400px);
+}
+
+  .table-header-actions {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1.5rem;
+    background: rgba(255, 255, 255, 0.95);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+    backdrop-filter: blur(10px);
+}
+
+  .selected-info {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    color: var(--primary-dark);
+    font-weight: 500;
+}
+
+  .selected-info i {
+    color: var(--success);
+}
+
+  .table-filters {
+    display: flex;
+    gap: 0.5rem;
+}
+
+  .filter-btn {
+    padding: 0.5rem 1rem;
+    border: 2px solid transparent;
+    background: rgba(255, 255, 255, 0.8);
+    color: var(--text-dark);
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 0.9rem;
+    font-weight: 500;
+    transition: all 0.3s ease;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    backdrop-filter: blur(5px);
+}
+
+
+  .filter-btn:hover {
+    background: rgba(255, 255, 255, 1);
+    transform: translateY(-2px);
+}
+
+.filter-btn.active {
+    background: var(--primary-dark);
+    color: white;
+    border-color: var(--primary-dark);
+}
+
+  /* Table Container */
+  .table-container {
+    overflow-x: auto;
+    flex: 1;
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(10px);
+    border-radius: 0 0 16px 16px;
+}
+.table-container::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+.table-container::-webkit-scrollbar-track {
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 4px;
+}
+
+.table-container::-webkit-scrollbar-thumb {
+    background: rgba(138, 153, 117, 0.6);
+    border-radius: 4px;
+}
+
+.table-container::-webkit-scrollbar-thumb:hover {
+    background: rgba(138, 153, 117, 0.8);
+}
+
+ .modern-table {
+    width: 100%;
+    border-collapse: collapse;
+    background: transparent;
+}
+
+  .modern-table thead {
+    background: var(--primary-dark);
+    position: sticky;
+    top: 0;
+    z-index: 10;
+}
+
+  .modern-table th {
+    color: #313647;
+    padding: 1rem;
+    font-weight: 600;
+    text-align: left;
+    font-size: 0.9rem;
+    white-space: nowrap;
+    border-bottom: 2px solid #8a9975;
+}
+
+  .modern-table td {
+    padding: 1rem;
+    border-bottom: 1px solid rgba(138, 153, 117, 0.2);
+    vertical-align: middle;
+    font-size: 0.9rem;
+    background: rgba(255, 255, 255, 0.8);
+}
+
+  .modern-table tbody tr {
+    transition: all 0.3s ease;
+    background: rgba(255, 255, 255, 0.8);
+}
+
+  .modern-table tbody tr:hover {
+    background: rgba(255, 255, 255, 0.95);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(138, 153, 117, 0.2);
+}
+
+  .modern-table tbody tr.grn-cancelled {
+    opacity: 0.6;
+    background: rgba(255, 245, 245, 0.8);
+}
+  /* Checkbox Column */
+  .checkbox-col {
+    width: 50px;
+    text-align: center;
+  }
+
+  .table-checkbox {
+    width: 20px;
+    height: 20px;
+    cursor: pointer;
+    accent-color: var(--accent-green);
+  }
+
+  /* Cell Styles */
+  .requisition-number-cell {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+  }
+
+  .req-number {
+    font-weight: 600;
+    color: var(--primary-dark);
+    font-size: 0.95rem;
+  }
+
+  .req-number.cancelled {
+    text-decoration: line-through;
+    color: var(--text-light);
+  }
+
+  .cancelled-badge {
+    display: inline-block;
+    padding: 0.25rem 0.5rem;
+    background: var(--danger);
+    color: white;
+    border-radius: 4px;
+    font-size: 0.7rem;
+    font-weight: 600;
+  }
+
+  .datetime-cell {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+  }
+
+  .date-text {
+    font-weight: 500;
+    color: var(--text-dark);
+  }
+
+  .time-text {
+    font-size: 0.85rem;
+    color: var(--text-light);
+  }
+
+  .details-cell {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
+  .detail-row {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.85rem;
+  }
+
+  .detail-row i {
+    color: var(--accent-green);
+    width: 14px;
+  }
+
+  .product-cell {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
+  .product-name {
+    font-weight: 600;
+    color: var(--text-dark);
+  }
+
+  .product-meta {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+  }
+
+  .uom-badge {
+    padding: 0.25rem 0.5rem;
+    background: var(--accent-green);
+    color: white;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    font-weight: 600;
+  }
+
+  .remark-badge {
+    padding: 0.25rem 0.5rem;
+    background: var(--info);
+    color: white;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    font-weight: 600;
+  }
+
+  .quantity-cell {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
+  .qty-ordered, .qty-received {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  .qty-label {
+    font-size: 0.8rem;
+    color: var(--text-light);
+    font-weight: 500;
+  }
+
+  .qty-value {
+    font-weight: 700;
+    color: var(--text-dark);
+    padding: 0.25rem 0.5rem;
+    background: var(--bg-light);
+    border-radius: 4px;
+  }
+
+  .qty-value.received {
+    background: rgba(40, 167, 69, 0.1);
+    color: var(--success);
+  }
+
+  .delivery-date {
+    font-weight: 500;
+    color: var(--text-dark);
+  }
+
+  /* Status Cell */
+  .status-cell {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
+  .status-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 0.75rem;
+    border-radius: 8px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    white-space: nowrap;
+  }
+
+  .status-badge.approved {
+    background: rgba(40, 167, 69, 0.1);
+    color: var(--success);
+  }
+
+  .status-badge.rejected {
+    background: rgba(220, 53, 69, 0.1);
+    color: var(--danger);
+  }
+
+  .status-badge.cancelled {
+    background: rgba(220, 53, 69, 0.1);
+    color: var(--danger);
+  }
+
+  .status-badge.pending {
+    background: rgba(255, 193, 7, 0.1);
+    color: var(--warning);
+  }
+
+  .status-badge.po-generated {
+    background: rgba(23, 162, 184, 0.1);
+    color: var(--info);
+  }
+
+  .status-badge.transfer {
+    background: rgba(163, 176, 135, 0.1);
+    color: var(--accent-green);
+  }
+
+  .po-number, .stn-number {
+    font-size: 0.8rem;
+    color: var(--text-light);
+    font-weight: 500;
+  }
+
+  /* Actions Cell */
+  .actions-cell {
+    min-width: 150px;
+  }
+
+  .action-buttons {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+  }
+
+  .action-btn-small {
+    padding: 0.5rem 0.75rem;
+    border: none;
+    border-radius: 8px;
+    font-size: 0.85rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    white-space: nowrap;
+  }
+
+  .action-btn-small.do-grn-btn {
+    background: var(--success);
+    color: white;
+  }
+
+  .action-btn-small.do-grn-btn:hover {
+    background: #218838;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(40, 167, 69, 0.3);
+  }
+
+  .action-btn-small.cancel-grn-btn {
+    background: var(--danger);
+    color: white;
+  }
+
+  .action-btn-small.cancel-grn-btn:hover {
+    background: #c82333;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(220, 53, 69, 0.3);
+  }
+
+  .action-btn-small.edit-btn {
+    background: var(--warning);
+    color: white;
+  }
+
+  .action-btn-small.edit-btn:hover {
+    background: #e0a800;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(255, 193, 7, 0.3);
+  }
+
+  .action-btn-small.delete-btn {
+    background: var(--danger);
+    color: white;
+  }
+
+  .action-btn-small.delete-btn:hover {
+    background: #c82333;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(220, 53, 69, 0.3);
+  }
+
+  .action-btn-small.primary {
+    background: var(--primary-dark);
+    color: white;
+    text-decoration: none;
+  }
+
+  .action-btn-small.primary:hover {
+    background: var(--primary-light);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(49, 54, 71, 0.3);
+  }
+
+  .grn-info {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    padding: 0.5rem;
+    border-radius: 8px;
+  }
+
+  .grn-info.done {
+    background: rgba(40, 167, 69, 0.1);
+    color: var(--success);
+  }
+
+  .grn-info.cancelled {
+    background: rgba(220, 53, 69, 0.1);
+    color: var(--danger);
+  }
+
+  .grn-info i {
+    font-size: 1rem;
+  }
+
+  .grn-info small {
+    font-size: 0.75rem;
+    opacity: 0.8;
+  }
+
+  /* Empty State */
+  .empty-state {
+    text-align: center;
+    padding: 4rem 2rem;
+  }
+
+  .empty-state-content {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1rem;
+  }
+
+  .empty-state-content i {
+    font-size: 4rem;
+    color: var(--text-light);
+    opacity: 0.5;
+  }
+
+  .empty-state-content h3 {
+    color: var(--text-dark);
+    font-weight: 600;
+  }
+
+  .empty-state-content p {
+    color: var(--text-light);
+  }
+
+  /* Modal Styles */
+  .modern-modal {
+    border: none;
+    border-radius: 16px;
+    overflow: hidden;
+    background-color: #A3B087;
+  }
+
+  .modern-modal .modal-header {
+    background: linear-gradient(135deg, var(--primary-dark) 0%, var(--primary-light) 100%);
+    color: #A3B087;
+    padding: 1.5rem;
+    border: none;
+  }
+  .modal-backdrop {
+    background-color: transparent !important;
+  }
+  .modern-modal .modal-title {
+    font-size: 1.25rem;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+  }
+
+  .modern-modal .modal-body {
+    padding: 2rem;
+  }
+
+  .modern-modal .modal-footer {
+    padding: 1.5rem;
+    background: var(--bg-light);
+    border: none;
+    background-color: #A3B087;
+  }
+
+  .warning-text {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 1rem;
+    background: rgba(255, 193, 7, 0.1);
+    border-left: 4px solid var(--warning);
+    border-radius: 8px;
+    color: white;
+    font-size: 0.9rem;
+  }
+
+  /* Form Styles */
+  .grn-form {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+  }
+
+  .form-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+  }
+
+  .form-group {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
+  .form-group.full-width {
+    grid-column: 1 / -1;
+  }
+
+  .form-group label {
+    font-weight: 500;
+    color: var(--text-dark);
+    font-size: 0.9rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  .form-group label i {
+    color: var(--accent-green);
+  }
+
+  .form-control {
+    padding: 0.75rem;
+    border: 2px solid var(--border-color);
+    border-radius: 8px;
+    font-size: 0.9rem;
+    transition: all 0.3s ease;
+    font-family: 'Lexend', sans-serif;
+  }
+
+  .form-control:focus {
+    outline: none;
+    border-color: var(--accent-green);
+    box-shadow: 0 0 0 3px rgba(163, 176, 135, 0.1);
+  }
+
+  .form-control:read-only {
+    background-color: #f8f9fa;
+    border-color: #e9ecef;
+    cursor: not-allowed;
+  }
+
+  .form-text {
+    color: var(--text-dark);
+    font-size: 0.85rem;
+    margin-top: 0.25rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  .form-text i {
+    color: var(--accent-green);
+  }
+
+  .error-message {
+    color: var(--danger);
+    font-size: 0.85rem;
+    margin-top: 0.25rem;
+  }
+
+  .section-subtitle {
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: var(--text-dark);
+    margin-bottom: 1rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  .section-subtitle i {
+    color: var(--accent-green);
+  }
+
+  /* GRN Table */
+  .grn-table-wrapper {
+    margin-top: 1rem;
+  }
+
+  .grn-table {
+    width: 100%;
+    border-collapse: collapse;
+    background: white;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    overflow: hidden;
+  }
+
+  .grn-table thead {
+    background: var(--bg-light);
+  }
+
+  .grn-table th {
+    padding: 0.75rem;
+    font-weight: 600;
+    text-align: left;
+    font-size: 0.85rem;
+    color: var(--text-dark);
+    border-bottom: none;
+  }
+
+  .grn-table td {
+    padding: 0.75rem;
+    border-top: 1px solid var(--border-color);
+    border-bottom: none;
+  }
+
+  .grn-table input[type="number"] {
+    width: 100%;
+  }
+
+  /* Alert */
+  .alert-danger {
+    padding: 1rem;
+    background: rgba(220, 53, 69, 0.1);
+    border-left: 4px solid var(--danger);
+    border-radius: 8px;
+    color: var(--danger);
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin-top: 1rem;
+  }
+
+  /* Button Styles */
+  .btn-primary, .btn-secondary, .btn-danger, .btn-warning {
+    padding: 0.75rem 1.5rem;
+    border: none;
+    border-radius: 8px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  .btn-primary {
+    background: var(--primary-dark);
+    color: white;
+  }
+
+  .btn-primary:hover {
+    background: var(--primary-light);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(49, 54, 71, 0.3);
+  }
+
+  .btn-secondary {
+    background: #31694E;
+    color: white;
+  }
+
+  .btn-secondary:hover {
+    background: #31694E;
+  }
+
+  .btn-danger {
+    background: var(--danger);
+    color: white;
+  }
+
+  .btn-danger:hover {
+    background: #c82333;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(220, 53, 69, 0.3);
+  }
+
+  .btn-warning {
+    background: var(--warning);
+    color: white;
+  }
+
+  .btn-warning:hover {
+    background: #e0a800;
+  }
+
+  .btn-close {
+    opacity: 0.5;
+  }
+
+  .btn-close:hover {
+    opacity: 1;
+  }
+
+  /* Responsive Design */
+  @media (max-width: 1200px) {
+    .layout-container {
+      flex-direction: column;
+    }
+    
+    .sidebar {
+      width: 100%;
+      margin: 0;
+      border-radius: 0;
+      position: relative;
+      top: 0;
+      min-height: auto;
+    }
+
+    .stats-section {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  @media (max-width: 768px) {
+    .main-content {
+      padding: 1rem;
+    }
+
+    .page-header {
+      padding: 1.5rem;
+      border: 2px solid black
+    }
+
+    .page-title {
+      font-size: 1.5rem;
+    }
+
+    .form-row {
+      grid-template-columns: 1fr;
+    }
+
+    .table-filters {
+      flex-wrap: wrap;
+    }
+
+    .filter-btn {
+      font-size: 0.8rem;
+      padding: 0.4rem 0.8rem;
+    }
+
+    .modern-table {
+      font-size: 0.8rem;
+    }
+
+    .modern-table th,
+    .modern-table td {
+      padding: 0.5rem;
+    }
+
+    .action-buttons {
+      flex-direction: column;
+    }
+  }
+
+  /* Loading States */
+  .spinner-border {
+    width: 1rem;
+    height: 1rem;
+    border-width: 2px;
+  }
+
+  /* Tooltips */
+  .tooltip {
+    font-size: 0.85rem;
+  }
+</style>
+
+<script>
+$(document).ready(function () {
+  // Initialize tooltips
+  $('[data-bs-toggle="tooltip"]').tooltip();
+
+  let currentRequisitionId = null;
+
+  // Fetch counts on page load
+  fetchCounts();
+
+  function fetchCounts() {
+    $.ajax({
+      url: "{% url 'get_inventory_count' %}",
+      method: "GET",
+      success: function (response) {
+        const count = response.inventory_count;
+        $("#inventoryCount").text(count);
+        $("#inventoryBadge").text(count);
+      },
+      error: function () {
+        console.error("Error fetching inventory count.");
+      },
+    });
+
+    $.ajax({
+      url: "{% url 'get_dispatch_notification_count' %}",
+      method: "GET",
+      success: function (response) {
+        const count = response.dispatch_notification_count;
+        $("#notificationCount").text(count);
+        $("#dispatchBadge").text(count);
+      },
+      error: function () {
+        console.error("Error fetching dispatch notification count.");
+      },
+    });
+  }
+
+  // Select All Checkbox
+  $("#selectAll").change(function () {
+    $(".requisition-checkbox").prop("checked", $(this).prop("checked"));
+    updateSelectedCount();
+  });
+
+  // Individual Checkbox
+  $(".requisition-checkbox").change(function () {
+    updateSelectedCount();
+  });
+
+  function updateSelectedCount() {
+    const count = $(".requisition-checkbox:checked").length;
+    if (count > 0) {
+      $("#selectedCount").text(count);
+      $("#selectedInfo").show();
+    } else {
+      $("#selectedInfo").hide();
+    }
+  }
+
+  // Filter Buttons
+  $(".filter-btn").click(function () {
+    $(".filter-btn").removeClass("active");
+    $(this).addClass("active");
+
+    const filter = $(this).data("filter");
+    const rows = $("#indentsTable tbody tr");
+
+    if (filter === "all") {
+      rows.show();
+    } else {
+      rows.hide();
+      rows.each(function () {
+        const status = $(this).data("status");
+        if (filter === "pending" && status === "INDENT RAISED") {
+          $(this).show();
+        } else if (filter === "approved" && status === "APPROVED") {
+          $(this).show();
+        } else if (filter === "po-generated" && status === "PO GENERATED") {
+          $(this).show();
+        }
+      });
+    }
+  });
+
+  // Cancel GRN Button
+  $(".cancel-grn-btn").click(function () {
+    currentRequisitionId = $(this).data("requisition-id");
+    $("#cancelGrnModal").modal("show");
+  });
+
+  // Confirm Cancel GRN
+  $("#confirmCancelGrnButton").click(function () {
+    if (!currentRequisitionId) return;
+
+    $(this)
+      .prop("disabled", true)
+      .html('<span class="spinner-border spinner-border-sm"></span> Cancelling...');
+
+    $.ajax({
+      url: "{% url 'cancel_grn' %}",
+      type: "POST",
+      data: {
+        requisition_id: currentRequisitionId,
+        csrfmiddlewaretoken: "{{ csrf_token }}",
+      },
+      success: function (response) {
+        if (response.status === "success") {
+          alert("GRN cancelled successfully!");
+          location.reload();
+        } else {
+          alert("Error: " + response.message);
+        }
+      },
+      error: function () {
+        alert("An error occurred while cancelling GRN. Please try again.");
+      },
+      complete: function () {
+        $("#confirmCancelGrnButton").prop("disabled", false).text("Yes, Cancel GRN");
+        $("#cancelGrnModal").modal("hide");
+        currentRequisitionId = null;
+      },
+    });
+  });
+
+$(".do-grn-btn").click(function () {
+    const selectedCheckboxes = $(".requisition-checkbox:checked");
+    if (selectedCheckboxes.length === 0) {
+        alert("Please select at least one requisition before proceeding with GRN.");
+        return;
+    }
+
+    // Check if multiple requisitions have different PO numbers (after splitting by colon)
+    if (selectedCheckboxes.length > 1) {
+        const poNumbers = new Set();
+        let commonPoNumber = null;
+        let hasDifferentPoNumbers = false;
+
+        selectedCheckboxes.each(function () {
+            const poNumber = $(this).data("po-number");
+            if (poNumber) {
+                // Split by colon and take only the first part for comparison
+                const cleanPoNumber = poNumber.split(':')[0];
+                poNumbers.add(cleanPoNumber);
+                
+                if (commonPoNumber === null) {
+                    commonPoNumber = cleanPoNumber;
+                } else if (commonPoNumber !== cleanPoNumber) {
+                    hasDifferentPoNumbers = true;
+                }
+            }
+        });
+
+        if (hasDifferentPoNumbers) {
+            alert("Cannot club two requisitions with different P.O numbers. Please select requisitions with the same P.O number.");
+            return;
+        }
+
+        // Auto-populate the PO number field with the common PO number (split by colon)
+        if (commonPoNumber) {
+            $("#poNumber").val(commonPoNumber);
+        } else {
+            $("#poNumber").val("");
+        }
+    } else {
+        // Single requisition selected - auto-populate its PO number (split by colon)
+        const singlePoNumber = selectedCheckboxes.first().data("po-number");
+        if (singlePoNumber) {
+            // Split by colon and take only the first part
+            const cleanPoNumber = singlePoNumber.split(':')[0];
+            $("#poNumber").val(cleanPoNumber);
+        } else {
+            $("#poNumber").val("");
+        }
+    }
+
+    const stockItemsTableBody = $("#stockItemsTableBody");
+    stockItemsTableBody.empty();
+
+    const requisitionNumbers = [];
+    selectedCheckboxes.each(function () {
+        const requisitionId = $(this).val();
+        const requisitionNumber = $(this).data("requisition-number");
+        const stockItem = $(this).data("stock-item");
+        const uom = $(this).data("uom");
+        const orderedQuantity = $(this).data("ordered-quantity");
+        const poNumber = $(this).data("po-number");
+
+        requisitionNumbers.push(requisitionId);
+
+        const row = `
+        <tr>
+            <td>${requisitionNumber}</td>
+            <td>${uom}</td>
+            <td>${stockItem}</td>
+            <td><strong>${orderedQuantity}</strong></td>
+            <td>
+            <input
+                type="number"
+                class="form-control received-quantity"
+                data-ordered-quantity="${orderedQuantity}"
+                placeholder="Enter quantity"
+                min="0"
+                step="0.01"
+            />
+            </td>
+            <td>
+            <input 
+                type="number" 
+                class="form-control rejected-quantity"
+                placeholder="Enter quantity" 
+                min="0"
+                step="0.01"
+            />
+            </td>
+        </tr>
+        `;
+        stockItemsTableBody.append(row);
+    });
+
+    $("#requisitionNumbers").val(requisitionNumbers.join(","));
+    
+    // Reset form state
+    $("#quantityError").addClass("d-none");
+    $("#approvalButton").addClass("d-none");
+    $("#uploadApprovalRow").addClass("d-none");
+    $("#submitGRN").prop("disabled", false);
+    
+    // Reset other form fields
+    $("#chalanNumber").val("");
+    $("#chalanDate").val("");
+    $("#chalanFile").val("");
+    $("#approvalMailFile").val("");
+    
+    $("#grnModal").modal("show");
+
+    // Add quantity validation
+    $(".received-quantity").on("input", function () {
+        validateQuantities();
+    });
+
+    $(".rejected-quantity").on("input", function () {
+        validateQuantities();
+    });
+});
+
+  function validateQuantities() {
+    let hasQuantityError = false;
+    let requiresApproval = false;
+
+    $("#stockItemsTableBody tr").each(function () {
+      const orderedQuantity = parseFloat($(this).find("td:eq(3)").text().trim());
+      const receivedInput = $(this).find(".received-quantity");
+      const rejectedInput = $(this).find(".rejected-quantity");
+      
+      const receivedQuantity = parseFloat(receivedInput.val()) || 0;
+      const rejectedQuantity = parseFloat(rejectedInput.val()) || 0;
+      const totalQuantity = receivedQuantity + rejectedQuantity;
+
+      // Check if received quantity exceeds 10% of ordered quantity
+      if (receivedQuantity > orderedQuantity * 1.1) {
+        hasQuantityError = true;
+      }
+      
+      // Check if received quantity exceeds ordered quantity (requires approval)
+      if (receivedQuantity > orderedQuantity) {
+        requiresApproval = true;
+      }
+    });
+
+    if (hasQuantityError) {
+      $("#quantityError").removeClass("d-none");
+      $("#submitGRN").prop("disabled", true);
+      $("#approvalButton").addClass("d-none");
+      $("#uploadApprovalRow").addClass("d-none");
+    } else if (requiresApproval) {
+      $("#quantityError").addClass("d-none");
+      $("#approvalButton").removeClass("d-none");
+      $("#uploadApprovalRow").removeClass("d-none");
+      $("#submitGRN").prop("disabled", false);
+    } else {
+      $("#quantityError").addClass("d-none");
+      $("#approvalButton").addClass("d-none");
+      $("#uploadApprovalRow").addClass("d-none");
+      $("#submitGRN").prop("disabled", false);
+    }
+  }
+
+  // Send Approval Mail
+  $("#approvalButton").click(function () {
+    const requisitionNumbers = $("#requisitionNumbers").val().split(",");
+    const stockItems = [];
+
+    $("#stockItemsTableBody tr").each(function () {
+      const requisitionNumber = $(this).find("td:eq(0)").text().trim();
+      const stockItem = $(this).find("td:eq(2)").text().trim();
+      const orderedQuantity = parseFloat($(this).find("td:eq(3)").text().trim());
+      const receivedQuantity = parseFloat($(this).find(".received-quantity").val()) || 0;
+
+      if (receivedQuantity > orderedQuantity) {
+        stockItems.push({
+          requisition_number: requisitionNumber,
+          product_name: stockItem,
+          quantity_ordered: orderedQuantity,
+          quantity_received: receivedQuantity,
+        });
+      }
+    });
+
+    if (stockItems.length === 0) {
+      alert("No items require approval.");
+      return;
+    }
+
+    const approvalButton = $("#approvalButton");
+    approvalButton.prop("disabled", true).html(
+      '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Sending...'
+    );
+
+    $.ajax({
+      url: "{% url 'send_approval_email' %}",
+      type: "POST",
+      data: {
+        requisition_numbers: requisitionNumbers.join(","),
+        stock_items: JSON.stringify(stockItems),
+        csrfmiddlewaretoken: $('input[name="csrfmiddlewaretoken"]').val(),
+      },
+      success: function (response) {
+        if (response.status === "success") {
+          alert("Approval email sent successfully.");
+        } else {
+          alert("Error: " + response.message);
+        }
+      },
+      error: function (xhr, status, error) {
+        console.error("Error sending approval email:", error);
+        alert("An error occurred while sending the approval email. Please try again.");
+      },
+      complete: function () {
+        approvalButton.prop("disabled", false).html('<i class="fas fa-envelope"></i> Send Approval Mail');
+      },
+    });
+  });
+
+  // Submit GRN
+$("#submitGRN").click(function () {
+    const poNumber = $("#poNumber").val();
+    const chalanNumber = $("#chalanNumber").val();
+    const chalanDate = $("#chalanDate").val();
+    const chalanFile = $("#chalanFile")[0].files[0];
+    const approvalFile = $("#approvalMailFile")[0].files[0];
+    const requisitionNumbers = $("#requisitionNumbers").val();
+
+    // P.O Number validation
+    const sapPoPattern = /^[0-9]{10}$/;
+    const poNumberError = $("#poNumberError");
+
+    $("#chalanFileError").text("");
+
+    // Validate chalan file (MANDATORY)
+    if (!chalanFile) {
+      $("#chalanFileError").text("Chalan / Invoice file is required.");
+      $("#chalanFile").focus();
+      return;
+    }
+
+    if (!sapPoPattern.test(poNumber)) {
+      poNumberError.text("Please enter a valid 10-digit SAP PO number (e.g., 4500000001)");
+      poNumberError.show();
+      return;
+    } else {
+      poNumberError.hide();
+    }
+
+    // Validate required fields
+    if (!chalanNumber.trim()) {
+      alert("Please enter Chalan/Invoice Number.");
+      return;
+    }
+
+    if (!chalanDate) {
+      alert("Please select Chalan/Invoice Date.");
+      return;
+    }
+
+    // Capture data from the stock items table
+    const stockItems = [];
+    let hasValidQuantities = true;
+
+    $("#stockItemsTableBody tr").each(function () {
+      const requisitionNumber = $(this).find("td:eq(0)").text().trim();
+      const uom = $(this).find("td:eq(1)").text().trim();
+      const stockItem = $(this).find("td:eq(2)").text().trim();
+      const orderedQuantity = parseFloat($(this).find("td:eq(3)").text().trim());
+      const receivedQuantity = parseFloat($(this).find(".received-quantity").val()) || 0;
+      const quantityRejected = parseFloat($(this).find(".rejected-quantity").val()) || 0;
+
+      // Validate received quantities
+      if (receivedQuantity < 0 || quantityRejected < 0) {
+        hasValidQuantities = false;
+        alert("Please enter valid non-negative quantities for all items.");
+        return false;
+      }
+
+      if (receivedQuantity === 0 && quantityRejected === 0) {
+        hasValidQuantities = false;
+        alert("Please enter received or rejected quantity for all items.");
+        return false;
+      }
+
+      stockItems.push({
+        requisitionNumber,
+        uom,
+        stockItem,
+        orderedQuantity,
+        receivedQuantity,
+        quantityRejected,
+      });
+    });
+
+    if (!hasValidQuantities) {
+      return;
+    }
+
+    // Create FormData object
+    const formData = new FormData();
+    formData.append("po_number", poNumber);
+    formData.append("chalan_number", chalanNumber);
+    formData.append("chalan_date", chalanDate);
+    if (chalanFile) formData.append("chalan_file", chalanFile);
+    formData.append("requisition_numbers", requisitionNumbers);
+    formData.append("stock_items", JSON.stringify(stockItems));
+
+    if (approvalFile) {
+      formData.append("approval_file", approvalFile);
+    }
+
+    formData.append(
+      "csrfmiddlewaretoken",
+      $('input[name="csrfmiddlewaretoken"]').val()
+    );
+    // Reused across retries of this GRN submission so a re-submit (or double-click)
+    // never creates a second GRN. Key is per PO + chalan being submitted.
+    var _grnIdemKey = window.IdemKeys.get("submit_grn-" + poNumber + "-" + chalanNumber);
+    formData.append("idempotency_key", _grnIdemKey);
+
+    // Disable submit button and show loader
+    $(this)
+      .prop("disabled", true)
+      .html('<span class="spinner-border spinner-border-sm"></span> Processing...');
+
+    // Send AJAX request
+    $.ajax({
+      url: "{% url 'submit_grn' %}",
+      type: "POST",
+      data: formData,
+      processData: false,
+      contentType: false,
+      headers: { "X-Idempotency-Key": _grnIdemKey },
+      xhrFields: {
+        responseType: 'blob'  // Important: Expect binary data (PDF)
+      },
+      success: function (response) {
+  // Confirmed success: next GRN submission should use a fresh key.
+  window.IdemKeys.reset("submit_grn-" + poNumber + "-" + chalanNumber);
+  console.log("GRN submission successful");
+  
+  // Create a blob from the PDF data
+  const blob = new Blob([response], { type: 'application/pdf' });
+  const url = window.URL.createObjectURL(blob);
+  
+  // Create download link
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `GRN_${poNumber}_with_attachments.pdf`;
+  document.body.appendChild(a);
+  a.click();
+  
+  console.log("PDF download triggered");
+  
+  // Clean up
+  window.URL.revokeObjectURL(url);
+  document.body.removeChild(a);
+  
+  // Close modal silently
+  $("#grnModal").modal("hide");
+  console.log("Modal closed");
+  
+  // Test the URL
+  const successUrl = "{% url 'grn_done' %}";
+  console.log("Success URL:", successUrl);
+  
+  // Try to open in new tab
+  setTimeout(function() {
+    try {
+      console.log("Attempting to open success page");
+      const successWindow = window.open(successUrl, '_blank');
+      
+      if (successWindow) {
+        console.log("Success window opened");
+        successWindow.focus();
+      } else {
+        console.log("Popup blocked or failed to open");
+        // Try alternative
+        window.location.href = successUrl;
+      }
+      
+      // Reload main page after delay
+      setTimeout(function() {
+        console.log("Reloading main page");
+        window.location.reload(true);
+      }, 2000);
+    } catch (error) {
+      console.error("Error opening success page:", error);
+      window.location.reload(true);
+    }
+  }, 500);
+},
+      error: function (xhr, status, error) {
+        console.error("GRN submission error:", error);
+        let errorMessage = "An error occurred while submitting the GRN.";
+
+        if (xhr.response) {
+          const reader = new FileReader();
+          reader.onload = function () {
+            try {
+              const res = JSON.parse(reader.result);
+
+              if (res.field === "chalan_file") {
+                $("#chalanFileError").text(res.message);
+                $("#chalanFile").focus();
+                return;
+              }
+
+              if (res.message) {
+                alert(res.message);
+              }
+            } catch (e) {
+              alert(errorMessage);
+            }
+          };
+          reader.readAsText(xhr.response);
+        } else {
+          alert(errorMessage);
+        }
+      },
+      complete: function () {
+        $("#submitGRN").prop("disabled", false).html('<i class="fas fa-check"></i> Submit GRN');
+      },
+    });
+  });
+// Edit Button
+  $(".edit-btn").click(function (e) {
+    e.preventDefault();
+    const requisitionId = $(this).data("id");
+
+    $.ajax({
+      url: `/get-requisition-details/${requisitionId}/`,
+      method: "GET",
+      success: function (data) {
+        $("#requisitionId").val(data.id);
+        $("#bags").val(data.bags);
+        $("#stockItem").val(data.stock_item);
+        $("#quantity").val(data.quantity);
+        $("#date").val(data.expected_delivery_date);
+        $("#remark").val(data.remark);
+
+        // Set minimum date for expected delivery date
+        const today = new Date();
+        const tomorrow = new Date(today);
+        tomorrow.setDate(tomorrow.getDate() + 1);
+        const minDate = tomorrow.toISOString().split("T")[0];
+        $("#date").attr("min", minDate);
+
+        $("#editModal").modal("show");
+      },
+      error: function (xhr, status, error) {
+        console.error("Error fetching requisition details:", error);
+      },
+    });
+  });
+
+  // Save Changes
+  $("#saveChangesButton").click(function () {
+    const requisitionId = $("#requisitionId").val();
+    const updatedData = {
+      bags: $("#bags").val(),
+      stock_item: $("#stockItem").val(),
+      quantity: $("#quantity").val(),
+      expected_delivery_date: $("#date").val(),
+      remark: $("#remark").val(),
+    };
+
+    $(this)
+      .prop("disabled", true)
+      .html('<span class="spinner-border spinner-border-sm"></span> Saving...');
+    
+    $.ajax({
+      url: `/update-requisition/${requisitionId}/`,
+      method: "POST",
+      data: {
+        ...updatedData,
+        csrfmiddlewaretoken: $('input[name="csrfmiddlewaretoken"]').val(),
+      },
+      success: function () {
+        alert("Requisition updated successfully!");
+        $("#editModal").modal("hide");
+        location.reload();
+      },
+      error: function () {
+        alert("An error occurred while updating the requisition. Please try again.");
+      },
+      complete: function () {
+        $("#saveChangesButton").prop("disabled", false).html('<i class="fas fa-save"></i> Save Changes');
+      },
+    });
+  });
+
+  // Delete Button
+  $(".delete-btn").click(function () {
+    const requisitionId = $(this).data("id");
+    $("#confirmDeleteButton").data("id", requisitionId);
+    $("#deleteConfirmationModal").modal("show");
+  });
+
+  // Confirm Delete
+  $("#confirmDeleteButton").click(function () {
+    const requisitionId = $(this).data("id");
+
+    $(this)
+      .prop("disabled", true)
+      .html('<span class="spinner-border spinner-border-sm"></span> Removing...');
+
+    $.ajax({
+      url: "{% url 'delete_requisition' %}",
+      type: "POST",
+      data: {
+        requisition_id: requisitionId,
+        csrfmiddlewaretoken: "{{ csrf_token }}",
+      },
+      success: function (response) {
+        if (response.status === "success") {
+          alert("Requisition deleted successfully!");
+          location.reload();
+        } else {
+          alert("Failed to delete the requisition. Please try again.");
+        }
+      },
+      error: function () {
+        alert("An error occurred while deleting the requisition. Please try again.");
+      },
+      complete: function () {
+        $("#confirmDeleteButton").prop("disabled", false).text("Yes, Delete");
+      },
+    });
+  });
+
+  // File Preview Functionality
+  function previewFile(inputField, modalContainer, modal) {
+    const file = inputField[0].files[0];
+    if (file && file.type.startsWith('image/')) {
+      const reader = new FileReader();
+      reader.onload = function (e) {
+        modalContainer.html(`<img src="${e.target.result}" alt="Uploaded Image" style="max-width: 100%; height: auto;">`);
+        modal.modal("show");
+      };
+      reader.readAsDataURL(file);
+    } else {
+      alert("Please upload a valid image file.");
+    }
+  }
+
+  // Handle file upload previews
+  $("#chalanFile").on("change", function () {
+    previewFile($(this), $("#chalanModalContainer"), $("#chalanModal"));
+  });
+
+  $("#approvalMailFile").on("change", function () {
+    previewFile($(this), $("#approvalModalContainer"), $("#approvalModal"));
+  });
+});
+
+</script>
+
+{% endblock %}

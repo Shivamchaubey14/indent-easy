@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>GRN Against Stock Transfer Note</title>
+    <style>
+        @page {
+            size: A4;
+            margin: 150px 40px 170px 40px;
+            @top-center { content: element(grnHeader); }
+            @bottom-center { content: element(grnFooter); vertical-align: top; }
+        }
+
+        body {
+            font-family: Arial, sans-serif;
+            font-size: 12px;
+            margin: 0;
+            padding: 0;
+            color: #000;
+            background-color: #fff;
+        }
+
+        /* ---- Running header (logo + company), shown on each page ---- */
+        .running-header {
+            position: running(grnHeader);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-bottom: 2px solid black;
+            padding-bottom: 8px;
+            width: 100%;
+        }
+        .running-header .logo { width: 70px; height: 70px; object-fit: contain; margin-right: 18px; }
+        .running-header .header-text { text-align: center; }
+        .running-header .header-text h1 { font-size: 18px; margin: 0; text-transform: uppercase; }
+        .running-header .header-text .addr { font-size: 10px; margin: 3px 0 0; }
+        .running-header .header-text .cin { font-size: 11px; margin: 2px 0 0; }
+        .running-header .header-text .gst { font-size: 11px; margin: 2px 0 0; font-weight: bold; }
+
+        .grn-title {
+            font-size: 20px;
+            font-weight: bold;
+            text-align: center;
+            margin: 0 0 14px;
+            text-transform: uppercase;
+        }
+
+        .meta-row {
+            display: flex;
+            justify-content: space-between;
+            font-size: 12px;
+            margin-bottom: 8px;
+        }
+
+        .details {
+            font-size: 12px;
+            padding: 8px 0;
+            border-top: 1px solid black;
+            border-bottom: 1px solid black;
+            margin-bottom: 6px;
+        }
+        .details-row { display: flex; justify-content: space-between; }
+        .details-column { width: 48%; }
+        .details-column.right { text-align: right; }
+        .details-column p { margin: 2px 0 0; }
+
+        .items-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 16px;
+            font-size: 10px;
+            border: 1px solid black;
+        }
+        .items-table th { border: 1px solid black; padding: 4px; text-align: center; background-color: #f2f2f2; }
+        .items-table td { border: 1px solid black; padding: 4px; text-align: center; }
+        .no-short { text-align: center; font-size: 12px; margin-top: 16px; font-style: italic; }
+
+        /* ---- Running footer (signatures): repeats on EVERY page ---- */
+        .running-footer { position: running(grnFooter); width: 713px; }
+        .signature-section { display: flex; justify-content: space-between; margin-top: 14px; font-size: 11px; }
+        .signature-box { width: 30%; text-align: center; }
+        .signature-box img { width: 72px; height: 72px; object-fit: contain; }
+        .signature-box .signature-line { width: 100%; height: 1px; background-color: black; margin-top: 40px; }
+        .signature-box p { margin: 5px 0 0; font-weight: bold; }
+        .signature-box .name { font-weight: normal; font-size: 10px; }
+    </style>
+</head>
+<body>
+    <!-- Running header: rendered on every page through @top-center -->
+    <div class="running-header">
+        <img src="{{ logo_url }}" alt="Company Logo" class="logo">
+        <div class="header-text">
+            <h1>{{ company_name }}</h1>
+            <p class="addr">GORAKHNATH COMPLEX, FIRST FLOOR LEFT SIDE, PRAYAGRAJ ROAD, NEAR AWADH UNIVERSITY AYODHYA, AYODHYA, 224001</p>
+            <p class="cin">CIN: U01100UP2016PTC082671</p>
+            <p class="gst">GST N.O. - 09AAXCS0900R1ZJ</p>
+        </div>
+    </div>
+
+    <!-- Running footer: declared early so it appears on EVERY page -->
+    <div class="running-footer">
+        <div class="signature-section">
+            <div class="signature-box">
+                {% if received_by_signature %}
+                <img src="{{ received_by_signature }}" alt="Received by Signature">
+                {% else %}
+                <div class="signature-line"></div>
+                {% endif %}
+                <p>Received By</p>
+                {% if received_by_name %}<div class="name">{{ received_by_name }}</div>{% endif %}
+            </div>
+            <div class="signature-box">
+                <div class="signature-line"></div>
+                <p>Checked By</p>
+            </div>
+            <div class="signature-box">
+                {% if approved_by_stamp %}
+                <img src="{{ approved_by_stamp }}" alt="Approved by Stamp">
+                {% else %}
+                <div class="signature-line"></div>
+                {% endif %}
+                <p>Approved By</p>
+            </div>
+        </div>
+    </div>
+
+    <p class="grn-title">GRN Against Stock Transfer Note</p>
+
+    <div class="meta-row">
+        <div><strong>GRN No:</strong> {{ grn_number }}</div>
+        <div><strong>STN No:</strong> {{ stn_number }}</div>
+        <div><strong>Received Date:</strong> {{ received_date }}</div>
+    </div>
+
+    <div class="details">
+        <div class="details-row">
+            <div class="details-column">
+                <div><strong>From Location:</strong> {{ from_location }}</div>
+                <div><strong>Detail Address:</strong><p>{{ from_address }}</p></div>
+            </div>
+            <div class="details-column right">
+                <div><strong>To Location:</strong> {{ to_location }}</div>
+                <div><strong>Detail Address:</strong><p>{{ to_address }}</p></div>
+            </div>
+        </div>
+    </div>
+
+    {% if items %}
+    <table class="items-table">
+        <thead>
+            <tr>
+                <th style="width: 8%;">S. No.</th>
+                <th>Stock Item</th>
+                <th style="width: 10%;">UOM</th>
+                <th style="width: 13%;">Transferred</th>
+                <th style="width: 14%;">Received (good)</th>
+                <th style="width: 15%;">Expired / Returned</th>
+                <th style="width: 12%;">Shortfall</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for item in items %}
+            <tr>
+                <td>{{ forloop.counter }}</td>
+                <td>{{ item.stock_item }}</td>
+                <td>{{ item.uom|default:"-" }}</td>
+                <td>{{ item.quantity }}</td>
+                <td>{{ item.received_quantity|default:"0" }}</td>
+                <td>{{ item.rejected_quantity }}</td>
+                <td>{% if item.shortfall is None %}-{% else %}{{ item.shortfall }}{% endif %}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <p class="no-short">No items recorded against this STN.</p>
+    {% endif %}
+</body>
+</html>

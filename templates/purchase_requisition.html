@@ -1,0 +1,4183 @@
+{% extends "base.html" %}
+{% load custom_filters %}
+{% block content %}
+
+<div class="layout-container">
+  <!-- Sidebar -->
+  <aside class="sidebar">
+    <div class="sidebar-content">
+      <!-- User Welcome Section -->
+      <div class="user-welcome">
+        <div class="welcome-header">
+          <h1 class="welcome-title">
+            Welcome!
+            <span class="wave-emoji">👋</span>
+          </h1>
+          <p class="user-name">{{request.user.first_name}} {{request.user.last_name}}</p>
+          <div class="user-details">
+            <span class="detail-badge">
+              <i class="fas fa-id-badge"></i>
+              {{ request.user.employee_code }}
+            </span>
+            <span class="detail-badge">
+              <i class="fas fa-building"></i>
+              {{ request.user.department }}
+            </span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Stats Section -->
+      <div class="stats-section">
+        <div class="stat-card">
+          <div class="stat-icon inventory-icon">
+            <i class="fas fa-file-invoice"></i>
+          </div>
+          <div class="stat-info">
+            <span class="stat-value" id="pendingCount">{{ requisitions|length|default:0 }}</span>
+            <span class="stat-label">Purchase Orders</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Quick Actions -->
+      <div class="quick-actions">
+        <h3 class="section-title">Quick Actions</h3>
+        <a href="{% url 'send_mail_page' %}" class="action-btn" style="text-decoration: none;">
+          <i class="fas fa-envelope"></i>
+          <span>Send Mail</span>
+        </a>
+        <a href="{% url 'export_excel_purchase' %}" class="action-btn" style="text-decoration: none;">
+          <i class="fas fa-download"></i>
+          <span>Export Excel</span>
+        </a>
+        <a href="#" class="action-btn" id="uploadPoExcelBtn" style="text-decoration: none;">
+          <i class="fas fa-upload"></i>
+          <span>Upload SAP's P.O Excel</span>
+        </a>
+        <a href="{% url 'document_search_purchase' %}" class="action-btn" id="searchDocumentsBtn" style="text-decoration: none;">
+          <i class="fas fa-user-check"></i>
+          <span>Search Documents</span>
+        </a>
+      </div>
+    </div>
+  </aside>
+
+  <!-- Main Content -->
+  <main class="main-content">
+    <!-- Page Header -->
+    <div class="page-header">
+      <div class="header-content">
+        <div class="header-text">
+          <h1 class="page-title">
+            <i class="fas fa-file-purchase-order"></i>
+            <span class="page-title-text">Purchase Order Management</span>
+          </h1>
+          <p class="page-subtitle">Raise purchase orders for approved indents</p>
+        </div>
+
+        <!-- Search Bar -->
+        <div class="search-container">
+          <form method="GET" action="{% url 'search_po' %}" id="searchForm">
+            {% csrf_token %}
+            <div class="search-wrapper">
+              <i class="fas fa-search search-icon"></i>
+              <input
+                type="text"
+                name="query"
+                class="search-input"
+                placeholder="Search requisitions..."
+                aria-label="Search"
+                required
+                value="{{ search_query|default:'' }}"
+              />
+              <button type="submit" class="search-btn" id="search-btn">
+                <span class="search-btn-text">Search</span>
+                <i class="fas fa-search search-btn-icon"></i>
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+
+    <!-- SAP PO Upload Section (Initially Hidden) -->
+    <div id="sapUploadSection" class="upload-section" style="display: none;">
+      <!-- Upload Header Card -->
+      <div class="upload-header-card">
+        <div class="upload-header-content">
+          <div class="upload-header-icon">
+            <i class="fas fa-file-excel"></i>
+          </div>
+          <div class="upload-header-text">
+            <h2 class="upload-title">
+              <i class="fas fa-upload"></i>
+              <span class="upload-title-text">Upload Purchase Orders from SAP</span>
+            </h2>
+            <p class="upload-subtitle">
+              Upload SAP-exported Excel files to map and validate Purchase Orders
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Upload Card -->
+      <div class="upload-card" id="uploadCard">
+        <div class="upload-zone" id="uploadZone">
+          <div class="upload-zone-content">
+            <div class="upload-icon">
+              <i class="fas fa-file-excel"></i>
+            </div>
+            <h3 class="upload-zone-title">
+              Drag & drop SAP PO Excel here
+            </h3>
+            <p class="upload-zone-subtitle" id="clickToBrowse">
+              or click to browse files
+            </p>
+            <div class="file-types">
+              <span class="file-type-badge">.xlsx</span>
+              <span class="file-type-badge">.xls</span>
+            </div>
+          </div>
+          <!-- TRANSPARENT FILE INPUT OVERLAY -->
+          <input 
+            type="file" 
+            id="fileInput" 
+            class="file-input"
+            accept=".xlsx,.xls" 
+          />
+        </div>
+        
+        <div class="selected-file" id="selectedFile" style="display: none;">
+          <div class="selected-file-content">
+            <div class="file-info">
+              <i class="fas fa-file-excel file-icon"></i>
+              <div class="file-details">
+                <span class="file-name" id="fileName"></span>
+                <span class="file-size" id="fileSize"></span>
+              </div>
+            </div>
+            <button class="remove-file-btn" id="removeFileBtn">
+              <i class="fas fa-times"></i>
+            </button>
+          </div>
+        </div>
+
+        <div class="upload-actions">
+          <button class="btn-primary upload-btn" id="uploadBtn" disabled>
+            <i class="fas fa-upload"></i>
+            <span>Upload & Validate</span>
+          </button>
+          <div class="upload-loader" id="uploadLoader" style="display: none;">
+            <div class="spinner-border spinner-border-sm" role="status">
+              <span class="visually-hidden">Loading...</span>
+            </div>
+            <span>Validating SAP data...</span>
+          </div>
+        </div>
+
+        <div class="helper-notes">
+          <h4 class="helper-title">
+            <i class="fas fa-info-circle"></i>
+            Important Notes:
+          </h4>
+          <ul class="helper-list">
+            <li>
+              <i class="fas fa-check-circle"></i>
+              Only SAP-exported PO Excel files are supported
+            </li>
+            <li>
+              <i class="fas fa-check-circle"></i>
+              PO Number must be 10 digits
+            </li>
+            <li>
+              <i class="fas fa-check-circle"></i>
+              Duplicate PO numbers will be skipped
+            </li>
+          </ul>
+        </div>
+      </div>
+
+      <!-- Validation Results -->
+      <div class="results-section" id="resultsSection" style="display: none;">
+        <!-- Summary Cards -->
+        <div class="summary-cards" id="summaryCards">
+          <div class="summary-card total">
+            <div class="summary-card-icon">
+              <i class="fas fa-list-alt"></i>
+            </div>
+            <div class="summary-card-content">
+              <span class="summary-card-value" id="totalRows">0</span>
+              <span class="summary-card-label">Total Rows Found</span>
+            </div>
+          </div>
+          <div class="summary-card success">
+            <div class="summary-card-icon">
+              <i class="fas fa-check-circle"></i>
+            </div>
+            <div class="summary-card-content">
+              <span class="summary-card-value" id="processedRows">0</span>
+              <span class="summary-card-label">Successfully Processed</span>
+            </div>
+          </div>
+          <div class="summary-card warning">
+            <div class="summary-card-icon">
+              <i class="fas fa-exclamation-triangle"></i>
+            </div>
+            <div class="summary-card-content">
+              <span class="summary-card-value" id="duplicateRows">0</span>
+              <span class="summary-card-label">Duplicate POs Skipped</span>
+            </div>
+          </div>
+          <div class="summary-card error">
+            <div class="summary-card-icon">
+              <i class="fas fa-times-circle"></i>
+            </div>
+            <div class="summary-card-content">
+              <span class="summary-card-value" id="failedRows">0</span>
+              <span class="summary-card-label">Failed Records</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Error Details -->
+        <div class="error-details" id="errorDetails" style="display: none;">
+          <div class="error-details-header">
+            <h4 class="error-details-title">
+              <i class="fas fa-exclamation-triangle"></i>
+              Validation Errors
+            </h4>
+            <span class="error-count" id="errorCount">0 errors found</span>
+          </div>
+          <div class="error-cards-container" id="errorCardsContainer">
+            <!-- Error cards will be dynamically inserted here -->
+          </div>
+        </div>
+
+        <!-- Results Table -->
+        <div class="results-table-container" id="resultsTableContainer" style="display: none;">
+          <div class="table-header-actions">
+            <h4 class="table-title">
+              <i class="fas fa-table"></i>
+              Processed Purchase Orders
+            </h4>
+          </div>
+          <div class="table-container">
+            <table class="modern-table results-table" id="resultsTable">
+              <thead>
+                <tr>
+                  <th>PO Number</th>
+                  <th>Vendor</th>
+                  <th>Material</th>
+                  <th>Quantity</th>
+                  <th>Status</th>
+                  <th>Remarks</th>
+                </tr>
+              </thead>
+              <tbody id="resultsTableBody">
+                <!-- Table rows will be dynamically inserted here -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Main Table Container (Initially Visible) -->
+    <div class="table-wrapper" id="mainTableWrapper">
+      <div class="table-header-actions">
+        <div class="selected-info" id="selectedInfo" style="display: none;">
+          <i class="fas fa-check-circle"></i>
+          <span id="selectedCount">0</span> items selected
+        </div>
+        <div class="table-filters">
+          <button class="filter-btn active" data-filter="all">
+            <i class="fas fa-list"></i> <span class="filter-text">All</span>
+          </button>
+          <button class="filter-btn" data-filter="approved">
+            <i class="fas fa-check"></i> <span class="filter-text">Approved</span>
+          </button>
+          <button class="filter-btn" data-filter="po-generated">
+            <i class="fas fa-file-invoice"></i> <span class="filter-text">PO Generated</span>
+          </button>
+        </div>
+      </div>
+
+      <div class="table-container">
+        <table class="modern-table" id="purchaseTable">
+          <thead>
+            <tr>
+              <th>Requisition No.</th>
+              <th>Date & Time</th>
+              <th>Details</th>
+              <th>Product Info</th>
+              <th>Quantity</th>
+              <th>Expected Delivery</th>
+              <th>Status</th>
+              <th>Approval Info</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% if requisitions %}
+              {% for requisition in requisitions %}
+                <tr class="table-row" 
+                    id="requisition-{{ requisition.id }}"
+                    data-status="{{ requisition.status|default:'PENDING' }}">
+                  <td>
+                    <div class="requisition-number-cell">
+                      <span class="req-number">
+                        {{ requisition.requisition_number }}
+                      </span>
+                    </div>
+                  </td>
+                  <td>
+                    <div class="datetime-cell">
+                      <span class="date-text">{{ requisition.date_of_request }}</span>
+                      <span class="time-text">{{ requisition.time_of_request }}</span>
+                    </div>
+                  </td>
+                  <td>
+                    <div class="details-cell">
+                      <div class="detail-row">
+                        <i class="fas fa-user"></i>
+                        <span>{{ requisition.employee_name }}</span>
+                      </div>
+                      <div class="detail-row">
+                        <i class="fas fa-building"></i>
+                        <span>{{ requisition.department }}</span>
+                      </div>
+                      <div class="detail-row">
+                        <i class="fas fa-map-marker-alt"></i>
+                        <span>{{ requisition.location }}</span>
+                      </div>
+                    </div>
+                  </td>
+                  <td>
+                    <div class="product-cell">
+                      <div class="product-name">
+                        {% if requisition.mapped_product_name and requisition.mapped_system != 'INDENT_EASY' %}
+                          <div class="mapped-product-info">
+                            <div class="mapped-product-name">{{ requisition.mapped_product_name }}</div>
+                            <div class="original-product-name">
+                              <small class="text-muted">(Original: {{ requisition.stock_item }})</small>
+                            </div>
+                            <div class="mapping-badge">
+                              <span class="badge {% if requisition.mapped_system == 'NDDB' %}bg-warning{% else %}bg-info{% endif %}">
+                                {{ requisition.mapped_system }}
+                              </span>
+                            </div>
+                          </div>
+                        {% else %}
+                          <div class="product-name">{{ requisition.stock_item }}</div>
+                        {% endif %}
+                      </div>
+                      {% if requisition.remark %}
+                        <div class="product-meta">
+                          <span class="remark-badge" data-bs-toggle="tooltip" title="{{ requisition.remark }}">
+                            <i class="fas fa-comment"></i> Remark
+                          </span>
+                        </div>
+                      {% endif %}
+                    </div>
+                  </td>
+                  <td>
+                    <div class="quantity-cell">
+                      <div class="qty-ordered">
+                        <span class="qty-value">{{ requisition.quantity }}</span>
+                      </div>
+                    </div>
+                  </td>
+                  <td>
+                    <span class="delivery-date">{{ requisition.expected_delivery_date }}</span>
+                  </td>
+                  <td>
+                    <div class="status-cell">
+                      {% if requisition.status == "PO GENERATED" %}
+                        <span class="status-badge po-generated">
+                          <i class="fas fa-file-invoice"></i> <span class="status-text">PO Generated</span>
+                        </span>
+                      {% elif requisition.status == "APPROVED" %}
+                        <span class="status-badge approved">
+                          <i class="fas fa-check-circle"></i> <span class="status-text">Approved</span>
+                        </span>
+                      {% else %}
+                        <span class="status-badge pending">
+                          <i class="fas fa-clock"></i> <span class="status-text">{{ requisition.status }}</span>
+                        </span>
+                      {% endif %}
+                    </div>
+                  </td>
+                  <td>
+                    <div class="approval-info">
+                      {% if requisition.status == "PO GENERATED" or requisition.status == "APPROVED" %}
+                        <div class="approval-details">
+                          <i class="fas fa-user-check"></i>
+                          <strong>Approved by:</strong> <span class="approval-name">{{ requisition.hod_name }}</span>
+                        </div>
+                        {% if requisition.status == "PO GENERATED" %}
+                          <div class="po-details">
+                            <i class="fas fa-box-open"></i>
+                            <strong>PO:</strong> <span class="po-number">{{ requisition.po_number|split_po_number }}</span>
+                          </div>
+                        {% endif %}
+                      {% else %}
+                        <span class="no-approval">Pending approval</span>
+                      {% endif %}
+                    </div>
+                  </td>
+                  <td>
+                    <div class="actions-cell">
+                      {% if requisition.status == "PO GENERATED" %}
+                        <div class="grn-info done">
+                          <i class="fas fa-check-circle"></i>
+                          <span>PO Generated</span>
+                        </div>
+                      {% elif requisition.status == "APPROVED" %}
+                        <button class="action-btn-small primary" 
+                                data-bs-toggle="modal" 
+                                data-bs-target="#addPOModal-{{ requisition.id }}"
+                                data-bs-toggle="tooltip" 
+                                title="Add PO Details">
+                          <i class="fas fa-plus-circle"></i>
+                          <span class="action-text">Add PO</span>
+                        </button>
+                      {% else %}
+                        <div class="grn-info">
+                          <i class="fas fa-info-circle"></i>
+                          <span>Awaiting Approval</span>
+                        </div>
+                      {% endif %}
+                    </div>
+                  </td>
+                </tr>
+              {% endfor %}
+            {% else %}
+              <tr>
+                <td colspan="9" class="empty-state">
+                  <div class="empty-state-content">
+                    <i class="fas fa-inbox"></i>
+                    <h3>No Requisitions Found</h3>
+                    <p>There are no requisitions available for purchase order generation.</p>
+                  </div>
+                </td>
+              </tr>
+            {% endif %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </main>
+</div>
+
+<!-- Add PO Modal -->
+{% for requisition in requisitions %}
+  {% if requisition.status == "APPROVED" %}
+  <div class="modal fade" id="addPOModal-{{ requisition.id }}" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-xl modal-dialog-scrollable">
+      <div class="modal-content modern-modal">
+        <div class="modal-header">
+          <h5 class="modal-title">
+            <i class="fas fa-file-invoice"></i>
+            Add PO Details
+          </h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <form method="post" action="{% url 'view_purchase_requisitions' %}" id="purchaseForm-{{ requisition.id }}" class="po-form">
+            {% csrf_token %}
+            <input type="hidden" name="requisition_id" value="{{ requisition.id }}">
+            <input type="hidden" name="no_po_required" id="noPoRequired-{{ requisition.id }}" value="false">
+            <input type="hidden" name="sap_po_selected" value="false">
+            <input type="hidden" name="sap_po_id" value="">
+            
+            <!-- Product Info Section -->
+            <div class="form-section product-section">
+              <div class="section-header">
+                <i class="fas fa-box"></i>
+                <h6>Product Information</h6>
+              </div>
+              <div class="product-info-display">
+                {% if requisition.mapped_product_name and requisition.mapped_system != 'INDENT_EASY' %}
+                  <div class="mapped-product-display">
+                    <div class="mapped-product-name">
+                      <strong>{{ requisition.mapped_product_name }}</strong>
+                    </div>
+                    <div class="original-product-name">
+                      <small>Original: {{ requisition.stock_item }}</small>
+                    </div>
+                    <div class="mapping-badge">
+                      <span class="badge {% if requisition.mapped_system == 'NDDB' %}bg-warning{% else %}bg-info{% endif %}">
+                        {{ requisition.mapped_system }}
+                      </span>
+                    </div>
+                  </div>
+                {% else %}
+                  <div class="product-name-display">
+                    <strong>{{ requisition.stock_item }}</strong>
+                  </div>
+                {% endif %}
+              </div>
+            </div>
+
+            <!-- Two-Column Layout -->
+            <div class="form-grid">
+              <!-- Left Column: PO Number Section -->
+              <div class="form-column">
+                <!-- SAP PO Selection Section -->
+                <div class="form-section">
+                  <div class="section-header">
+                    <i class="fas fa-file-excel"></i>
+                    <h6>SAP PO Selection</h6>
+                  </div>
+                  <div class="sap-po-section" id="sapPoSection-{{ requisition.id }}">
+                    <!-- SAP PO Dropdown will be dynamically inserted here -->
+                    <div class="sap-po-placeholder">
+                      <p class="placeholder-text">
+                        <i class="fas fa-spinner fa-spin"></i>
+                        Loading SAP PO options...
+                      </p>
+                    </div>
+                  </div>
+                  <!-- SAP PO Availability Message (Single Instance) -->
+                  <div class="sap-po-message" id="sapPoMessage-{{ requisition.id }}" style="display: none;"></div>
+                </div>
+
+                <!-- Manual PO Entry Section -->
+                <div class="form-section">
+                  <div class="section-header">
+                    <i class="fas fa-pencil-alt"></i>
+                    <h6>Manual PO Entry</h6>
+                  </div>
+                  <div class="form-group">
+                    <label for="po_number-{{ requisition.id }}">
+                      <i class="fas fa-file-invoice"></i>
+                      PO Number (SAP Format)
+                    </label>
+                    <input type="text" 
+                           id="po_number-{{ requisition.id }}" 
+                           name="po_number" 
+                           class="form-control po-number-input" 
+                           placeholder="Enter 10-digit SAP PO Number" 
+                           required 
+                           pattern="[0-9]{10}" 
+                           title="Please enter a 10-digit SAP PO number" />
+                    <div class="form-text">
+                      <i class="fas fa-info-circle"></i>
+                      Enter the 10-digit SAP PO number (e.g., 4500000001)
+                    </div>
+                    <div class="error-message" id="error-message-{{ requisition.id }}">
+                      <i class="fas fa-exclamation-circle"></i>
+                      Please enter a valid 10-digit SAP PO number
+                    </div>
+                  </div>
+
+                  <!-- No PO Required Checkbox -->
+                  <div class="form-group po-exception-group">
+                    <label class="checkbox-label">
+                      <input 
+                        type="checkbox" 
+                        class="no-po-checkbox" 
+                        data-requisition="{{ requisition.id }}"
+                      />
+                      <span>
+                        This product does not require a Purchase Order
+                      </span>
+                    </label>
+                    <small class="form-text">
+                      <i class="fas fa-info-circle"></i>
+                      Selecting this will auto-generate a system PO and allow GRN processing.
+                    </small>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Right Column: Vendor & Email Section -->
+              <div class="form-column">
+                <!-- Vendor Selection -->
+                <div class="form-section">
+                  <div class="section-header">
+                    <i class="fas fa-building"></i>
+                    <h6>Vendor Selection</h6>
+                  </div>
+                  <div class="form-group">
+                    <label for="party_name-{{ requisition.id }}">
+                      <i class="fas fa-user-tie"></i>
+                      Vendor Name
+                    </label>
+                    <select id="party_name-{{ requisition.id }}" name="party_name" class="form-control" required>
+                      <option value="" disabled selected>Select Vendor</option>
+                      {% for product_vendor in requisition.product_vendors %}
+                        {% for vendor in product_vendor.vendors %}
+                          <option value="{{ vendor }}">{{ vendor }}</option>
+                        {% endfor %}
+                      {% endfor %}
+                    </select>
+                    <div class="form-text">
+                      <i class="fas fa-info-circle"></i>
+                      Manual vendor selection is required even when using SAP PO
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Email Section -->
+                <div class="form-section">
+                  <div class="section-header">
+                    <i class="fas fa-envelope"></i>
+                    <h6>Notification</h6>
+                  </div>
+                  <div class="form-group">
+                    <label for="email-{{ requisition.id }}">
+                      <i class="fas fa-at"></i>
+                      Notification Email
+                    </label>
+                    <input type="text" 
+                           id="email-{{ requisition.id }}" 
+                           name="email" 
+                           class="form-control" 
+                           placeholder="Enter recipient email(s) separated by commas" 
+                           required />
+                    <div class="form-text">
+                      <i class="fas fa-info-circle"></i>
+                      Vendor email will be auto-filled based on selection
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Action Buttons -->
+            <div class="form-actions">
+              <button type="button" class="btn-secondary" data-bs-dismiss="modal">
+                <i class="fas fa-times"></i>
+                <span class="btn-text">Cancel</span>
+              </button>
+              <button type="submit" class="btn-primary" id="submitBtn-{{ requisition.id }}">
+                <i class="fas fa-paper-plane"></i>
+                <span class="btn-text">Submit PO</span>
+              </button>
+              <div id="loader-{{ requisition.id }}" class="loader d-none">
+                <div class="spinner-border spinner-border-sm" role="status">
+                  <span class="visually-hidden">Loading...</span>
+                </div>
+                <span>Processing...</span>
+              </div>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+  {% endif %}
+{% endfor %}
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
+<style>
+  :root {
+    --primary-dark: #313647;
+    --primary-light: #435663;
+    --accent-green: #a3b087;
+    --accent-red: #ea5b6f;
+    --accent-yellow: #fff8d4;
+    --accent-orange: #5d866c;
+    --text-dark: #2c3e50;
+    --text-light: #7f8c8d;
+    --bg-light: #f8f9fa;
+    --border-color: #e9ecef;
+    --success: #28a745;
+    --warning: #ffc107;
+    --danger: #dc3545;
+    --info: #17a2b8;
+    --modal-bg: #ffffff;
+    --section-bg: #f8f9fa;
+  }
+
+  /* Layout */
+  .layout-container {
+    display: flex;
+    min-height: calc(100vh - 90px);
+    background: white;
+    align-items: stretch;
+  }
+
+  /* MODAL REDESIGN STYLES */
+  .modal-xl {
+    max-width: 1200px;
+  }
+
+  .modern-modal {
+    border: none;
+    border-radius: 16px;
+    overflow: hidden;
+    background-color: var(--modal-bg);
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+  }
+
+  .modern-modal .modal-header {
+    background: linear-gradient(135deg, var(--primary-dark) 0%, var(--primary-light) 100%);
+    color: white;
+    padding: 1.5rem 2rem;
+    border-bottom: 2px solid var(--accent-green);
+  }
+
+  .modern-modal .modal-title {
+    font-size: 1.5rem;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    color: white;
+  }
+  
+  .modal-backdrop {
+    display: none !important;
+  }
+
+  .modern-modal {
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5) !important;
+    border: 2px solid var(--accent-green) !important;
+  }
+
+  .modern-modal .modal-body {
+    padding: 2rem;
+    background: linear-gradient(135deg, #f8f9fa 0%, #ffffff 100%);
+  }
+
+  /* Form Grid Layout */
+  .form-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 2rem;
+    margin: 1.5rem 0;
+  }
+
+  /* Form Sections */
+  .form-section {
+    background: var(--section-bg);
+    border-radius: 12px;
+    padding: 1.5rem;
+    border: 1px solid var(--border-color);
+    transition: all 0.3s ease;
+  }
+
+  .form-section:hover {
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+    transform: translateY(-2px);
+  }
+
+  .section-header {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin-bottom: 1.25rem;
+    padding-bottom: 0.75rem;
+    border-bottom: 2px solid var(--accent-green);
+  }
+
+  .section-header i {
+    color: var(--accent-green);
+    font-size: 1.25rem;
+  }
+
+  .section-header h6 {
+    margin: 0;
+    font-weight: 600;
+    color: var(--primary-dark);
+    font-size: 1.1rem;
+  }
+
+  /* Product Section */
+  .product-section {
+    background: linear-gradient(135deg, rgba(163, 176, 135, 0.1) 0%, rgba(93, 134, 108, 0.1) 100%);
+    border: 2px dashed var(--accent-green);
+  }
+
+  .product-info-display {
+    padding: 1rem;
+    background: white;
+    border-radius: 8px;
+    border: 1px solid var(--border-color);
+  }
+
+  .mapped-product-display {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
+  .mapped-product-name {
+    font-size: 1.2rem;
+    font-weight: 600;
+    color: var(--primary-dark);
+  }
+
+  .original-product-name {
+    font-size: 0.9rem;
+    color: var(--text-light);
+  }
+
+  .mapping-badge .badge {
+    font-size: 0.75rem;
+    padding: 0.25rem 0.75rem;
+    border-radius: 20px;
+  }
+
+  /* SAP PO Section */
+  .sap-po-section {
+    min-height: 120px;
+  }
+
+  .sap-po-placeholder {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 120px;
+    background: rgba(255, 255, 255, 0.8);
+    border-radius: 8px;
+    border: 2px dashed var(--border-color);
+  }
+
+  .placeholder-text {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    color: var(--text-light);
+    margin: 0;
+  }
+
+  .sap-po-select-container {
+    margin-bottom: 1rem;
+  }
+
+  .sap-po-select-group {
+    display: flex;
+    gap: 0.5rem;
+    align-items: stretch;
+  }
+
+  .sap-po-select {
+    flex: 1;
+    border: 2px solid var(--border-color);
+    border-radius: 8px;
+    padding: 0.75rem;
+    font-size: 0.9rem;
+    transition: all 0.3s ease;
+  }
+
+  .sap-po-select:focus {
+    border-color: var(--accent-green);
+    box-shadow: 0 0 0 3px rgba(163, 176, 135, 0.1);
+  }
+
+  .sap-po-use-btn {
+    background: var(--primary-dark);
+    color: white;
+    border: none;
+    border-radius: 8px;
+    padding: 0.75rem 1.25rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    white-space: nowrap;
+  }
+
+  .sap-po-use-btn:hover {
+    background: var(--primary-light);
+    transform: translateY(-2px);
+  }
+
+  .sap-po-use-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    transform: none !important;
+  }
+
+  /* SAP PO Message */
+  .sap-po-message {
+    margin-top: 1rem;
+    padding: 0.75rem 1rem;
+    border-radius: 8px;
+    font-size: 0.9rem;
+    animation: fadeIn 0.3s ease;
+  }
+
+  .sap-po-message.info {
+    background: rgba(23, 162, 184, 0.1);
+    border-left: 4px solid var(--info);
+    color: var(--info);
+  }
+
+  .sap-po-message.warning {
+    background: rgba(255, 193, 7, 0.1);
+    border-left: 4px solid var(--warning);
+    color: var(--warning);
+  }
+
+  .sap-po-message.danger {
+    background: rgba(220, 53, 69, 0.1);
+    border-left: 4px solid var(--danger);
+    color: var(--danger);
+  }
+
+  .sap-po-message i {
+    margin-right: 0.5rem;
+  }
+
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(-10px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  /* Form Controls */
+  .form-group {
+    margin-bottom: 1.25rem;
+  }
+
+  .form-group:last-child {
+    margin-bottom: 0;
+  }
+
+  .form-group label {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-weight: 600;
+    color: var(--primary-dark);
+    margin-bottom: 0.5rem;
+    font-size: 0.95rem;
+  }
+
+  .form-group label i {
+    color: var(--accent-green);
+    width: 16px;
+  }
+
+  .form-control {
+    width: 100%;
+    padding: 0.75rem 1rem;
+    border: 2px solid var(--border-color);
+    border-radius: 8px;
+    font-size: 0.9rem;
+    font-family: 'Lexend', sans-serif;
+    transition: all 0.3s ease;
+    background: white;
+  }
+
+  .form-control:focus {
+    border-color: var(--accent-green);
+    box-shadow: 0 0 0 3px rgba(163, 176, 135, 0.1);
+    outline: none;
+  }
+
+  .form-control:disabled {
+    background-color: #f8f9fa;
+    border-color: #dee2e6;
+    color: #6c757d;
+    cursor: not-allowed;
+  }
+
+  .form-text {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    color: var(--text-light);
+    font-size: 0.85rem;
+    margin-top: 0.25rem;
+  }
+
+  .form-text i {
+    color: var(--accent-green);
+  }
+
+  .error-message {
+    display: none;
+    align-items: center;
+    gap: 0.5rem;
+    color: var(--danger);
+    font-size: 0.85rem;
+    margin-top: 0.25rem;
+    animation: fadeIn 0.3s ease;
+  }
+
+  .error-message.show {
+    display: flex;
+  }
+
+  /* No PO Checkbox */
+  .po-exception-group {
+    background: rgba(163, 176, 135, 0.05);
+    border: 1px solid rgba(163, 176, 135, 0.2);
+    border-radius: 8px;
+    padding: 1rem;
+    margin-top: 1rem;
+  }
+
+  .checkbox-label {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    cursor: pointer;
+    user-select: none;
+  }
+
+  .checkbox-label input[type="checkbox"] {
+    width: 18px;
+    height: 18px;
+    cursor: pointer;
+    accent-color: var(--accent-green);
+  }
+
+  .checkbox-label span {
+    font-weight: 500;
+    color: var(--primary-dark);
+    font-size: 0.95rem;
+  }
+
+  /* Form Actions */
+  .form-actions {
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+    gap: 1rem;
+    padding-top: 1.5rem;
+    margin-top: 1.5rem;
+    border-top: 1px solid var(--border-color);
+  }
+
+  .btn-primary, .btn-secondary {
+    padding: 0.75rem 1.75rem;
+    border: none;
+    border-radius: 8px;
+    font-weight: 600;
+    font-size: 0.95rem;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  .btn-primary {
+    background: linear-gradient(135deg, var(--primary-dark) 0%, var(--primary-light) 100%);
+    color: white;
+  }
+
+  .btn-primary:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(49, 54, 71, 0.3);
+  }
+
+  .btn-primary:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    transform: none !important;
+  }
+
+  .btn-secondary {
+    background: #6c757d;
+    color: white;
+  }
+
+  .btn-secondary:hover {
+    background: #5a6268;
+    transform: translateY(-2px);
+  }
+
+  /* Loader */
+  .loader {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.75rem;
+    color: var(--text-light);
+    font-size: 0.9rem;
+  }
+
+  .loader.d-none {
+    display: none;
+  }
+
+  .spinner-border {
+    width: 1rem;
+    height: 1rem;
+    border-width: 2px;
+    border-color: var(--accent-green);
+    border-right-color: transparent;
+  }
+
+  /* Manual Entry Toggle */
+  .manual-entry-toggle {
+    text-align: center;
+    margin-top: 1rem;
+    padding-top: 1rem;
+    border-top: 1px solid var(--border-color);
+  }
+
+  .toggle-manual-entry {
+    color: var(--info);
+    text-decoration: none;
+    font-size: 0.9rem;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    transition: all 0.3s ease;
+  }
+
+  .toggle-manual-entry:hover {
+    color: var(--primary-dark);
+    text-decoration: underline;
+  }
+
+  /* File Input Overlay */
+  .file-input {
+    position: absolute;
+    inset: 0;
+    opacity: 0;
+    cursor: pointer;
+    z-index: 10;
+    width: 100%;
+    height: 100%;
+  }
+
+  .upload-zone {
+    position: relative;
+    cursor: pointer;
+  }
+
+  .upload-zone-content {
+    pointer-events: none;
+    position: relative;
+    z-index: 1;
+  }
+
+  /* Sidebar */
+  .sidebar {
+    width: 320px;
+    background: var(--primary-dark);
+    color: white;
+    padding: 2rem 1.5rem;
+    box-shadow: 2px 0 20px rgba(0, 0, 0, 0.1);
+    border-radius: 0 20px 20px 0;
+    position: sticky;
+    top: 90px;
+    height: auto;
+    min-height: calc(100vh - 90px);
+    overflow-y: auto;
+    flex-shrink: 0;
+    margin-top: 40px;
+    margin-left: 10px;
+  }
+
+  .sidebar-content {
+    display: flex;
+    flex-direction: column;
+    gap: 2rem;
+    height: 100%;
+  }
+
+  .user-welcome {
+    text-align: center;
+    padding-bottom: 1.5rem;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  }
+
+  .welcome-title {
+    font-size: 1.5rem;
+    font-weight: 600;
+    margin-bottom: 0.5rem;
+    color: var(--accent-green);
+  }
+
+  .wave-emoji {
+    display: inline-block;
+    animation: wave 1.5s ease-in-out infinite;
+  }
+
+  @keyframes wave {
+    0%, 100% { transform: rotate(0deg); }
+    25% { transform: rotate(15deg); }
+    75% { transform: rotate(-10deg); }
+  }
+
+  .user-name {
+    font-size: 1.1rem;
+    color: var(--accent-yellow);
+    font-weight: 500;
+    margin-bottom: 1rem;
+  }
+
+  .user-details {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    align-items: center;
+  }
+
+  .detail-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.4rem 0.8rem;
+    background: rgba(163, 176, 135, 0.1);
+    border-radius: 20px;
+    font-size: 0.85rem;
+    color: rgba(255, 255, 255, 0.9);
+  }
+
+  .detail-badge i {
+    color: var(--accent-green);
+  }
+
+  /* Stats Section */
+  .stats-section {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 1rem;
+    padding-bottom: 1.5rem;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  }
+
+  .stat-card {
+    background: rgba(163, 176, 135, 0.1);
+    padding: 1rem;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    border: 1px solid rgba(163, 176, 135, 0.2);
+  }
+
+  .stat-icon {
+    width: 48px;
+    height: 48px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.5rem;
+  }
+
+  .inventory-icon {
+    background: rgba(163, 176, 135, 0.2);
+    color: var(--accent-green);
+  }
+
+  .stat-info {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .stat-value {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: white;
+  }
+
+  .stat-label {
+    font-size: 0.75rem;
+    color: rgba(255, 255, 255, 0.7);
+  }
+
+  /* Quick Actions */
+  .quick-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+
+  .section-title {
+    font-size: 1.1rem;
+    color: var(--accent-yellow);
+    margin-bottom: 0.5rem;
+    font-weight: 500;
+  }
+
+  .action-btn {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.875rem 1rem;
+    background: rgba(163, 176, 135, 0.1);
+    color: var(--accent-yellow);
+    text-decoration: none;
+    border-radius: 10px;
+    transition: all 0.3s ease;
+    border: 1px solid rgba(163, 176, 135, 0.2);
+    position: relative;
+  }
+
+  .action-btn:hover {
+    background: rgba(163, 176, 135, 0.2);
+    color: white;
+    transform: translateX(5px);
+  }
+
+  .action-btn i {
+    color: var(--accent-green);
+    font-size: 1.1rem;
+  }
+
+  .action-btn span {
+    flex: 1;
+  }
+
+  /* Main Content */
+  .main-content {
+    flex: 1;
+    background: #ffffff;
+    padding: 2rem;
+    overflow-y: auto;
+    min-height: calc(100vh - 90px);
+    display: flex;
+    flex-direction: column;
+    gap: 2rem;
+  }
+
+  /* Page Header */
+  .page-header {
+    margin-bottom: 0;
+    background: linear-gradient(135deg, var(--accent-green) 0%, #8a9975 100%);
+    border-radius: 20px;
+    padding: 1.5rem 2rem;
+    box-shadow: 0 8px 32px rgba(163, 176, 135, 0.2);
+    border: 2px solid black;
+  }
+
+  .header-content {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+  }
+
+  .header-text {
+    text-align: center;
+  }
+
+  .page-title {
+    font-size: 2rem;
+    font-weight: 700;
+    color: #313647;
+    margin-bottom: 0.5rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.75rem;
+  }
+
+  .page-title i {
+    font-size: 1.75rem;
+  }
+
+  .page-subtitle {
+    font-size: 1rem;
+    color: #313647;
+    font-weight: 400;
+  }
+
+  /* Search Container */
+  .search-container {
+    width: 100%;
+    max-width: none;
+    margin: 0;
+    padding: 0 20px;
+  }
+
+  .search-wrapper {
+    position: relative;
+    display: flex;
+    align-items: center;
+    background: white;
+    border-radius: 50px;
+    overflow: hidden;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+    width: 100%;
+    border: 2px solid transparent;
+    transition: all 0.3s ease;
+  }
+
+  .search-wrapper:focus-within {
+    border-color: var(--accent-green);
+    box-shadow: 0 4px 20px rgba(163, 176, 135, 0.3);
+  }
+
+  .search-icon {
+    position: absolute;
+    left: 1.25rem;
+    color: var(--text-light);
+    font-size: 1rem;
+    z-index: 2;
+  }
+
+  .search-input {
+    flex: 1;
+    border: none;
+    padding: 1rem 1rem 1rem 3rem;
+    font-size: 0.95rem;
+    outline: none;
+    font-family: 'Lexend', sans-serif;
+    border-radius: 50px 0 0 50px;
+    background: transparent;
+    min-width: 0;
+  }
+
+  .search-input::placeholder {
+    color: var(--text-light);
+  }
+
+  .search-btn {
+    background: var(--primary-dark);
+    color: white;
+    border: none;
+    padding: 1rem 2rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    border-radius: 0 50px 50px 0;
+    white-space: nowrap;
+    flex-shrink: 0;
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  .search-btn:hover {
+    background: var(--primary-light);
+    transform: translateY(-1px);
+  }
+
+  .search-btn::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 50%;
+    transform: translateY(-50%);
+    height: 60%;
+    width: 1px;
+    background: rgba(255, 255, 255, 0.3);
+  }
+
+  .search-btn-icon {
+    display: none;
+  }
+
+  /* SAP Upload Section */
+  .upload-section {
+    background: linear-gradient(135deg, var(--accent-green) 0%, #8a9975 100%);
+    border-radius: 20px;
+    border: 2px solid black;
+    box-shadow: 0 8px 32px rgba(163, 176, 135, 0.2);
+    margin-bottom: 2rem;
+    overflow: hidden;
+  }
+
+  .upload-header-card {
+    background: var(--primary-dark);
+    padding: 1.5rem 2rem;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  }
+
+  .upload-header-content {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+  }
+
+  .upload-header-icon {
+    width: 50px;
+    height: 50px;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.5rem;
+    color: var(--accent-green);
+  }
+
+  .upload-header-text {
+    flex: 1;
+  }
+
+  .upload-title {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: white;
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  .upload-subtitle {
+    color: rgba(255, 255, 255, 0.8);
+    margin: 0.25rem 0 0;
+    font-size: 0.95rem;
+  }
+
+  /* Upload Card */
+  .upload-card {
+    background: rgba(255, 255, 255, 0.95);
+    margin: 2rem;
+    padding: 2rem;
+    border-radius: 16px;
+    border: 2px dashed var(--accent-green);
+    text-align: center;
+    transition: all 0.3s ease;
+  }
+
+  .upload-card:hover {
+    border-color: var(--primary-dark);
+    background: rgba(255, 255, 255, 1);
+  }
+
+  .upload-zone {
+    cursor: pointer;
+    padding: 3rem 2rem;
+    border-radius: 12px;
+    border: 2px solid #494949;
+    background: rgba(163, 176, 135, 0.05);
+    transition: all 0.3s ease;
+  }
+
+  .upload-zone:hover {
+    background: rgba(163, 176, 135, 0.1);
+    transform: translateY(-2px);
+  }
+
+  .upload-zone.drag-over {
+    background: rgba(163, 176, 135, 0.2);
+    border-color: var(--primary-dark);
+  }
+
+  .upload-zone-content {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1rem;
+  }
+
+  .upload-icon {
+    width: 64px;
+    height: 64px;
+    background: rgba(163, 176, 135, 0.1);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 2rem;
+    color: var(--accent-green);
+  }
+
+  .upload-zone-title {
+    font-size: 1.25rem;
+    font-weight: 600;
+    color: var(--text-dark);
+    margin: 0;
+  }
+
+  .upload-zone-subtitle {
+    color: var(--text-light);
+    margin: 0;
+  }
+
+  .file-types {
+    display: flex;
+    gap: 0.5rem;
+    justify-content: center;
+    margin-top: 1rem;
+  }
+
+  .file-type-badge {
+    padding: 0.25rem 0.75rem;
+    background: rgba(102, 146, 6, 0.1);
+    border-radius: 20px;
+    font-size: 0.85rem;
+    color: var(--accent-green);
+    font-weight: 500;
+  }
+
+  /* Selected File */
+  .selected-file {
+    margin-top: 1.5rem;
+    background: rgba(163, 176, 135, 0.05);
+    border-radius: 12px;
+    padding: 1rem;
+    border: 1px solid rgba(163, 176, 135, 0.2);
+  }
+
+  .selected-file-content {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .file-info {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+  }
+
+  .file-icon {
+    font-size: 1.5rem;
+    color: var(--success);
+  }
+
+  .file-details {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .file-name {
+    font-weight: 600;
+    color: var(--text-dark);
+  }
+
+  .file-size {
+    font-size: 0.85rem;
+    color: var(--text-light);
+  }
+
+  .remove-file-btn {
+    background: none;
+    border: none;
+    color: var(--danger);
+    cursor: pointer;
+    padding: 0.5rem;
+    border-radius: 50%;
+    transition: all 0.3s ease;
+  }
+
+  .remove-file-btn:hover {
+    background: rgba(220, 53, 69, 0.1);
+    transform: rotate(90deg);
+  }
+
+  /* Upload Actions */
+  .upload-actions {
+    margin-top: 2rem;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1rem;
+  }
+
+  .upload-btn {
+    padding: 0.75rem 2rem;
+    font-size: 1rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  .upload-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    transform: none !important;
+  }
+
+  .upload-loader {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    color: var(--text-light);
+  }
+
+  .spinner-border {
+    width: 1rem;
+    height: 1rem;
+    border-width: 2px;
+    border-color: var(--accent-green);
+    border-right-color: transparent;
+  }
+
+  /* Helper Notes */
+  .helper-notes {
+    margin-top: 2rem;
+    padding-top: 1.5rem;
+    border-top: 1px solid rgba(163, 176, 135, 0.2);
+  }
+
+  .helper-title {
+    font-size: 1rem;
+    color: var(--text-dark);
+    margin-bottom: 1rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  .helper-title i {
+    color: var(--accent-green);
+  }
+
+  .helper-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
+  .helper-list li {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    color: var(--text-light);
+    font-size: 0.9rem;
+  }
+
+  .helper-list li i {
+    color: var(--success);
+    font-size: 0.85rem;
+  }
+
+  /* Results Section */
+  .results-section {
+    background: white;
+    margin: 0 2rem 2rem;
+    padding: 2rem;
+    border-radius: 16px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+  }
+
+  /* Summary Cards */
+  .summary-cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1rem;
+    margin-bottom: 2rem;
+  }
+
+  .summary-card {
+    background: white;
+    padding: 1.5rem;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+    border: 1px solid var(--border-color);
+  }
+
+  .summary-card.total {
+    border-left: 4px solid var(--info);
+  }
+
+  .summary-card.success {
+    border-left: 4px solid var(--success);
+  }
+
+  .summary-card.warning {
+    border-left: 4px solid var(--warning);
+  }
+
+  .summary-card.error {
+    border-left: 4px solid var(--danger);
+  }
+
+  .summary-card-icon {
+    width: 48px;
+    height: 48px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.5rem;
+  }
+
+  .summary-card.total .summary-card-icon {
+    background: rgba(23, 162, 184, 0.1);
+    color: var(--info);
+  }
+
+  .summary-card.success .summary-card-icon {
+    background: rgba(40, 167, 69, 0.1);
+    color: var(--success);
+  }
+
+  .summary-card.warning .summary-card-icon {
+    background: rgba(255, 193, 7, 0.1);
+    color: var(--warning);
+  }
+
+  .summary-card.error .summary-card-icon {
+    background: rgba(220, 53, 69, 0.1);
+    color: var(--danger);
+  }
+
+  .summary-card-content {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .summary-card-value {
+    font-size: 1.75rem;
+    font-weight: 700;
+    color: var(--text-dark);
+  }
+
+  .summary-card-label {
+    font-size: 0.85rem;
+    color: var(--text-light);
+  }
+
+  /* Error Details */
+  .error-details {
+    background: rgba(220, 53, 69, 0.05);
+    border-radius: 12px;
+    padding: 1.5rem;
+    border: 1px solid rgba(220, 53, 69, 0.1);
+  }
+
+  .error-details-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1rem;
+  }
+
+  .error-details-title {
+    font-size: 1rem;
+    color: var(--danger);
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  .error-count {
+    font-size: 0.85rem;
+    color: var(--danger);
+    font-weight: 500;
+  }
+
+  .error-cards-container {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    max-height: 300px;
+    overflow-y: auto;
+  }
+
+  .error-card {
+    background: white;
+    padding: 1rem;
+    border-radius: 8px;
+    border-left: 4px solid var(--danger);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+  }
+
+  .error-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.5rem;
+  }
+
+  .error-row-info {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.85rem;
+    color: var(--text-dark);
+    font-weight: 500;
+  }
+
+  .error-row-info i {
+    color: var(--danger);
+  }
+
+  .error-message {
+    color: var(--text-dark);
+    font-size: 0.9rem;
+    margin: 0;
+    line-height: 1.4;
+  }
+
+  /* Results Table */
+  .results-table-container {
+    margin-top: 2rem;
+  }
+
+  .results-table-container .table-header-actions {
+    background: var(--primary-dark);
+    padding: 1rem 1.5rem;
+    border-radius: 12px 12px 0 0;
+  }
+
+  .results-table-container .table-title {
+    color: white;
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  .results-table {
+    border-radius: 0 0 12px 12px;
+    overflow: hidden;
+  }
+
+  .results-table th {
+    background: var(--primary-light);
+    color: white;
+  }
+
+  .results-table td {
+    vertical-align: middle;
+  }
+
+  /* Status Badges for Results Table */
+  .status-badge-small {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    font-weight: 600;
+  }
+
+  .status-success {
+    background: rgba(40, 167, 69, 0.1);
+    color: var(--success);
+  }
+
+  .status-warning {
+    background: rgba(255, 193, 7, 0.1);
+    color: var(--warning);
+  }
+
+  .status-error {
+    background: rgba(220, 53, 69, 0.1);
+    color: var(--danger);
+  }
+
+  /* Table Wrapper */
+  .table-wrapper {
+    background: linear-gradient(135deg, var(--accent-green) 0%, #8a9975 100%);
+    border-radius: 16px;
+    border: 2px solid black;
+    box-shadow: 0 8px 32px rgba(163, 176, 135, 0.2);
+    overflow: hidden;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-height: calc(100vh - 400px);
+  }
+
+  .table-header-actions {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1.5rem;
+    background: var(--accent-green);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+    backdrop-filter: blur(10px);
+  }
+
+  .selected-info {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    color: var(--primary-dark);
+    font-weight: 500;
+  }
+
+  .selected-info i {
+    color: var(--success);
+  }
+
+  .table-filters {
+    display: flex;
+    gap: 0.5rem;
+  }
+
+  .filter-btn {
+    padding: 0.5rem 1rem;
+    border: 2px solid transparent;
+    background: rgba(255, 255, 255, 0.8);
+    color: var(--text-dark);
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 0.9rem;
+    font-weight: 500;
+    transition: all 0.3s ease;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    backdrop-filter: blur(5px);
+  }
+
+  .filter-btn:hover {
+    background: rgba(255, 255, 255, 1);
+    transform: translateY(-2px);
+  }
+
+  .filter-btn.active {
+    background: var(--primary-dark);
+    color: white;
+    border-color: var(--primary-dark);
+  }
+
+  /* Table Container */
+  .table-container {
+    overflow-x: auto;
+    flex: 1;
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(10px);
+    border-radius: 0 0 16px 16px;
+  }
+
+  .table-container::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+
+  .table-container::-webkit-scrollbar-track {
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 4px;
+  }
+
+  .table-container::-webkit-scrollbar-thumb {
+    background: rgba(138, 153, 117, 0.6);
+    border-radius: 4px;
+  }
+
+  .table-container::-webkit-scrollbar-thumb:hover {
+    background: rgba(138, 153, 117, 0.8);
+  }
+
+  .modern-table {
+    width: 100%;
+    border-collapse: collapse;
+    background: transparent;
+  }
+
+  .modern-table thead {
+    background: var(--primary-dark);
+    position: sticky;
+    top: 0;
+    z-index: 10;
+  }
+
+  .modern-table th {
+    color: #313647;
+    padding: 1rem;
+    font-weight: 600;
+    text-align: left;
+    font-size: 0.9rem;
+    white-space: nowrap;
+    border-bottom: 2px solid #8a9975;
+  }
+
+  .modern-table td {
+    padding: 1rem;
+    border-bottom: 1px solid rgba(138, 153, 117, 0.2);
+    vertical-align: middle;
+    font-size: 0.9rem;
+    background: rgba(255, 255, 255, 0.8);
+  }
+
+  .modern-table tbody tr {
+    transition: all 0.3s ease;
+    background: rgba(255, 255, 255, 0.8);
+  }
+
+  .modern-table tbody tr:hover {
+    background: rgba(255, 255, 255, 0.95);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(138, 153, 117, 0.2);
+  }
+
+  /* Cell Styles */
+  .requisition-number-cell {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+  }
+
+  .req-number {
+    font-weight: 600;
+    color: var(--primary-dark);
+    font-size: 0.95rem;
+  }
+
+  .datetime-cell {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+  }
+
+  .date-text {
+    font-weight: 500;
+    color: var(--text-dark);
+  }
+
+  .time-text {
+    font-size: 0.85rem;
+    color: var(--text-light);
+  }
+
+  .details-cell {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
+  .detail-row {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.85rem;
+  }
+
+  .detail-row i {
+    color: var(--accent-green);
+    width: 14px;
+  }
+
+  .product-cell {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
+  .product-name {
+    font-weight: 600;
+    color: var(--text-dark);
+  }
+
+  .product-meta {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+  }
+
+  .remark-badge {
+    padding: 0.25rem 0.5rem;
+    background: var(--info);
+    color: white;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    font-weight: 600;
+  }
+
+  /* Mapped Product Styles */
+  .mapped-product-info {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+  }
+
+  .mapped-product-name {
+    font-weight: 600;
+    color: var(--primary-dark);
+  }
+
+  .original-product-name {
+    font-size: 0.8rem;
+    color: var(--text-light);
+  }
+
+  .mapping-badge {
+    margin-top: 0.25rem;
+  }
+
+  .mapping-badge .badge {
+    font-size: 0.7rem;
+    padding: 0.25rem 0.5rem;
+  }
+
+  .bg-warning {
+    background-color: var(--warning) !important;
+    color: #000 !important;
+  }
+
+  .bg-info {
+    background-color: var(--info) !important;
+    color: #fff !important;
+  }
+
+  .quantity-cell {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
+  .qty-ordered, .qty-received {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  .qty-label {
+    font-size: 0.8rem;
+    color: var(--text-light);
+    font-weight: 500;
+  }
+
+  .qty-value {
+    font-weight: 700;
+    color: var(--text-dark);
+    padding: 0.25rem 0.5rem;
+    background: var(--bg-light);
+    border-radius: 4px;
+  }
+
+  .delivery-date {
+    font-weight: 500;
+    color: var(--text-dark);
+  }
+
+  /* Status Cell */
+  .status-cell {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
+  .status-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 0.75rem;
+    border-radius: 8px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    white-space: nowrap;
+  }
+
+  .status-badge.approved {
+    background: rgba(40, 167, 69, 0.1);
+    color: var(--success);
+  }
+
+  .status-badge.pending {
+    background: rgba(255, 193, 7, 0.1);
+    color: var(--warning);
+  }
+
+  .status-badge.po-generated {
+    background: rgba(23, 162, 184, 0.1);
+    color: var(--info);
+  }
+
+  /* Approval Info */
+  .approval-info {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
+  .approval-details, .po-details {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.85rem;
+  }
+
+  .approval-details i, .po-details i {
+    color: var(--success);
+  }
+
+  .no-approval {
+    color: var(--text-light);
+    font-style: italic;
+  }
+
+  /* Actions Cell */
+  .actions-cell {
+    min-width: 120px;
+  }
+
+  .action-buttons {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+  }
+
+  .action-btn-small {
+    padding: 0.5rem 0.75rem;
+    border: none;
+    border-radius: 8px;
+    font-size: 0.85rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    white-space: nowrap;
+  }
+
+  .action-btn-small.primary {
+    background: var(--primary-dark);
+    color: white;
+  }
+
+  .action-btn-small.primary:hover {
+    background: var(--primary-light);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(49, 54, 71, 0.3);
+  }
+
+  .grn-info {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    padding: 0.5rem;
+    border-radius: 8px;
+    font-size: 0.85rem;
+  }
+
+  .grn-info.done {
+    background: rgba(40, 167, 69, 0.1);
+    color: var(--success);
+  }
+
+  .grn-info i {
+    font-size: 1rem;
+  }
+
+  /* Empty State */
+  .empty-state {
+    text-align: center;
+    padding: 4rem 2rem;
+  }
+
+  .empty-state-content {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1rem;
+  }
+
+  .empty-state-content i {
+    font-size: 4rem;
+    color: var(--text-light);
+    opacity: 0.5;
+  }
+
+  .empty-state-content h3 {
+    color: var(--text-dark);
+    font-weight: 600;
+  }
+
+  .empty-state-content p {
+    color: var(--text-light);
+  }
+
+  /* =========== RESPONSIVE DESIGN IMPROVEMENTS ============== */
+  
+  /* Large Desktop */
+  @media (max-width: 1400px) {
+    .modal-xl {
+      max-width: 1140px;
+    }
+  }
+
+  /* Desktop */
+  @media (max-width: 1200px) {
+    .layout-container {
+      flex-direction: column;
+    }
+    
+    .sidebar {
+      width: 100%;
+      margin: 0;
+      border-radius: 0;
+      position: relative;
+      top: 0;
+      min-height: auto;
+    }
+
+    .main-content {
+      padding: 1.5rem;
+    }
+  }
+
+  /* Tablet */
+  @media (max-width: 992px) {
+    .form-grid {
+      grid-template-columns: 1fr;
+    }
+
+    .page-title {
+      font-size: 1.75rem;
+    }
+
+    .page-title i {
+      font-size: 1.5rem;
+    }
+
+    .upload-header-content {
+      flex-direction: column;
+      text-align: center;
+    }
+
+    .summary-cards {
+      grid-template-columns: repeat(2, 1fr);
+    }
+
+    .sap-po-select-group {
+      flex-direction: column;
+    }
+
+    .sap-po-use-btn {
+      width: 100%;
+      justify-content: center;
+    }
+
+    .form-actions {
+      flex-direction: column;
+    }
+
+    .btn-primary, .btn-secondary {
+      width: 100%;
+      justify-content: center;
+    }
+
+    .modal-dialog {
+      margin: 1rem;
+    }
+
+    .modern-modal .modal-body {
+      padding: 1.5rem;
+    }
+  }
+
+  /* Mobile Landscape */
+  @media (max-width: 768px) {
+    .main-content {
+      padding: 1rem;
+    }
+
+    .page-header {
+      padding: 1.25rem;
+    }
+
+    .page-title {
+      font-size: 1.5rem;
+      flex-wrap: wrap;
+    }
+
+    .page-title-text {
+      font-size: 1.25rem;
+    }
+
+    .page-title i {
+      font-size: 1.25rem;
+    }
+
+    .page-subtitle {
+      font-size: 0.9rem;
+    }
+
+    .search-container {
+      padding: 0;
+    }
+
+    .search-wrapper {
+      flex-direction: column;
+      border-radius: 12px;
+      background: transparent;
+    }
+
+    .search-input {
+      width: 100%;
+      border-radius: 12px 12px 0 0;
+      background: white;
+      padding: 0.875rem 1rem 0.875rem 2.5rem;
+    }
+
+    .search-btn {
+      width: 100%;
+      border-radius: 0 0 12px 12px;
+      padding: 0.875rem;
+      justify-content: center;
+    }
+
+    .search-btn-text {
+      display: none;
+    }
+
+    .search-btn-icon {
+      display: inline-block;
+    }
+
+    .search-btn::before {
+      display: none;
+    }
+
+    .upload-section,
+    .upload-card,
+    .results-section {
+      margin: 0.75rem;
+      padding: 1rem;
+    }
+
+    .upload-header-card {
+      padding: 1.25rem;
+    }
+
+    .upload-title {
+      font-size: 1.25rem;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+
+    .upload-title-text {
+      font-size: 1.1rem;
+    }
+
+    .upload-subtitle {
+      font-size: 0.85rem;
+    }
+
+    .upload-zone {
+      padding: 1.5rem 1rem;
+    }
+
+    .upload-zone-title {
+      font-size: 1.1rem;
+    }
+
+    .summary-cards {
+      grid-template-columns: 1fr;
+      gap: 0.75rem;
+    }
+
+    .summary-card {
+      padding: 1rem;
+    }
+
+    .summary-card-value {
+      font-size: 1.5rem;
+    }
+
+    .table-header-actions {
+      flex-direction: column;
+      gap: 1rem;
+      padding: 1rem;
+    }
+
+    .table-filters {
+      flex-wrap: wrap;
+      width: 100%;
+      justify-content: center;
+    }
+
+    .filter-btn {
+      font-size: 0.85rem;
+      padding: 0.5rem 0.75rem;
+      flex: 1;
+      justify-content: center;
+      min-width: 100px;
+    }
+
+    .filter-text {
+      display: none;
+    }
+
+    .filter-btn i {
+      margin-right: 0;
+    }
+
+    .modern-table th,
+    .modern-table td {
+      padding: 0.75rem;
+      font-size: 0.85rem;
+    }
+
+    .status-badge {
+      padding: 0.35rem 0.5rem;
+      font-size: 0.75rem;
+    }
+
+    .status-text {
+      display: none;
+    }
+
+    .status-badge i {
+      margin-right: 0;
+    }
+
+    .action-btn-small {
+      padding: 0.4rem 0.6rem;
+      font-size: 0.75rem;
+    }
+
+    .action-text {
+      display: none;
+    }
+
+    .action-btn-small i {
+      margin-right: 0;
+    }
+
+    .approval-details, .po-details {
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 0.25rem;
+    }
+
+    .approval-name, .po-number {
+      word-break: break-all;
+    }
+
+    .empty-state {
+      padding: 2rem 1rem;
+    }
+
+    .empty-state-content i {
+      font-size: 3rem;
+    }
+
+    .empty-state-content h3 {
+      font-size: 1.25rem;
+    }
+
+    .empty-state-content p {
+      font-size: 0.9rem;
+    }
+  }
+
+  /* Mobile Portrait */
+  @media (max-width: 576px) {
+    .main-content {
+      padding: 0.75rem;
+    }
+
+    .page-header {
+      padding: 1rem;
+    }
+
+    .page-title {
+      font-size: 1.25rem;
+    }
+
+    .page-title-text {
+      font-size: 1.1rem;
+    }
+
+    .page-title i {
+      font-size: 1rem;
+    }
+
+    .sidebar {
+      padding: 1.5rem 1rem;
+    }
+
+    .welcome-title {
+      font-size: 1.25rem;
+    }
+
+    .user-name {
+      font-size: 1rem;
+    }
+
+    .detail-badge {
+      font-size: 0.8rem;
+      padding: 0.3rem 0.6rem;
+    }
+
+    .stat-card {
+      padding: 0.75rem;
+    }
+
+    .stat-icon {
+      width: 40px;
+      height: 40px;
+      font-size: 1.25rem;
+    }
+
+    .stat-value {
+      font-size: 1.25rem;
+    }
+
+    .action-btn {
+      padding: 0.75rem;
+    }
+
+    .action-btn i {
+      font-size: 1rem;
+    }
+
+    .action-btn span {
+      font-size: 0.9rem;
+    }
+
+    .upload-card {
+      margin: 0.5rem;
+      padding: 1rem;
+    }
+
+    .upload-header-icon {
+      width: 40px;
+      height: 40px;
+      font-size: 1.25rem;
+    }
+
+    .upload-title i {
+      font-size: 1rem;
+    }
+
+    .upload-zone {
+      padding: 1rem;
+    }
+
+    .upload-icon {
+      width: 48px;
+      height: 48px;
+      font-size: 1.5rem;
+    }
+
+    .upload-zone-title {
+      font-size: 1rem;
+    }
+
+    .file-type-badge {
+      font-size: 0.75rem;
+      padding: 0.2rem 0.5rem;
+    }
+
+    .selected-file-content {
+      flex-direction: column;
+      gap: 1rem;
+      align-items: flex-start;
+    }
+
+    .file-info {
+      width: 100%;
+    }
+
+    .remove-file-btn {
+      align-self: flex-end;
+    }
+
+    .helper-list li {
+      font-size: 0.8rem;
+    }
+
+    .results-section {
+      padding: 1rem;
+    }
+
+    .error-details-header {
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 0.5rem;
+    }
+
+    .error-card-header {
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 0.5rem;
+    }
+
+    .error-row-info {
+      flex-wrap: wrap;
+    }
+
+    .modern-modal .modal-header {
+      padding: 1rem;
+    }
+
+    .modern-modal .modal-title {
+      font-size: 1.25rem;
+    }
+
+    .modern-modal .modal-body {
+      padding: 1rem;
+    }
+
+    .form-section {
+      padding: 1rem;
+    }
+
+    .section-header h6 {
+      font-size: 1rem;
+    }
+
+    .form-group label {
+      font-size: 0.9rem;
+    }
+
+    .form-control {
+      padding: 0.6rem 0.8rem;
+      font-size: 0.85rem;
+    }
+
+    .form-text {
+      font-size: 0.8rem;
+    }
+
+    .checkbox-label {
+      align-items: flex-start;
+    }
+
+    .checkbox-label span {
+      font-size: 0.85rem;
+      line-height: 1.4;
+    }
+
+    .po-exception-group {
+      padding: 0.75rem;
+    }
+
+    .btn-primary, .btn-secondary {
+      padding: 0.6rem 1rem;
+      font-size: 0.85rem;
+    }
+  }
+
+  /* Small Mobile */
+  @media (max-width: 375px) {
+    .page-title {
+      font-size: 1.1rem;
+    }
+
+    .page-title-text {
+      font-size: 1rem;
+    }
+
+    .filter-btn {
+      min-width: 70px;
+      padding: 0.4rem 0.5rem;
+      font-size: 0.75rem;
+    }
+
+    .modern-table th,
+    .modern-table td {
+      padding: 0.5rem;
+      font-size: 0.75rem;
+    }
+
+    .detail-row {
+      font-size: 0.75rem;
+    }
+
+    .qty-value {
+      padding: 0.15rem 0.3rem;
+    }
+
+    .action-btn-small {
+      padding: 0.3rem 0.5rem;
+    }
+
+    .upload-zone-title {
+      font-size: 0.9rem;
+    }
+
+    .upload-zone-subtitle {
+      font-size: 0.8rem;
+    }
+
+    .file-type-badge {
+      font-size: 0.7rem;
+    }
+
+    .summary-card {
+      padding: 0.75rem;
+    }
+
+    .summary-card-icon {
+      width: 36px;
+      height: 36px;
+      font-size: 1rem;
+    }
+
+    .summary-card-value {
+      font-size: 1.25rem;
+    }
+
+    .summary-card-label {
+      font-size: 0.7rem;
+    }
+  }
+
+  /* Handle very small screens */
+  @media (max-width: 320px) {
+    .filter-btn {
+      min-width: 60px;
+      padding: 0.3rem;
+    }
+
+    .detail-badge {
+      font-size: 0.7rem;
+    }
+
+    .form-section {
+      padding: 0.75rem;
+    }
+  }
+
+  /* Touch-friendly improvements */
+  @media (hover: none) and (pointer: coarse) {
+    .filter-btn:hover,
+    .action-btn:hover,
+    .action-btn-small:hover,
+    .btn-primary:hover,
+    .btn-secondary:hover,
+    .upload-zone:hover {
+      transform: none;
+    }
+
+    .filter-btn:active,
+    .action-btn:active,
+    .action-btn-small:active,
+    .btn-primary:active,
+    .btn-secondary:active,
+    .upload-zone:active {
+      transform: scale(0.98);
+    }
+
+    .search-input,
+    .form-control,
+    select.form-control {
+      font-size: 16px; /* Prevent zoom on iOS */
+    }
+
+    .action-btn,
+    .action-btn-small,
+    .filter-btn,
+    .btn-primary,
+    .btn-secondary {
+      min-height: 44px; /* Apple's recommended touch target size */
+    }
+
+    .checkbox-label input[type="checkbox"] {
+      width: 22px;
+      height: 22px;
+    }
+  }
+
+  /* Print styles */
+  @media print {
+    .sidebar,
+    .quick-actions,
+    .search-container,
+    .filter-btn,
+    .actions-cell,
+    .modal,
+    .upload-section {
+      display: none !important;
+    }
+
+    .layout-container {
+      display: block;
+    }
+
+    .main-content {
+      padding: 0;
+    }
+
+    .table-wrapper {
+      border: 1px solid #000;
+      box-shadow: none;
+    }
+
+    .modern-table th {
+      background: #f0f0f0 !important;
+      color: #000 !important;
+    }
+
+    .modern-table td {
+      background: #fff !important;
+    }
+  }
+</style>
+
+<script>
+$(document).ready(function () {
+  console.log('[INIT] Document ready - Initializing Purchase Order Management interface');
+
+  // =========== GLOBAL STATE MANAGEMENT ==============
+  // Store SAP PO message state per modal
+  const sapPoMessageState = {};
+  console.log('[STATE] Initializing sapPoMessageState object');
+  
+  // Track active AJAX requests to prevent duplicates
+  const activeSapPoRequests = {};
+  console.log('[STATE] Initializing activeSapPoRequests object');
+  
+  // Track modal state to prevent multiple initializations
+  const modalInitializationState = {};
+  console.log('[STATE] Initializing modalInitializationState object');
+
+  // Initialize tooltips
+  console.log('[INIT] Initializing Bootstrap tooltips');
+  $('[data-bs-toggle="tooltip"]').tooltip();
+
+  // =========== SAP UPLOAD SECTION TOGGLE ==============
+  $('#uploadPoExcelBtn').click(function(e) {
+    e.preventDefault();
+    console.log('[SAP-UPLOAD] Toggle button clicked');
+    
+    const uploadSection = $('#sapUploadSection');
+    const mainTableWrapper = $('#mainTableWrapper');
+    
+    if (uploadSection.is(':visible')) {
+      console.log('[SAP-UPLOAD] Hiding upload section, showing main table');
+      uploadSection.hide();
+      mainTableWrapper.show();
+      resetUploadSection();
+    } else {
+      console.log('[SAP-UPLOAD] Showing upload section, hiding main table');
+      uploadSection.show();
+      mainTableWrapper.hide();
+    }
+  });
+
+  // =========== FIXED: FILE UPLOAD FUNCTIONALITY (TRANSPARENT OVERLAY PATTERN) ==============
+  console.log('[SAP-UPLOAD] Initializing file upload functionality with transparent overlay');
+  let selectedFile = null;
+  const uploadZone = $('#uploadZone');
+  const fileInput = $('#fileInput');
+  const uploadBtn = $('#uploadBtn');
+  
+  // File input change handler
+  fileInput.on('change', function(e) {
+    console.log('[SAP-UPLOAD] File input changed, files selected:', e.target.files.length);
+    if (e.target.files && e.target.files.length > 0) {
+      handleFileSelection(e.target.files[0]);
+    } else {
+      console.log('[SAP-UPLOAD] No files selected or file input empty');
+    }
+  });
+
+  // Drag and drop events
+  console.log('[SAP-UPLOAD] Binding drag-and-drop event handlers');
+  uploadZone.on('dragover', function(e) {
+    e.preventDefault();
+    e.stopPropagation();
+    console.log('[SAP-UPLOAD] Drag over upload zone');
+    uploadZone.addClass('drag-over');
+  });
+
+  uploadZone.on('dragleave', function(e) {
+    e.preventDefault();
+    e.stopPropagation();
+    console.log('[SAP-UPLOAD] Drag left upload zone');
+    uploadZone.removeClass('drag-over');
+  });
+
+  uploadZone.on('drop', function(e) {
+    e.preventDefault();
+    e.stopPropagation();
+    console.log('[SAP-UPLOAD] File dropped on upload zone');
+    uploadZone.removeClass('drag-over');
+    
+    if (e.originalEvent.dataTransfer && e.originalEvent.dataTransfer.files.length > 0) {
+      console.log('[SAP-UPLOAD] Dropped files count:', e.originalEvent.dataTransfer.files.length);
+      const file = e.originalEvent.dataTransfer.files[0];
+      console.log('[SAP-UPLOAD] Processing dropped file:', file.name, 'type:', file.type, 'size:', file.size);
+      if (validateFileType(file)) {
+        handleFileSelection(file);
+      } else {
+        console.log('[SAP-UPLOAD] Invalid file type dropped:', file.type, file.name);
+        showError('Please upload only Excel files (.xlsx, .xls)');
+      }
+    } else {
+      console.log('[SAP-UPLOAD] No files in drop event');
+    }
+  });
+
+  // Remove file
+  console.log('[SAP-UPLOAD] Binding remove file button handler');
+  $('#removeFileBtn').on('click', function() {
+    console.log('[SAP-UPLOAD] Remove file button clicked');
+    resetFileSelection();
+  });
+
+  // Upload button click
+  console.log('[SAP-UPLOAD] Binding upload button handler');
+  uploadBtn.on('click', function() {
+    console.log('[SAP-UPLOAD] Upload button clicked, selectedFile exists:', !!selectedFile);
+    if (selectedFile) {
+      uploadFile();
+    } else {
+      console.log('[SAP-UPLOAD] Upload attempted without selected file');
+      showError('Please select a file first');
+    }
+  });
+
+  // File type validation
+  function validateFileType(file) {
+    console.log('[VALIDATION] validateFileType called for file:', file.name);
+    
+    // Check file extension
+    const validExtensions = ['.xlsx', '.xls'];
+    const fileName = file.name.toLowerCase();
+    const hasValidExtension = validExtensions.some(ext => fileName.endsWith(ext));
+    
+    // Check MIME type (optional, but helpful)
+    const validMimeTypes = [
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      'application/vnd.ms-excel',
+      'application/excel',
+      'application/x-excel',
+      'application/x-msexcel'
+    ];
+    const hasValidMimeType = !file.type || validMimeTypes.includes(file.type);
+    
+    const isValid = hasValidExtension && hasValidMimeType;
+    
+    console.log('[VALIDATION] File validation result:', {
+      fileName: file.name,
+      fileType: file.type,
+      hasValidExtension: hasValidExtension,
+      hasValidMimeType: hasValidMimeType,
+      isValid: isValid
+    });
+    
+    return isValid;
+  }
+
+  // Handle file selection
+  function handleFileSelection(file) {
+    console.log('[SAP-UPLOAD] handleFileSelection called with file:', file.name);
+    
+    if (!validateFileType(file)) {
+      console.log('[VALIDATION] File type validation failed for:', file.name);
+      showError('Please upload only Excel files (.xlsx or .xls)');
+      return;
+    }
+
+    console.log('[STATE] Setting selectedFile to:', file.name);
+    selectedFile = file;
+    
+    // Update UI
+    console.log('[UI] Updating file display with name:', file.name);
+    $('#fileName').text(file.name);
+    const formattedSize = formatFileSize(file.size);
+    console.log('[UI] File size formatted:', file.size, '->', formattedSize);
+    $('#fileSize').text(formattedSize);
+    $('#selectedFile').show();
+    uploadBtn.prop('disabled', false);
+    console.log('[STATE] Upload button enabled');
+    
+    console.log('[UI] Hiding upload zone');
+    uploadZone.hide();
+    
+    console.log('[SAP-UPLOAD] File selection successful:', file.name);
+  }
+
+  // Reset file selection
+  function resetFileSelection() {
+    console.log('[SAP-UPLOAD] resetFileSelection called');
+    console.log('[STATE] Clearing selectedFile, previous:', selectedFile ? selectedFile.name : 'null');
+    selectedFile = null;
+    fileInput.val('');
+    console.log('[UI] Hiding selected file display');
+    $('#selectedFile').hide();
+    uploadBtn.prop('disabled', true);
+    console.log('[STATE] Upload button disabled');
+    console.log('[UI] Showing upload zone');
+    uploadZone.show();
+  }
+
+  // Reset upload section
+  function resetUploadSection() {
+    console.log('[SAP-UPLOAD] resetUploadSection called');
+    resetFileSelection();
+    console.log('[UI] Hiding results section');
+    $('#resultsSection').hide();
+    $('#errorDetails').hide();
+    $('#resultsTableContainer').hide();
+  }
+
+  // Format file size
+  function formatFileSize(bytes) {
+    console.log('[UTILS] formatFileSize called with bytes:', bytes);
+    if (bytes === 0) {
+      console.log('[UTILS] Zero bytes, returning "0 Bytes"');
+      return '0 Bytes';
+    }
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    const result = parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+    console.log('[UTILS] Formatted file size result:', result);
+    return result;
+  }
+
+  // Show error message
+  function showError(message) {
+    console.log('[UI] Showing error toast:', message);
+    const errorToast = `
+      <div class="error-toast" style="position: fixed; top: 20px; right: 20px; background: var(--danger); color: white; padding: 1rem; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.2); z-index: 1000; max-width: 300px;">
+        <div style="display: flex; align-items: center; gap: 0.5rem;">
+          <i class="fas fa-exclamation-circle"></i>
+          <strong>Error</strong>
+        </div>
+        <p style="margin: 0.5rem 0 0; font-size: 0.9rem;">${message}</p>
+      </div>
+    `;
+    
+    $('body').append(errorToast);
+    
+    setTimeout(() => {
+      console.log('[UI] Removing error toast after timeout');
+      $('.error-toast').fadeOut(300, function() {
+        $(this).remove();
+      });
+    }, 5000);
+  }
+
+  // Show success message
+  function showSuccess(message) {
+    console.log('[UI] Showing success toast:', message);
+    const successToast = `
+      <div class="success-toast" style="position: fixed; top: 20px; right: 20px; background: var(--success); color: white; padding: 1rem; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.2); z-index: 1000; max-width: 300px;">
+        <div style="display: flex; align-items: center; gap: 0.5rem;">
+          <i class="fas fa-check-circle"></i>
+          <strong>Success</strong>
+        </div>
+        <p style="margin: 0.5rem 0 0; font-size: 0.9rem;">${message}</p>
+      </div>
+    `;
+    
+    $('body').append(successToast);
+    
+    setTimeout(() => {
+      console.log('[UI] Removing success toast after timeout');
+      $('.success-toast').fadeOut(300, function() {
+        $(this).remove();
+      });
+    }, 5000);
+  }
+
+  // Upload file to server
+  function uploadFile() {
+    console.log('[SAP-UPLOAD] uploadFile called, selectedFile:', selectedFile ? selectedFile.name : 'null');
+    if (!selectedFile) {
+      console.warn('[SAP-UPLOAD] uploadFile called without selected file');
+      showError('No file selected. Please select a file first.');
+      return;
+    }
+
+    console.log('[UI] Hiding upload button, showing loader');
+    uploadBtn.hide();
+    $('#uploadLoader').show();
+    uploadBtn.prop('disabled', true);
+
+    const formData = new FormData();
+    formData.append('file', selectedFile);
+    formData.append('csrfmiddlewaretoken', $('input[name="csrfmiddlewaretoken"]').val());
+    
+    console.log('[AJAX] Preparing upload request to:', '{% url "upload_po_excel_from_sap" %}');
+    console.log('[AJAX] Payload summary:', {
+      fileName: selectedFile.name,
+      fileSize: selectedFile.size,
+      hasCsrfToken: true
+    });
+
+    $.ajax({
+      url: '{% url "upload_po_excel_from_sap" %}',
+      type: 'POST',
+      data: formData,
+      processData: false,
+      contentType: false,
+      success: function(response) {
+        console.log('[AJAX] Upload success response received:', {
+          success: response.success,
+          hasErrors: response.errors && response.errors.length > 0,
+          errorCount: response.errors ? response.errors.length : 0,
+          message: response.message
+        });
+        if (response.success) {
+          console.log('[SAP-UPLOAD] Upload successful, displaying validation results');
+          displayValidationResults(response);
+          showSuccess('File uploaded and validated successfully!');
+          
+          console.log('[MODAL] Refreshing SAP PO dropdowns in open modals');
+          refreshOpenModalSapDropdowns();
+        } else {
+          console.error('[AJAX] Upload failed with response:', response);
+          showError(response.error || 'Upload failed. Please try again.');
+          resetFileSelection();
+        }
+      },
+      error: function(xhr, status, error) {
+        console.error('[AJAX] Upload error:', {
+          status: xhr.status,
+          statusText: xhr.statusText,
+          error: error,
+          responseText: xhr.responseText
+        });
+        showError('Error uploading file: ' + error);
+        resetFileSelection();
+      },
+      complete: function() {
+        console.log('[AJAX] Upload request complete');
+        console.log('[UI] Hiding loader, showing upload button');
+        $('#uploadLoader').hide();
+        uploadBtn.show();
+        uploadBtn.prop('disabled', false);
+      }
+    });
+  }
+
+  // Refresh SAP PO dropdowns in all open modals
+  function refreshOpenModalSapDropdowns() {
+    console.log('[MODAL] refreshOpenModalSapDropdowns called');
+    const openModals = $('.modal.show');
+    console.log('[MODAL] Open modals count:', openModals.length);
+    
+    openModals.each(function(index) {
+      const modal = $(this);
+      const requisitionId = modal.find('input[name="requisition_id"]').val();
+      console.log(`[MODAL] Processing modal ${index + 1}, requisitionId:`, requisitionId);
+      if (requisitionId) {
+        console.log(`[MODAL] Fetching SAP PO options for requisition ${requisitionId}`);
+        fetchSapPoOptions(requisitionId, modal);
+      } else {
+        console.log(`[MODAL] Modal ${index + 1} has no requisition_id`);
+      }
+    });
+  }
+
+  // Display validation results
+  function displayValidationResults(data) {
+    console.log('[VALIDATION] displayValidationResults called with data:', {
+      totalRows: data.total_rows,
+      processedRows: data.rows_succeeded,
+      duplicateRows: data.duplicate_pos,
+      failedRows: data.rows_failed,
+      hasProductSummary: !!data.product_group_summary,
+      productSummaryCount: data.product_group_summary ? data.product_group_summary.length : 0,
+      errorCount: data.errors ? data.errors.length : 0
+    });
+    
+    console.log('[UI] Updating summary cards with counts');
+    $('#totalRows').text(data.total_rows || 0);
+    $('#processedRows').text(data.rows_succeeded || 0);
+    $('#duplicateRows').text(data.duplicate_pos || 0);
+    $('#failedRows').text(data.rows_failed || 0);
+
+    if (data.errors && data.errors.length > 0) {
+      console.log('[VALIDATION] Displaying error details, count:', data.errors.length);
+      displayErrorDetails(data.errors);
+    } else {
+      console.log('[VALIDATION] No errors to display');
+      $('#errorDetails').hide();
+    }
+
+    if (data.product_group_summary && data.product_group_summary.length > 0) {
+      console.log('[VALIDATION] Displaying product group summary, group count:', data.product_group_summary.length);
+      displayProductGroupSummary(data.product_group_summary);
+    } else {
+      console.log('[VALIDATION] No product group summary to display');
+    }
+
+    console.log('[UI] Showing results section');
+    $('#resultsSection').show();
+    
+    if (data.message) {
+      console.log('[VALIDATION] Success message:', data.message);
+      showSuccess(data.message);
+    }
+  }
+
+  // Display error details
+  function displayErrorDetails(errors) {
+    console.log('[VALIDATION] displayErrorDetails called with', errors.length, 'errors');
+    const errorContainer = $('#errorCardsContainer');
+    const errorCount = $('#errorCount');
+    
+    console.log('[UI] Clearing previous error cards');
+    errorContainer.empty();
+    const errorCountText = errors.length + ' error(s) found';
+    console.log('[UI] Setting error count:', errorCountText);
+    errorCount.text(errorCountText);
+
+    console.log('[VALIDATION] Rendering error cards');
+    errors.forEach((error, index) => {
+      console.log(`[VALIDATION] Rendering error ${index + 1}:`, {
+        row: error.row,
+        poNumber: error.poNumber,
+        material: error.material,
+        message: error.message
+      });
+      const errorCard = `
+        <div class="error-card">
+          <div class="error-card-header">
+            <div class="error-row-info">
+              <i class="fas fa-exclamation-circle"></i>
+              <span>Row ${error.row}</span>
+              ${error.poNumber && error.poNumber !== 'N/A' ? `<span class="po-number">PO: ${error.poNumber}</span>` : ''}
+              ${error.material && error.material !== 'N/A' ? `<span class="material-info">Material: ${error.material}</span>` : ''}
+            </div>
+          </div>
+          <p class="error-message">
+            <strong>Error:</strong> ${error.message || 'Unknown error'}
+          </p>
+        </div>
+      `;
+      errorContainer.append(errorCard);
+    });
+
+    console.log('[UI] Showing error details section');
+    $('#errorDetails').show();
+  }
+
+  // Display product group summary
+  function displayProductGroupSummary(summary) {
+    console.log('[VALIDATION] displayProductGroupSummary called with', summary.length, 'product groups');
+    const summaryContainer = $('#resultsTableContainer');
+    console.log('[UI] Building product group summary HTML');
+    
+    let summaryHtml = `
+      <div class="table-header-actions">
+        <h4 class="table-title">
+          <i class="fas fa-table"></i>
+          Processed Purchase Orders by Product Group
+        </h4>
+      </div>
+      <div class="table-container">
+        <table class="modern-table results-table">
+          <thead>
+            <tr>
+              <th>Product Group</th>
+              <th>PO Count</th>
+              <th>Total Quantity</th>
+              <th>Sample POs</th>
+            </tr>
+          </thead>
+          <tbody>
+    `;
+    
+    summary.forEach((group, index) => {
+      console.log(`[VALIDATION] Processing product group ${index + 1}:`, {
+        group: group.group,
+        poCount: group.po_count,
+        totalQuantity: group.total_quantity,
+        samplePosCount: group.sample_pos ? group.sample_pos.length : 0
+      });
+      const samplePos = group.sample_pos ? group.sample_pos.join(', ') : 'N/A';
+      summaryHtml += `
+        <tr>
+          <td>${group.group}</td>
+          <td>${group.po_count}</td>
+          <td>${group.total_quantity.toLocaleString()}</td>
+          <td>${samplePos}</td>
+        </tr>
+      `;
+    });
+    
+    summaryHtml += `
+          </tbody>
+        </table>
+      </div>
+    `;
+    
+    console.log('[UI] Updating results table container with product group summary');
+    summaryContainer.html(summaryHtml).show();
+  }
+
+  // =========== ENHANCED SAP PO DROPDOWN FUNCTIONALITY ==============
+  console.log('[SAP-PO] Initializing SAP PO dropdown functionality');
+  
+  // Debounce utility to prevent rapid successive calls
+  function debounce(func, wait) {
+    let timeout;
+    return function executedFunction(...args) {
+      console.log(`[UTILS] debounce called for function, timeout exists: ${!!timeout}`);
+      const later = () => {
+        clearTimeout(timeout);
+        func(...args);
+      };
+      clearTimeout(timeout);
+      timeout = setTimeout(later, wait);
+    };
+  }
+
+  // Modified: Prevent duplicate modal show event bindings
+  $(document).off('show.bs.modal', '.modal').on('show.bs.modal', '.modal', function(e) {
+    console.log('[MODAL] Modal show event triggered for:', this.id);
+    
+    // Prevent event from bubbling up multiple times
+    if (e.isPropagationStopped && e.isPropagationStopped()) {
+      console.log('[MODAL] Event propagation already stopped, skipping');
+      return;
+    }
+    
+    const modal = $(this);
+    const modalId = modal.attr('id');
+    const requisitionId = modal.find('input[name="requisition_id"]').val();
+    console.log('[MODAL] Modal requisitionId:', requisitionId);
+    
+    // Check if this modal is already being initialized
+    if (modalInitializationState[modalId]) {
+      console.log(`[MODAL] Modal ${modalId} already being initialized, skipping duplicate`);
+      return;
+    }
+    
+    // Mark modal as being initialized
+    modalInitializationState[modalId] = true;
+    
+    // Clear any existing message state for this modal
+    console.log(`[STATE] Clearing sapPoMessageState for requisition ${requisitionId}`);
+    sapPoMessageState[requisitionId] = null;
+    
+    // Clear any active request for this requisition
+    if (activeSapPoRequests[requisitionId]) {
+      console.log(`[STATE] Clearing active request for requisition ${requisitionId}`);
+      delete activeSapPoRequests[requisitionId];
+    }
+    
+    // Fetch SAP PO options (with debounce to prevent multiple rapid calls)
+    if (requisitionId) {
+      console.log(`[MODAL] Scheduling SAP PO fetch for requisition ${requisitionId} (debounced)`);
+      const debouncedFetch = debounce(() => {
+        console.log(`[MODAL] Executing debounced SAP PO fetch for requisition ${requisitionId}`);
+        fetchSapPoOptions(requisitionId, modal);
+      }, 100);
+      debouncedFetch();
+    } else {
+      console.log('[MODAL] No requisitionId found, skipping SAP PO fetch');
+    }
+    
+    // Initialize No PO Required checkbox
+    console.log('[MODAL] Initializing No PO Required checkbox');
+    modal.find('.no-po-checkbox').prop('checked', false).trigger('change');
+    modal.find('.error-message').removeClass('show');
+    
+    // Mark modal initialization as complete after a short delay
+    setTimeout(() => {
+      console.log(`[MODAL] Clearing initialization state for modal ${modalId}`);
+      delete modalInitializationState[modalId];
+    }, 500);
+  });
+  
+  // Reset on modal hide
+  $(document).off('hidden.bs.modal', '.modal').on('hidden.bs.modal', '.modal', function() {
+    console.log('[MODAL] Modal hidden event triggered for:', this.id);
+    const modal = $(this);
+    const modalId = modal.attr('id');
+    const requisitionId = modal.find('input[name="requisition_id"]').val();
+    console.log('[MODAL] Modal requisitionId:', requisitionId);
+    
+    // Clear modal initialization state
+    if (modalInitializationState[modalId]) {
+      console.log(`[STATE] Clearing modal initialization state for ${modalId}`);
+      delete modalInitializationState[modalId];
+    }
+    
+    // Clear message state
+    if (requisitionId) {
+      console.log(`[STATE] Clearing sapPoMessageState for requisition ${requisitionId}`);
+      sapPoMessageState[requisitionId] = null;
+    }
+    
+    // Clear any active request for this requisition
+    if (requisitionId && activeSapPoRequests[requisitionId]) {
+      console.log(`[STATE] Clearing active request for requisition ${requisitionId} on modal hide`);
+      delete activeSapPoRequests[requisitionId];
+    }
+    
+    // Reset form
+    console.log('[MODAL] Resetting modal form');
+    modal.find('form')[0].reset();
+    modal.find('.sap-po-message').empty().hide();
+    modal.find('input[name="sap_po_selected"]').val('false');
+    modal.find('input[name="sap_po_id"]').val('');
+    modal.find('.po-number-input').prop('readonly', false);
+    
+    // Clear event handlers to prevent accumulation
+    modal.find('.sap-po-select').off('change');
+    modal.find('.sap-po-use-btn').off('click');
+    modal.find('.toggle-manual-entry').off('click');
+    modal.find('.toggle-sap-selection').off('click');
+  });
+
+  // Fetch SAP PO options with improved error handling and duplicate prevention
+  function fetchSapPoOptions(requisitionId, modal) {
+    console.log(`[SAP-PO] fetchSapPoOptions called for requisition ${requisitionId}`);
+    
+    // Check if there's already an active request for this requisition
+    if (activeSapPoRequests[requisitionId]) {
+      console.log(`[SAP-PO] Skipping duplicate request for requisition ${requisitionId} - request already in progress`);
+      return;
+    }
+    
+    // Mark request as active
+    activeSapPoRequests[requisitionId] = true;
+    console.log(`[STATE] Marked request as active for requisition ${requisitionId}`);
+    
+    const sapPoSection = modal.find(`#sapPoSection-${requisitionId}`);
+    const sapPoMessage = modal.find(`#sapPoMessage-${requisitionId}`);
+    
+    console.log(`[UI] Clearing previous SAP PO content for requisition ${requisitionId}`);
+    sapPoSection.empty();
+    sapPoMessage.empty().hide();
+    
+    // Show loading placeholder
+    console.log(`[UI] Showing loading placeholder for requisition ${requisitionId}`);
+    sapPoSection.html(`
+      <div class="sap-po-placeholder">
+        <p class="placeholder-text">
+          <i class="fas fa-spinner fa-spin"></i>
+          Loading SAP PO options...
+        </p>
+      </div>
+    `);
+    
+    console.log(`[AJAX] Fetching SAP PO options for requisition ${requisitionId} from:`, '{% url "get_sap_pos_for_requisition" %}');
+    $.ajax({
+      url: '{% url "get_sap_pos_for_requisition" %}',
+      method: 'GET',
+      data: { 'requisition_id': requisitionId },
+      success: function(response) {
+        console.log(`[AJAX] SAP PO fetch success for requisition ${requisitionId}:`, {
+          success: response.success,
+          hasMapping: response.has_mapping,
+          poOptionsCount: response.po_options ? response.po_options.length : 0,
+          productGroup: response.product_group,
+          material: response.material
+        });
+        
+        // Clear the active request flag
+        console.log(`[STATE] Clearing active request flag for requisition ${requisitionId}`);
+        delete activeSapPoRequests[requisitionId];
+        
+        if (response.success && response.po_options && response.po_options.length > 0) {
+          console.log(`[SAP-PO] Rendering dropdown with ${response.po_options.length} options`);
+          renderSapPoDropdown(response, requisitionId, modal);
+        } else if (response.success && !response.has_mapping) {
+          console.log(`[SAP-PO] No product mapping found for: ${response.material}`);
+          showSapPoMessage(requisitionId, modal, 'info', 
+            `No product mapping found for "${response.material}". 
+            <a href="/admin/product-mapping" target="_blank">Map this product</a> to see SAP POs.`);
+        } else if (response.success && response.po_options.length === 0) {
+          console.log(`[SAP-PO] No SAP POs available for product group: ${response.product_group || response.material}`);
+          showSapPoMessage(requisitionId, modal, 'warning',
+            `No SAP POs available for "${response.product_group || response.material}". 
+            Upload SAP Excel file or enter PO manually.`);
+        } else {
+          console.warn(`[SAP-PO] Unable to load SAP PO options for requisition ${requisitionId}, response:`, response);
+          showSapPoMessage(requisitionId, modal, 'warning',
+            'Unable to load SAP PO options. Please enter PO manually.');
+        }
+      },
+      error: function(xhr, status, error) {
+        console.error(`[AJAX] SAP PO fetch error for requisition ${requisitionId}:`, {
+          status: xhr.status,
+          statusText: xhr.statusText,
+          error: error
+        });
+        
+        // Clear the active request flag on error too
+        console.log(`[STATE] Clearing active request flag for requisition ${requisitionId} after error`);
+        delete activeSapPoRequests[requisitionId];
+        
+        showSapPoMessage(requisitionId, modal, 'danger',
+          'Error fetching SAP POs. Please try again or enter PO manually.');
+      }
+    });
+  }
+
+  // Render SAP PO dropdown
+  function renderSapPoDropdown(response, requisitionId, modal) {
+    console.log(`[SAP-PO] renderSapPoDropdown called for requisition ${requisitionId}`);
+    const sapPoSection = modal.find(`#sapPoSection-${requisitionId}`);
+    
+    console.log(`[UI] Building dropdown with ${response.po_options.length} options`);
+    let optionsHtml = '<option value="">-- Select SAP PO --</option>';
+    response.po_options.forEach((po, index) => {
+      console.log(`[SAP-PO] Adding option ${index + 1}:`, {
+        poNumber: po.po_number,
+        vendor: po.vendor_info || 'Unknown Vendor',
+        quantity: po.order_quantity,
+        id: po.id
+      });
+      optionsHtml += `
+        <option value="${po.po_number}" 
+                data-id="${po.id}"
+                data-vendor="${po.vendor_info || ''}"
+                data-quantity="${po.order_quantity}"
+                data-plant="${po.plant || ''}"
+                data-date="${po.document_date || ''}">
+          ${po.po_number} - ${po.vendor_info || 'Unknown Vendor'} (${po.order_quantity} units)
+        </option>
+      `;
+    });
+    
+    const dropdownHtml = `
+      <div class="sap-po-select-container">
+        <label>
+          <i class="fas fa-file-excel"></i>
+          Select SAP PO for ${response.product_group}
+        </label>
+        <div class="sap-po-select-group">
+          <select class="form-control sap-po-select" id="sapPoSelect-${requisitionId}">
+            ${optionsHtml}
+          </select>
+          <button type="button" class="sap-po-use-btn" id="useSelectedPo-${requisitionId}" disabled>
+            <i class="fas fa-check"></i> <span class="btn-text">Use</span>
+          </button>
+        </div>
+        <small class="form-text">
+          <i class="fas fa-info-circle"></i>
+          Select a PO from uploaded SAP Excel. Vendor selection remains manual.
+        </small>
+      </div>
+      <div class="manual-entry-toggle">
+        <a href="#" class="toggle-manual-entry" data-requisition="${requisitionId}">
+          <i class="fas fa-pencil-alt"></i> <span class="toggle-text">Enter PO manually instead</span>
+        </a>
+      </div>
+    `;
+    
+    console.log(`[UI] Updating SAP PO section for requisition ${requisitionId}`);
+    sapPoSection.html(dropdownHtml);
+    
+    // Clear previous event handlers to prevent accumulation
+    modal.find(`#sapPoSelect-${requisitionId}`).off('change');
+    modal.find(`#useSelectedPo-${requisitionId}`).off('click');
+    modal.find(`.toggle-manual-entry[data-requisition="${requisitionId}"]`).off('click');
+    
+    // Enable/disable Use button based on selection
+    console.log(`[EVENT] Binding change handler for SAP PO select ${requisitionId}`);
+    modal.find(`#sapPoSelect-${requisitionId}`).on('change', function() {
+      const selectedValue = $(this).val();
+      console.log(`[EVENT] SAP PO select changed for requisition ${requisitionId}, value:`, selectedValue);
+      const useBtn = modal.find(`#useSelectedPo-${requisitionId}`);
+      const isDisabled = !selectedValue;
+      console.log(`[STATE] Setting use button disabled to: ${isDisabled}`);
+      useBtn.prop('disabled', isDisabled);
+    });
+    
+    // Handle Use button click
+    console.log(`[EVENT] Binding click handler for Use button ${requisitionId}`);
+    modal.find(`#useSelectedPo-${requisitionId}`).on('click', function() {
+      const select = modal.find(`#sapPoSelect-${requisitionId}`);
+      const selectedPo = select.val();
+      const selectedOption = select.find('option:selected');
+      console.log(`[EVENT] Use button clicked for requisition ${requisitionId}, selected PO:`, selectedPo);
+      
+      if (selectedPo) {
+        const sapPoId = selectedOption.data('id');
+        console.log(`[STATE] Setting SAP PO ID to: ${sapPoId} for PO: ${selectedPo}`);
+        
+        // Fill PO number
+        const poInput = modal.find('.po-number-input');
+        console.log(`[UI] Setting PO input value to: ${selectedPo}, making read-only`);
+        poInput.val(selectedPo);
+        poInput.prop('readonly', true);
+        
+        // Store SAP PO data
+        console.log(`[STATE] Setting hidden SAP PO data fields`);
+        modal.find('input[name="sap_po_id"]').val(sapPoId);
+        modal.find('input[name="sap_po_selected"]').val('true');
+        
+        // Hide manual entry toggle
+        console.log(`[UI] Hiding manual entry toggle`);
+        modal.find('.manual-entry-toggle').hide();
+        
+        // Show success message
+        showSuccess(`SAP PO ${selectedPo} selected successfully.`);
+      } else {
+        console.warn(`[EVENT] Use button clicked but no PO selected for requisition ${requisitionId}`);
+      }
+    });
+    
+    // Handle manual entry toggle
+    console.log(`[EVENT] Binding manual entry toggle for requisition ${requisitionId}`);
+    modal.find(`.toggle-manual-entry[data-requisition="${requisitionId}"]`).on('click', function(e) {
+      e.preventDefault();
+      console.log(`[EVENT] Manual entry toggle clicked for requisition ${requisitionId}`);
+      
+      // Hide SAP PO section
+      console.log(`[UI] Hiding SAP PO section`);
+      sapPoSection.hide();
+      
+      // Show manual entry form
+      const poInput = modal.find('.po-number-input');
+      console.log(`[UI] Enabling manual PO input, clearing value`);
+      poInput.prop('readonly', false);
+      poInput.val('');
+      poInput.focus();
+      
+      // Clear SAP PO data
+      console.log(`[STATE] Clearing SAP PO hidden fields`);
+      modal.find('input[name="sap_po_id"]').val('');
+      modal.find('input[name="sap_po_selected"]').val('false');
+      
+      // Show manual entry message
+      showSapPoMessage(requisitionId, modal, 'info',
+        'Manual PO entry enabled. Enter your 10-digit SAP PO number.');
+    });
+  }
+
+  // Show SAP PO message (idempotent - prevents duplicates)
+  function showSapPoMessage(requisitionId, modal, type, message) {
+    console.log(`[SAP-PO] showSapPoMessage called for requisition ${requisitionId}`, {
+      type: type,
+      message: message,
+      previousState: sapPoMessageState[requisitionId]
+    });
+    
+    const sapPoMessage = modal.find(`#sapPoMessage-${requisitionId}`);
+    const sapPoSection = modal.find(`#sapPoSection-${requisitionId}`);
+    
+    // Get clean message text for comparison (remove HTML tags)
+    const cleanMessage = message.replace(/<[^>]*>/g, '').trim();
+    const previousCleanMessage = sapPoMessageState[requisitionId] ? 
+      sapPoMessageState[requisitionId].replace(/<[^>]*>/g, '').trim() : null;
+    
+    console.log(`[SAP-PO] Clean message comparison:`, {
+      previous: previousCleanMessage,
+      current: cleanMessage,
+      isSame: cleanMessage === previousCleanMessage
+    });
+    
+    // Only show if message has actually changed
+    if (cleanMessage !== previousCleanMessage) {
+      console.log(`[STATE] Updating sapPoMessageState for requisition ${requisitionId} from "${previousCleanMessage}" to "${cleanMessage}"`);
+      sapPoMessageState[requisitionId] = cleanMessage;
+      
+      // Clear section
+      console.log(`[UI] Clearing SAP PO section`);
+      sapPoSection.empty();
+      
+      // Show message
+      const icon = getIconForType(type);
+      console.log(`[UI] Showing SAP PO message with type ${type}, icon ${icon}`);
+      sapPoMessage.html(`
+        <div class="sap-po-message ${type}">
+          <i class="fas fa-${icon}"></i>
+          ${message}
+        </div>
+      `).show();
+    } else {
+      console.log(`[SAP-PO] Message unchanged for requisition ${requisitionId}, skipping update`);
+    }
+  }
+
+  // Get icon for message type
+  function getIconForType(type) {
+    console.log(`[UTILS] getIconForType called with: ${type}`);
+    let icon;
+    switch(type) {
+      case 'info': 
+        icon = 'info-circle';
+        break;
+      case 'warning': 
+        icon = 'exclamation-triangle';
+        break;
+      case 'danger': 
+        icon = 'exclamation-circle';
+        break;
+      default: 
+        icon = 'info-circle';
+    }
+    console.log(`[UTILS] Returning icon: ${icon}`);
+    return icon;
+  }
+
+  // Open SAP upload from modal CTA
+  $(document).on('click', '[id^="openSapUpload-"]', function() {
+    const modal = $(this).closest('.modal');
+    console.log('[MODAL] SAP upload CTA clicked, modal ID:', modal.attr('id'));
+    
+    console.log('[MODAL] Hiding modal');
+    modal.modal('hide');
+    
+    // Show SAP upload section
+    console.log('[UI] Showing SAP upload section, hiding main table');
+    $('#sapUploadSection').show();
+    $('#mainTableWrapper').hide();
+    
+    // Scroll to upload section
+    console.log('[UI] Scrolling to SAP upload section');
+    $('html, body').animate({
+      scrollTop: $('#sapUploadSection').offset().top - 20
+    }, 500);
+  });
+
+  // =========== EXISTING FUNCTIONALITY ==============
+  console.log('[INIT] Initializing existing functionality');
+  
+  // Filter Buttons
+  console.log('[FILTER] Binding filter button handlers');
+  $(".filter-btn").on("click", function () {
+    console.log('[FILTER] Filter button clicked:', $(this).data("filter"));
+    
+    $(".filter-btn").removeClass("active");
+    $(this).addClass("active");
+    console.log('[UI] Updated active filter to:', $(this).data("filter"));
+
+    const filter = $(this).data("filter");
+    const rows = $("#purchaseTable tbody tr");
+    console.log('[FILTER] Applying filter:', filter, 'to', rows.length, 'rows');
+
+    if (filter === "all") {
+      console.log('[FILTER] Showing all rows');
+      rows.show();
+    } else {
+      console.log('[FILTER] Filtering rows by status:', filter);
+      rows.hide();
+      let visibleCount = 0;
+      rows.each(function () {
+        const status = $(this).data("status");
+        const shouldShow = (filter === "approved" && status === "APPROVED") ||
+                          (filter === "po-generated" && status === "PO GENERATED");
+        if (shouldShow) {
+          $(this).show();
+          visibleCount++;
+        }
+      });
+      console.log('[FILTER] Rows visible after filtering:', visibleCount);
+    }
+  });
+
+  // Vendor email autofill
+  console.log('[VENDOR] Binding vendor email autofill handler');
+  $(document).on('change', 'select[name="party_name"]', function() {
+    const vendorName = $(this).val();
+    const form = $(this).closest("form");
+    const emailField = form.find("input[name='email']");
+    console.log('[VENDOR] Vendor changed to:', vendorName);
+    
+    console.log('[AJAX] Fetching vendor email for:', vendorName);
+    $.ajax({
+      url: '{% url "get_vendor_email" %}',
+      method: 'GET',
+      data: {
+        'vendor_name': vendorName
+      },
+      success: function(data) {
+        console.log('[AJAX] Vendor email response:', {
+          hasEmail: !!data.email,
+          emailLength: data.email ? data.email.length : 0
+        });
+        if (data.email) {
+          console.log('[UI] Setting email field to vendor email');
+          emailField.val(data.email);  
+        } else {
+          console.log('[UI] Clearing email field (no vendor email found)');
+          emailField.val('');  
+        }
+      },
+      error: function(error) {
+        console.error('[AJAX] Vendor email fetch error:', error);
+        emailField.val(''); 
+      }
+    });
+  });
+
+  // Initialize No PO Required functionality
+  console.log('[NO-PO] Binding No PO Required checkbox handler');
+  $(document).on('change', '.no-po-checkbox', function() {
+    console.log('[EVENT] No PO Required checkbox changed, checked:', $(this).is(':checked'));
+    const checkbox = $(this);
+    const form = checkbox.closest('form');
+    const poInput = form.find('.po-number-input');
+    const errorMessage = form.find('.error-message');
+    const noPoHidden = form.find('input[name="no_po_required"]');
+    
+    const SAP_PATTERN = /^[0-9]{10}$/;
+    const AUTO_PO = "0000000000";
+
+    if (checkbox.is(':checked')) {
+      console.log('[STATE] No PO Required checked, setting auto PO:', AUTO_PO);
+      poInput.val(AUTO_PO);
+      poInput.prop('readonly', true);
+      poInput.removeAttr('required');
+      poInput.removeAttr('pattern');
+      errorMessage.removeClass('show');
+      noPoHidden.val('true');
+      console.log('[STATE] no_po_required set to: true');
+    } else {
+      console.log('[STATE] No PO Required unchecked, enabling manual PO entry');
+      poInput.val('');
+      poInput.prop('readonly', false);
+      poInput.attr('required', true);
+      poInput.attr('pattern', '[0-9]{10}');
+      noPoHidden.val('false');
+      console.log('[STATE] no_po_required set to: false');
+    }
+  });
+
+  // Real-time validation for PO input
+  console.log('[VALIDATION] Binding real-time PO input validation');
+  $(document).on('input', '.po-number-input', function() {
+    const poInput = $(this);
+    const poValue = poInput.val();
+    const form = poInput.closest('form');
+    const checkbox = form.find('.no-po-checkbox');
+    const errorMessage = form.find('.error-message');
+    const SAP_PATTERN = /^[0-9]{10}$/;
+    
+    console.log('[VALIDATION] PO input changed, value:', poValue, 'length:', poValue.length);
+    
+    if (!checkbox.is(':checked') && poValue && !SAP_PATTERN.test(poValue)) {
+      console.log('[VALIDATION] Invalid PO format, showing error');
+      errorMessage.addClass('show');
+    } else {
+      console.log('[VALIDATION] Valid PO format or No PO Required checked, hiding error');
+      errorMessage.removeClass('show');
+    }
+  });
+
+  // Enhanced PO Form validation and submission
+  console.log('[FORM] Binding form submission handler');
+  $(document).on('submit', 'form[id^="purchaseForm"]', function(event) {
+    const form = $(this);
+    const formId = form.attr('id');
+    console.log(`[FORM] Form submission triggered: ${formId}`);
+    
+    const poNumberInput = form.find('.po-number-input');
+    const poValue = poNumberInput.val();
+    const errorMessage = form.find('.error-message');
+    const checkbox = form.find('.no-po-checkbox');
+    const isNoPoChecked = checkbox.is(':checked');
+    const submitBtn = form.find('button[type="submit"]');
+    const loader = form.find('.loader');
+    const SAP_PATTERN = /^[0-9]{10}$/;
+
+    console.log(`[FORM] Validation state:`, {
+      poValue: poValue,
+      isNoPoChecked: isNoPoChecked,
+      isValidSapFormat: SAP_PATTERN.test(poValue),
+      formId: formId
+    });
+
+    // If No PO Required is checked, bypass validation
+    if (isNoPoChecked) {
+      console.log(`[FORM] No PO Required checked, bypassing validation, setting auto PO`);
+      poNumberInput.val("0000000000");
+      errorMessage.removeClass('show');
+      submitBtn.prop('disabled', true);
+      loader.removeClass('d-none');
+      console.log(`[FORM] Submission allowed for ${formId}`);
+      return true;
+    }
+
+    // Standard validation for normal PO entry
+    if (!SAP_PATTERN.test(poValue)) {
+      console.log(`[FORM] Invalid PO format, preventing submission for ${formId}`);
+      event.preventDefault();
+      errorMessage.addClass('show');
+      submitBtn.prop('disabled', false);
+      loader.addClass('d-none');
+      console.log(`[FORM] Submission prevented for ${formId}`);
+    } else {
+      console.log(`[FORM] Valid PO format, allowing submission for ${formId}`);
+      errorMessage.removeClass('show');
+      submitBtn.prop('disabled', true);
+      loader.removeClass('d-none');
+      console.log(`[FORM] Submission proceeding for ${formId}`);
+    }
+  });
+
+  // Search functionality
+  console.log('[SEARCH] Binding search functionality');
+  $('#search-btn').on('click', function(event) {
+    event.preventDefault();
+    const query = $('input[name="query"]').val();
+    console.log('[SEARCH] Search initiated, query:', query);
+    
+    if (!query.trim()) {
+      console.log('[SEARCH] Empty query, skipping search');
+      return;
+    }
+
+    console.log('[AJAX] Sending search request for query:', query);
+    $.ajax({
+      url: '{% url "search_po" %}',
+      method: 'GET',
+      data: {
+        'query': query
+      },
+      headers: {
+        'X-CSRFToken': $('input[name="csrfmiddlewaretoken"]').val()
+      },
+      success: function(data) {
+        console.log('[AJAX] Search response received:', {
+          hasResults: !!(data.results && data.results.length > 0),
+          resultCount: data.results ? data.results.length : 0
+        });
+        
+        $('#purchaseTable tbody').empty();
+        console.log('[UI] Cleared table body for search results');
+
+        if (data.results && data.results.length > 0) {
+          console.log('[SEARCH] Rendering', data.results.length, 'search results');
+          data.results.forEach(function(requisition, index) {
+            console.log(`[SEARCH] Rendering result ${index + 1}:`, {
+              id: requisition.id,
+              requisitionNumber: requisition.requisition_number,
+              status: requisition.status
+            });
+            
+            var statusBadge = '';
+            if (requisition.status === "PO GENERATED") {
+              statusBadge = '<span class="status-badge po-generated"><i class="fas fa-file-invoice"></i> <span class="status-text">PO Generated</span></span>';
+            } else if (requisition.status === "APPROVED") {
+              statusBadge = '<span class="status-badge approved"><i class="fas fa-check-circle"></i> <span class="status-text">Approved</span></span>';
+            } else {
+              statusBadge = '<span class="status-badge pending"><i class="fas fa-clock"></i> <span class="status-text">' + requisition.status + '</span></span>';
+            }
+
+            var actionButton = '';
+            if (requisition.status === "APPROVED") {
+              actionButton = '<button class="action-btn-small primary" data-bs-toggle="modal" data-bs-target="#addPOModal-' + requisition.id + '"><i class="fas fa-plus-circle"></i><span class="action-text">Add PO</span></button>';
+            } else if (requisition.status === "PO GENERATED") {
+              actionButton = '<div class="grn-info done"><i class="fas fa-check-circle"></i><span>PO Generated</span></div>';
+            } else {
+              actionButton = '<div class="grn-info"><i class="fas fa-info-circle"></i><span>Awaiting Approval</span></div>';
+            }
+
+            var productInfo = '';
+            if (requisition.mapped_product_name && requisition.mapped_system !== 'INDENT_EASY') {
+              productInfo = '<div class="mapped-product-info"><div class="mapped-product-name">' + requisition.mapped_product_name + '</div><div class="original-product-name"><small class="text-muted">(Original: ' + requisition.stock_item + ')</small></div><div class="mapping-badge"><span class="badge ' + (requisition.mapped_system === 'NDDB' ? 'bg-warning' : 'bg-info') + '">' + requisition.mapped_system + '</span></div></div>';
+            } else {
+              productInfo = '<div class="product-name">' + requisition.stock_item + '</div>';
+            }
+
+            var row = '<tr class="table-row" data-status="' + requisition.status + '">' +
+              '<td><div class="requisition-number-cell"><span class="req-number">' + requisition.requisition_number + '</span></div></td>' +
+              '<td><div class="datetime-cell"><span class="date-text">' + requisition.date_of_request + '</span><span class="time-text">' + requisition.time_of_request + '</span></div></td>' +
+              '<td><div class="details-cell"><div class="detail-row"><i class="fas fa-user"></i><span>' + requisition.employee_name + '</span></div><div class="detail-row"><i class="fas fa-building"></i><span>' + requisition.department + '</span></div><div class="detail-row"><i class="fas fa-map-marker-alt"></i><span>' + requisition.location + '</span></div></div></td>' +
+              '<td><div class="product-cell">' + productInfo + '</div></td>' +
+              '<td><div class="quantity-cell"><div class="qty-ordered"><span class="qty-value">' + requisition.quantity + '</span></div></div></td>' +
+              '<td><span class="delivery-date">' + requisition.expected_delivery_date + '</span></td>' +
+              '<td><div class="status-cell">' + statusBadge + '</div></td>' +
+              '<td><div class="approval-info">' + (requisition.hod_name ? '<div class="approval-details"><i class="fas fa-user-check"></i><strong>Approved by:</strong> <span class="approval-name">' + requisition.hod_name + '</span></div>' : '<span class="no-approval">Pending approval</span>') + '</div></td>' +
+              '<td><div class="actions-cell">' + actionButton + '</div></td>' +
+              '</tr>';
+            $('#purchaseTable tbody').append(row);
+          });
+          console.log('[UI] Added', data.results.length, 'rows to table');
+        } else {
+          console.log('[SEARCH] No results found for query');
+          $('#purchaseTable tbody').append('<tr><td colspan="9" class="empty-state"><div class="empty-state-content"><i class="fas fa-inbox"></i><h3>No Results Found</h3><p>No requisitions match your search criteria.</p></div></td></tr>');
+        }
+      },
+      error: function(xhr, errmsg, err) {
+        console.error("[AJAX] Search error:", {
+          status: xhr.status,
+          statusText: xhr.statusText,
+          error: errmsg,
+          errorObject: err
+        });
+        alert('Error searching requisitions. Please try again.');
+      }
+    });
+  });
+  
+  console.log('[INIT] All JavaScript initialization complete');
+});
+</script>
+
+{% endblock %}

@@ -1,0 +1,345 @@
+{% load custom_filters %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Goods Receipt Note</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Roboto+Condensed:wght@400&display=swap');
+
+        @page {
+            size: A4;
+            margin: 40px;
+        }
+        body {
+            font-family: Arial, sans-serif;
+            font-size: 12px;
+            margin: 0;
+            padding: 0;
+            color: #000;
+            background-color: #fff;
+            box-sizing: border-box;
+        }
+        .page {
+            page-break-after: always;
+            width: 100%;
+            max-width: 800px;
+            margin: auto;
+            padding: 20px;
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            height: 100%;
+        }
+        .header {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding-bottom: 10px;
+            border-bottom: 2px solid black;
+        }
+        .logo {
+            width: 100px;
+            height: 100px;
+            object-fit: contain;
+            margin-right: 20px;
+        }
+        .header-text {
+            text-align: center;
+        }
+        .header-text h1 {
+            font-family: 'Roboto Condensed', sans-serif;
+            font-size: 18px;
+            margin: 0;
+            text-transform: uppercase;
+        }
+        .header-text p {
+            font-size: 20px;
+            font-weight: bold;
+            margin-top: 10px;
+        }
+        .goods-receipt-note {
+            font-size: 24px;
+            font-weight: bold;
+            text-align: center;
+            margin: 20px 0;
+        }
+        .details {
+            margin-top: 10px;
+            font-size: 12px;
+        }
+        .details-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: auto;
+        }
+        .details-table td {
+            padding: 5px;
+            border: none;
+        }
+        .details-table td {
+            word-wrap: break-word;
+            max-width: 50%; /* Ensures long text wraps within 50% of the table width */
+            vertical-align: top; /* Aligns text to the top */
+        }
+        
+        .details-table td:last-child {
+            text-align: right; /* Aligns the right-side content */
+        }
+        .items-table-container {
+            margin: 0 auto;
+            padding: 0 30px;
+            flex-grow: 1;
+        }
+        .items-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 10px;
+            border: 1px solid black;
+        }
+        .items-table th {
+            border: 1px solid black;
+            padding: 4px;
+            text-align: center;
+            background-color: #f2f2f2;
+        }
+        .items-table td {
+            padding: 4px;
+            text-align: center;
+            border-left: 1px solid black;
+            border-right: 1px solid black;
+        }
+        .items-table td:first-child {
+            border-left: none;
+        }
+        .items-table td:last-child {
+            border-right: none;
+        }
+        .footer {
+            margin-top: 20px;
+            text-align: center;
+            font-size: 12px;
+            width: 100%;
+        }
+        .signature {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 40px;
+            margin-bottom: 60px;
+            position: relative;
+            width: 100%;
+        }
+        .signature div {
+            width: 30%;
+            text-align: center;
+            padding-top: 5px;
+        }
+        .editable-input {
+            border: 1px solid #000;
+            padding: 2px;
+            width: 50%;
+            text-align: center;
+            font-size: 10px;
+        }
+        .upload-input {
+            padding: 5px;
+            width: 70%;
+            text-align: center;
+            font-size: 10px;
+        }
+        .signature-preview {
+            width: 100px;
+            height: 100px;
+            object-fit: contain;
+            margin-top: 10px;
+        }
+        .signature-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+    </style>
+</head>
+<body>
+    {% load static %}
+    {% if vendor_grn_data %}
+        {% for vendor, po_data in vendor_grn_data.items %}
+            {% for po_number, grns in po_data.items %}
+                <div class="page">
+                    <div>
+                        <div class="header">
+                            <img src="{{ logo_url }}" alt="Logo" class="logo">
+                            <div class="header-text">
+                                <h1>SHWETDHARA MILK PRODUCER COMPANY LIMITED</h1>
+                                <h3>CIN: U01100UP2016PTC082671</h3>
+                                <h5>GORAKHNATH COMPLEX, FIRST FLOOR LEFT SIDE, PRAYAGRAJ ROAD, NEAR AWADH UNIVERSITY AYODHYA, AYODHYA, 224001</h5>
+                            </div>
+                        </div>
+                        <p class="goods-receipt-note">GOODS RECEIPT NOTES</p>
+                        <div class="details">
+                            <table class="details-table">
+                                <tr>
+                                    <td style="word-wrap: break-word; max-width: 50%;"><strong>Supplier Name:</strong> {{ vendor.name }}</td>
+                                    <td style="text-align: right;"><strong>GRN No:</strong> {{ grns.0.grn_number }}</td>
+                                </tr>
+                                <tr>
+                                    <td style="word-wrap: break-word; max-width: 50%;"><strong>Supplier Address:</strong> {{ vendor.address }}</td>
+                                    <td style="text-align: right;"><strong>GRN Date:</strong> {{ grns.0.created_at|date:"d M, Y" }}</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>Chaalan/Invoice Number:</strong> {{ chaalan_numbers.0 }}</td>
+                                    <td style="text-align: right;"><strong>Chaalan/Invoice Date:</strong> <span class="chaalan-date">{{ date_of_receipts.0 }}</span></td>
+                                </tr>
+                                {% if po_number|should_display_po %}
+                                    <tr>
+                                        <td><strong>PO No:</strong> {{ po_number|split_po_number }}</td>
+                                        <td style="text-align: right;"><strong>Location:</strong> {{ location }}</td>
+                                    </tr>
+                                {% else %}
+                                    {# Dummy PO - suppress entire row #}
+                                    <tr>
+                                        <td></td>
+                                        <td style="text-align: right;"><strong>Location:</strong> {{ location }}</td>
+                                    </tr>
+                                {% endif %}
+                            </table>
+                        </div>
+
+                        <div class="items-table-container" style="margin-top: 40px;">
+                            <table class="items-table">
+                                <thead>
+                                    <tr>
+                                        <th>S. No.</th>
+                                        <th>Item Description</th>
+                                        <th>Ordered Quantities</th>
+                                        <th>Delivered Quantities</th>
+                                        <th>Rejected Quantities</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for grn in grns %}
+                                    <tr>
+                                        <td>{{ forloop.counter }}</td>
+                                        <td>{{ grn.stock_item }}</td>
+                                        <td>{{ grn.quantity_ordered }}</td>
+                                        <td>{{ grn.quantity_received }}</td>
+                                        <td>{{ grn.quantity_rejected }}</td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <div>
+                        <div class="footer">
+                            <p>All technical, qualitative, and economic parameters were checked and found as per requirement.</p>
+                        </div>
+
+                        <div class="signature">
+                            <div class="signature-container">
+                                <div id="received-signature-{{ forloop.parentloop.counter }}-{{ forloop.counter }}-preview" class="signature-preview">
+                                    {% if signature_url %}
+                                        <img src="{{ signature_url }}" alt="Signature" class="signature-preview">
+                                    {% endif %}
+                                </div>
+                                Received By
+                                
+                            </div>
+                            
+                            <div class="signature-container">
+                                <div id="prepared-signature-{{ forloop.parentloop.counter }}-{{ forloop.counter }}-preview" class="signature-preview">
+                                    {% if mohar_url %}
+                                        <img src="{{ mohar_url }}" alt="Mohar" class="signature-preview">
+                                    {% endif %}
+                                </div>
+                                <span id="store-mohar-text-{{ forloop.parentloop.counter }}-{{ forloop.counter }}">Store Mohar</span>
+                            </div>
+                            <div class="signature-container">
+                                <div id="approved-signature-{{ forloop.parentloop.counter }}-{{ forloop.counter }}-preview" class="signature-preview">
+                                    {% if signature_url %}
+                                        <img src="{{ signature_url }}" alt="Signature" class="signature-preview">
+                                    {% endif %}
+                                </div>
+                                Prepared By
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            {% endfor %}
+        {% endfor %}
+    {% else %}
+        <p>No GRN data available.</p>
+    {% endif %}
+</body>
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script>
+    function blurInput(id) {
+        var value = document.getElementById(id).value;
+        console.log("The value is", value);
+        document.getElementById(id).outerHTML = '<span>' + value + '</span>';
+    }
+
+    function previewSignature(id) {
+        console.log("Preview Signature Function Called for ID:", id);
+        var input = document.getElementById(id);
+        console.log("Input Element:", input);
+
+        var previewId = id + '-preview';
+        console.log("Preview ID:", previewId);
+
+        var previewElement = document.getElementById(previewId);
+        console.log("Preview Element:", previewElement);
+
+        if (!previewElement) {
+            console.error("Element with ID '" + previewId + "' not found.");
+            return; // Prevent further execution if the element is missing
+        }
+
+        if (input.files && input.files[0]) {
+            var reader = new FileReader();
+            reader.onload = function (e) {
+                previewElement.innerHTML = `<img src="${e.target.result}" class="signature-preview">`;
+                input.style.display = 'none';
+
+                // Hide the "Store Mohar" text if the input ID matches
+                if (id.includes('prepared-signature')) {
+                    var textElementId = 'store-mohar-text-' + id.split('-')[2] + '-' + id.split('-')[3];
+                    var textElement = document.getElementById(textElementId);
+                    if (textElement) {
+                        textElement.style.display = 'none';
+                    }
+                }
+            };
+            reader.readAsDataURL(input.files[0]);
+        }
+    }
+    function changeSignature(id) {
+        var input = document.getElementById(id);
+        console.log("The input is", input);
+        if (input) {
+            input.style.display = 'block';
+        }
+    }
+
+    // Function to format date to d-m-Y
+    function formatDate(dateString) {
+        const date = new Date(dateString);
+        const day = String(date.getDate()).padStart(2, '0');
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const year = date.getFullYear();
+        return `${day}-${month}-${year}`;
+    }
+
+    // Format all chaalan dates on page load
+    $(document).ready(function() {
+        $('.chaalan-date').each(function() {
+            const originalDate = $(this).text();
+            const formattedDate = formatDate(originalDate);
+            $(this).text(formattedDate);
+        });
+    });
+</script>
+</html>

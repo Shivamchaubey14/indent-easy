@@ -1,0 +1,67 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+.Python
+
+# Virtual environment
+venv/
+env/
+.venv/
+
+# Django
+*.log
+*.pot
+*.pyc
+db.sqlite3
+*.sqlite3
+media/
+staticfiles/
+staticfiles_build/
+
+# Environment variables & secrets  (NEVER commit these)
+.env
+.env.*
+!.env.example
+
+# Database dumps / backups (contain real business data + PII)
+database_backup/
+*_backup.sql
+shwetdhara_db_backup.sql
+*.dump
+
+# Generated reports / spreadsheets
+*.xlsx
+*.xls
+
+# Documents / uploaded files (real data)
+*.pdf
+grns/
+uploads/
+PyWhatKit_DB.txt
+
+# Ad-hoc SQL / data scripts & backups (keep only the reference schema)
+output.sql
+script.sql
+populate_*.sql
+*_backup.json
+product_vendor_data.json
+
+# Stray files
+cls
+pipenv
+
+# Celery runtime files
+celerybeat-schedule*
+celerybeat.pid
+*.pid
+
+# OS / IDE
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Scratch / temp
+scratchpad/
+*.tmp

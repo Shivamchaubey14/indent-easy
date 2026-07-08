@@ -34,6 +34,7 @@ from .models import (
     Cycle,
     Inventory,
     InventoryHistory,
+    MonthlyCycle,
     MPPWithCode,
     Product,
     ProductMapping,
@@ -145,27 +146,193 @@ def _norm_product(name):
     return s
 
 
+# Curated aliases: Sale/Stock-report (Excel) product name  ->  the real product in the
+# indent product table. Left-hand keys are matched loosely (case / punctuation / leading
+# zeros ignored), so an uploaded "Cattle Feed Sag (50_Kg)" resolves to "CF- SAG 50 KG"
+# instead of creating a duplicate product.
+PRODUCT_ALIASES = {
+    "Cattle Feed Sag (50_Kg)": "CF- SAG 50 KG",
+    "Cattle Feed Sag (25_Kg)": "CF- SAG 25 KG",
+    "Cattle Feed Gold (50_Kg)": "CF- Gold 50 KG",
+    "Cattle Feed Gold (25_Kg)": "CF- Gold 25 KG",
+    "Cattle Feed Sag Type_01 (40_Kg)": "CF- SAG 40 KG TYPE1",
+    "Cattle Feed Buff.. Spl (40_Kg)": "CF- Buff Spl 40 KG",
+    "Pregancy Feed (40_Kg)": "CF-Pregnancy 40 Kg",
+    "Early Lactation Feed (40_Kg)": "EARLY LACTATION FEED",
+    "Jica Miniral Mixture (01_Kg)": "MM- 1KG JICA",
+    "Ghee (01_Ltr)": "MOTHER DAIRY GHEE 1 LTR",
+    "Ghee (500_ML)": "MOTHER DAIRY GHEE 1/2 L",
+    "Calcium (05_Ltr)": "Calcium 5 Ltr",
+    "Calcium (01_Ltr)": "Calcium 1 Ltr",
+    "Chelated Mineral Mixture (01_Kg)": "MM- Chealted",
+    "Mineral Mixture  (01_Kg)": "MM- 1 KG",
+    "Goudhara Shakti (01_Kg)": "Gaudhra Shakti 1Kg",
+    "Calsagar Plus (01_Kg)": "Calsagar Plus 1 Kg",
+    "Iodophor Solution 200_ML": "Iodophor solution",
+    "TSC Nos": "Trisodium citrate",
+    "Gulab Jamun (01_kg)": "GULAB JAMUN (1KG)",
+    "Dewormer Bolus Tab.": "Dewormer- Bolus",
+    "Dewormer Nilzan Suspension ML Nos": "Dewormer- 100ML",
+    "Jwar Seed (01_Kg)": "Seeds- Jowar 1 KG",
+    "Bazara Seed (01_Kg)": "Seeds- Bazra 1 KG",
+    "Sorgam CH43 (03_Kg)": "Seeds- Sorgum 3 KG",
+    "Hybrid Jumbo Gold (01_Kg)": "Hyb Jumbo Gold 1Kg",
+    "Maze (01_Kg)": "Seeds- Maize 1 KG",
+    "Teat Dip Nos": "Teat dip solution",
+    # 'Oats Seeds jau (25_Kg)' is the real product; these two name variants fold into it.
+    "Oats Seeds (25_Kg)": "Oats Seeds jau (25_Kg)",
+    "Jau ( 25 Kg Bag)": "Oats Seeds jau (25_Kg)",
+}
+
+# Uploaded rows whose "product" is really a header/blank leaking through — never create these.
+_PRODUCT_NAME_JUNK = {"product name", "sr.no", "total", "mcc/bmc name"}
+
+# Reverse of PRODUCT_ALIASES: real indent product name -> the report/SMPCL name to DISPLAY.
+# So a stored 'CF- SAG 50 KG' shows as 'Cattle Feed Sag (50_Kg)' in the report and workbook.
+# Skip the name-variant aliases whose target is itself a report-style product (oats).
+REVERSE_ALIAS = {}
+for _ex, _real in PRODUCT_ALIASES.items():
+    if _ex.strip().lower() in ("oats seeds (25_kg)", "jau ( 25 kg bag)"):
+        continue
+    REVERSE_ALIAS.setdefault(_real.strip().lower(), _ex)
+
+
+def report_display_name(product_name):
+    """The name to show in the report — the report/SMPCL alias if the product has one,
+    otherwise the product's own name."""
+    return REVERSE_ALIAS.get(str(product_name or "").strip().lower(), product_name)
+
+
+# The fixed Sale & Stock Report product list, in the standard order the report uses.
+# Names are the report/SMPCL names; each resolves (via alias / exact) to a real product.
+REPORT_ORDER = [
+    "Cattle Feed Sag (50_Kg)", "Cattle Feed Sag (25_Kg)", "Cattle Feed Gold (50_Kg)",
+    "Cattle Feed Gold (25_Kg)", "Cattle Feed Sag Type_01 (40_Kg)", "Cattle Feed Buff.. Spl (40_Kg)",
+    "Pregancy Feed (40_Kg)", "Early Lactation Feed (40_Kg)", "Jica Miniral Mixture (01_Kg)",
+    "Ghee (01_Ltr)", "Ghee (500_ML)", "Calcium (05_Ltr)", "Calcium (01_Ltr)",
+    "Chelated Mineral Mixture (01_Kg)", "Mineral Mixture  (01_Kg)", "Goudhara Shakti (01_Kg)",
+    "Calsagar Plus (01_Kg)", "Dewormer Bolus Tab.", "Dewormer Nilzan Suspension ML Nos",
+    "Dwormer IIL_2200 Mg Tab", "Dwormer IIL Calf 150_Mg Tab", "Gulab Jamun (01_kg)",
+    "Rasgulla (01_Kg)", "Iodophor Solution 200_ML", "Teat Dip Nos", "TSC Nos",
+    "Mustard 250g + Berseem 02_Kg", "Oats Seeds jau (25_Kg)", "Jwar Seed (01_Kg)",
+    "Bazara Seed (01_Kg)", "Sorgam CH43 (03_Kg)", "Hybrid Jumbo Gold (01_Kg)", "Maze (01_Kg)",
+    "Silage Kg", "Teat dip cup..",
+]
+
+
+def report_product_index():
+    """{real product-name (lower): (order, smpcl_display_name)} for the fixed report list.
+    Used to restrict and order the report to the standard product set."""
+    cache = build_product_norm_cache()
+    idx = {}
+    for pos, smpcl in enumerate(REPORT_ORDER):
+        p = resolve_product_by_name(smpcl, cache, create=False)
+        if p:
+            idx.setdefault(p.name.strip().lower(), (pos, smpcl))
+    return idx
+
+
+def report_products():
+    """Ordered [(Product, display_name)] for the fixed report set (skips any unresolved)."""
+    cache = build_product_norm_cache()
+    out, seen = [], set()
+    for smpcl in REPORT_ORDER:
+        p = resolve_product_by_name(smpcl, cache, create=False)
+        if p and p.id not in seen:
+            out.append((p, smpcl))
+            seen.add(p.id)
+    return out
+
+
+def ensure_all_locations(statement):
+    """Create zero entries so EVERY MCC/BMC shows EVERY report product, even a location with
+    no data (so e.g. DURJANPURGHAT still appears with all zeros). Additive only — never
+    touches existing entries, so it's safe on a manually-overridden statement."""
+    pids = [p.id for p, _d in report_products()]
+    if not pids:
+        return 0
+    existing = {(e.bmc_or_mcc_id, e.product_id) for e in statement.entries.all()}
+    to_create = [
+        StockStatementEntry(statement=statement, bmc_or_mcc_id=b.id, product_id=pid)
+        for b in BMCOrMCC.objects.all()
+        for pid in pids
+        if (b.id, pid) not in existing
+    ]
+    if to_create:
+        StockStatementEntry.objects.bulk_create(to_create, batch_size=1000)
+    return len(to_create)
+
+
+def _norm_bmc(name):
+    """Collapse a BMC/MCC name for matching so 'RAMSANEHI GHAT' == 'RAM SANEHI GHAT'."""
+    return re.sub(r"[^a-z0-9]", "", str(name or "").lower())
+
+
+def _map_report_columns(header):
+    """Map report columns by HEADER TEXT so uploads work whatever the layout:
+    single 'Received' or split 'Received NDS/Other Company' + 'Received MCC/BMC', and
+    combined 'Damage Product / Expire Item' or separate 'Damage'/'Expire'.
+    `header` is the header row (list of cell values). Returns {field: 1-based col index}."""
+    cols = {}
+    for i, raw in enumerate(header, start=1):
+        h = re.sub(r"\s+", " ", str(raw or "").strip().lower())
+        if not h:
+            continue
+        if "product name" in h:
+            cols.setdefault("product", i)
+        elif ("mcc" in h or "bmc" in h) and "name" in h:
+            cols.setdefault("bmc", i)
+        elif "opp" in h or "opening" in h:
+            cols.setdefault("opening", i)
+        elif "received" in h and "mcc" in h:
+            cols.setdefault("received_mcc", i)
+        elif "received" in h:                       # NDS/Other Company, or a single 'Received'
+            cols.setdefault("received", i)
+        elif "transfer" in h:
+            cols.setdefault("transfer", i)
+        elif "sale" in h:
+            cols.setdefault("sale", i)
+        elif "damage" in h and "expire" in h:
+            cols.setdefault("damage_combined", i)
+        elif "damage" in h:
+            cols.setdefault("damage", i)
+        elif "expire" in h:
+            cols.setdefault("expire", i)
+        elif "closing" in h:
+            cols.setdefault("closing", i)
+        elif "remark" in h:
+            cols.setdefault("remark", i)
+    return cols
+
+
 def build_product_norm_cache():
-    """Map loose-normalised product name -> Product (first wins) for pattern matching."""
+    """Map loose-normalised product name -> Product for pattern matching, then overlay the
+    curated PRODUCT_ALIASES so report names resolve to the real indent products."""
     cache = {}
+    by_lower = {}
     for p in Product.objects.all().only("id", "name"):
         cache.setdefault(_norm_product(p.name), p)
+        by_lower[p.name.strip().lower()] = p
+    for excel_name, real_name in PRODUCT_ALIASES.items():
+        target = by_lower.get(real_name.strip().lower()) or cache.get(_norm_product(real_name))
+        if target is not None:
+            cache[_norm_product(excel_name)] = target   # alias wins over any loose match
     return cache
 
 
 def resolve_product_by_name(name, norm_cache, create=False):
-    """Match an uploaded product name to a Product: exact (case-insensitive) first, then a
-    loose pattern match. If ``create`` and nothing matches, create a Product with just the
-    name (all other fields left blank / None)."""
+    """Match an uploaded product name to a Product: curated alias / exact (case-insensitive) /
+    loose pattern. If ``create`` and nothing matches, create a Product with just the name
+    (all other fields left blank / None). Header/junk rows never match or create."""
     raw = str(name or "").strip()
-    if not raw:
+    if not raw or raw.lower() in _PRODUCT_NAME_JUNK:
         return None
+    key = _norm_product(raw)
+    if key and key in norm_cache:      # alias or previously-cached match
+        return norm_cache[key]
     p = Product.objects.filter(name__iexact=raw).first()
     if p:
         return p
-    key = _norm_product(raw)
-    if key and key in norm_cache:
-        return norm_cache[key]
     if create:
         p = Product.objects.create(name=raw)   # unique name; other fields blank/default/None
         if key:
@@ -179,6 +346,40 @@ def resolve_product_by_name(name, norm_cache, create=False):
 # ---------------------------------------------------------------------------------------
 _MONTHS = ["january", "february", "march", "april", "may", "june", "july",
            "august", "september", "october", "november", "december"]
+
+_MONTH_ABBR = {m[:3]: m.capitalize() for m in _MONTHS}
+
+
+def parse_cycle_header(text):
+    """Read a sheet's cycle line, e.g. 'Sale Report Cycle-01-10 Apr-2026' (or
+    '... Sale Report Cycle 01-10 Jul 2026'), returning (start_day, end_day, 'April', 2026)
+    or None if the text isn't a cycle header."""
+    m = re.search(
+        r"sale\s*report\s*cycle[\s:_\-]*?(\d{1,2})\s*[-–]\s*(\d{1,2})\s+([A-Za-z]{3,})[\s\-_]*?(\d{4})",
+        str(text or ""), re.I)
+    if not m:
+        return None
+    sd, ed = int(m.group(1)), int(m.group(2))
+    mon = m.group(3).strip().lower()[:3]
+    return sd, ed, _MONTH_ABBR.get(mon, m.group(3).capitalize()), int(m.group(4))
+
+
+def detect_cycle_from_workbook(wb):
+    """Identify which Cycle a report workbook belongs to from its 'Sale Report Cycle ...'
+    header. Returns (Cycle or None, parsed_tuple or None). parsed is set even when no
+    matching Cycle exists, so the caller can report a helpful message."""
+    for ws in wb.worksheets:
+        for row in ws.iter_rows(min_row=1, max_row=6, values_only=True):
+            for v in row:
+                parsed = parse_cycle_header(v)
+                if parsed:
+                    sd, ed, month, yr = parsed
+                    cyc = (Cycle.objects
+                           .filter(monthly_cycle__month__iexact=month, monthly_cycle__year=yr,
+                                   start_date__day=sd, end_date__day=ed)
+                           .select_related("monthly_cycle").first())
+                    return cyc, parsed
+    return None, None
 
 
 def get_previous_cycle(cycle):
@@ -220,14 +421,22 @@ def generate_statement(cycle, user=None):
     def bmc_for_location(loc):
         return bmc_by_name.get(str(loc or "").strip().upper())
 
-    # ---- Opening: previous cycle finalized closing, else current inventory snapshot ----
+    # ---- Opening: carry the previous cycle's closing forward ----
+    # Within a month, always chain to the previous cycle. ACROSS months, only carry from a
+    # CONFIRMED month (uploaded / finalized) — so an uploaded month seeds the next month's
+    # first cycle, but empty future months stay at 0 instead of inheriting stale data or an
+    # unrelated inventory snapshot (which was bleeding April's numbers into June/July).
     opening = defaultdict(int)   # (bmc_id, product_id) -> qty
     prev = get_previous_cycle(cycle)
     prev_stmt = getattr(prev, "stock_statement", None) if prev else None
-    if prev_stmt is not None:
+    same_month = bool(prev and prev.monthly_cycle_id == cycle.monthly_cycle_id)
+    confirmed = prev_stmt is not None and (
+        prev_stmt.is_manual_override or prev_stmt.status == StockStatement.STATUS_FINALIZED)
+    if prev_stmt is not None and (same_month or confirmed):
         for e in prev_stmt.entries.all():
             opening[(e.bmc_or_mcc_id, e.product_id)] = e.closing_balance
-    else:
+    elif prev is None:
+        # genuinely the first cycle in the system -> seed from current inventory
         snap = (Inventory.objects
                 .values("mcc_bmc_user__location", "product_id")
                 .annotate(q=Sum("quantity")))
@@ -235,6 +444,7 @@ def generate_statement(cycle, user=None):
             bmc = bmc_for_location(row["mcc_bmc_user__location"])
             if bmc and row["product_id"] and row["q"]:
                 opening[(bmc.id, row["product_id"])] += int(row["q"] or 0)
+    # else: a cross-month link to an unconfirmed prior month -> opening stays 0 (empty)
 
     # ---- Received (split) and Stock Transfer from InventoryHistory in range ----
     # received      = GRN from NDS / other company / party (action=GRN)
@@ -303,6 +513,7 @@ def generate_statement(cycle, user=None):
     statement.generated_at = timezone.now()
     statement.is_manual_override = False   # recomputed from source -> drops any manual override
     statement.save()
+    ensure_all_locations(statement)   # every location shows every report product (even zeros)
     return statement
 
 
@@ -553,9 +764,16 @@ def build_workbook(statement, only_bmc=None, include_summary=False):
                .order_by("bmc_or_mcc__name", "product__name"))
     if only_bmc is not None:
         entries = entries.filter(bmc_or_mcc=only_bmc)
+    report_idx = report_product_index()   # restrict + order to the standard report products
     by_bmc = defaultdict(list)
     for e in entries:
-        by_bmc[e.bmc_or_mcc].append(e)
+        ri = report_idx.get(e.product.name.strip().lower())
+        if ri is None:
+            continue
+        by_bmc[e.bmc_or_mcc].append((ri[0], e))
+    for bmc in by_bmc:
+        by_bmc[bmc].sort(key=lambda oe: oe[0])
+        by_bmc[bmc] = [e for _o, e in by_bmc[bmc]]
 
     if not by_bmc:
         ws = wb.create_sheet(_safe_sheet_title("No Data", used_titles))
@@ -584,7 +802,7 @@ def build_workbook(statement, only_bmc=None, include_summary=False):
         row_ptr = 5
         for i, e in enumerate(by_bmc[bmc], start=1):
             values = [
-                i, bmc.name, e.product.name, e.opening_balance, e.received, e.received_mcc,
+                i, bmc.name, report_display_name(e.product.name), e.opening_balance, e.received, e.received_mcc,
                 e.stock_transfer, e.mpp_sale, e.damage, e.expire, e.closing_balance, e.remark,
             ]
             for c, v in enumerate(values, start=1):
@@ -667,7 +885,15 @@ def build_smpcl_summary(wb, statement, used_titles):
         _row(r["product_id"])["closing"] = r["c"] or 0
 
     products = {p.id: p for p in Product.objects.filter(id__in=agg.keys())}
-    ordered = sorted(agg.items(), key=lambda kv: (products[kv[0]].name.lower() if kv[0] in products else ""))
+    report_idx = report_product_index()   # restrict + order to the standard report products
+    _tmp = []
+    for pid, d in agg.items():
+        p = products.get(pid)
+        ri = report_idx.get(p.name.strip().lower()) if p else None
+        if ri is not None:
+            _tmp.append((ri[0], pid, d))
+    _tmp.sort(key=lambda x: x[0])
+    ordered = [(pid, d) for _o, pid, d in _tmp]
 
     ncol = len(REPORT_COLUMNS)
     month_display = f"{mc.month}-{mc.year}" if mc else ""
@@ -691,7 +917,7 @@ def build_smpcl_summary(wb, statement, used_titles):
     for i, (pid, d) in enumerate(ordered, start=1):
         p = products.get(pid)
         values = [
-            i, "SMPCL STORE", (p.name if p else str(pid)), d["opening"], d["recv"], d["recv_mcc"],
+            i, "SMPCL STORE", (report_display_name(p.name) if p else str(pid)), d["opening"], d["recv"], d["recv_mcc"],
             d["xfer"], d["sale"], d["damage"], d["expire"], d["closing"], "",
         ]
         for c, v in enumerate(values, start=1):
@@ -721,6 +947,142 @@ def build_smpcl_summary(wb, statement, used_titles):
         ws.column_dimensions[get_column_letter(c)].width = w
     ws.freeze_panes = "A5"
     return ws
+
+
+def _write_stock_block(ws, row, title_line, rows_data):
+    """Write one report block (title line + column headers + data rows + Total) starting at
+    `row`; return the next free row (after a blank gap). `rows_data` is a list of dicts with
+    the report fields. Used for both per-cycle and month-summary blocks so the download looks
+    exactly like the uploaded workbook (all cycles stacked in one sheet)."""
+    ncol = len(REPORT_COLUMNS)
+    ws.merge_cells(start_row=row, start_column=1, end_row=row, end_column=ncol)
+    ws.cell(row, 1, title_line).font = Font(bold=True)
+    row += 1
+    for c, title in enumerate(REPORT_COLUMNS, start=1):
+        cell = ws.cell(row, c, title)
+        cell.font = Font(bold=True, color="FFFFFF")
+        cell.fill = _HEADER_FILL
+        cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
+        cell.border = _BORDER
+    row += 1
+    totals = defaultdict(int)
+    for i, rd in enumerate(rows_data, start=1):
+        vals = [i, rd["bmc"], rd["product"], rd["opening"], rd["received"], rd["received_mcc"],
+                rd["transfer"], rd["sale"], rd["damage"], rd["expire"], rd["closing"], rd.get("remark", "")]
+        for c, v in enumerate(vals, start=1):
+            cell = ws.cell(row, c, v)
+            cell.border = _BORDER
+            if c >= 4:
+                cell.alignment = Alignment(horizontal="center")
+        for col in (COL_OPENING, COL_RECEIVED, COL_RECEIVED_MCC, COL_TRANSFER, COL_MPP_SALE,
+                    COL_DAMAGE, COL_EXPIRE, COL_CLOSING):
+            totals[col] += vals[col] or 0
+        row += 1
+    ws.cell(row, 1, "Total").font = Font(bold=True)
+    for c in range(1, ncol + 1):
+        cell = ws.cell(row, c)
+        cell.border = _BORDER
+        cell.fill = _TOTAL_FILL
+        cell.font = Font(bold=True)
+        if (c - 1) in totals:
+            cell.value = totals[c - 1]
+            cell.alignment = Alignment(horizontal="center")
+    return row + 3   # blank gap before the next block
+
+
+def build_month_workbook(monthly_cycle, only_bmc=None, include_summary=True):
+    """Build the downloadable workbook for a WHOLE month: one sheet per MCC/BMC with every
+    cycle of the month stacked vertically (Cycle 1, 2, 3 ...) followed by a month-summary
+    block — the same layout as the uploaded SMPCL file. Pass ``only_bmc`` for a single
+    location; ``include_summary`` appends the company-wide 'SMPCL SUMMERY' sheet."""
+    stmts = list(StockStatement.objects
+                 .filter(cycle__monthly_cycle=monthly_cycle)
+                 .select_related("cycle")
+                 .order_by("cycle__cycle_number"))
+    report_prods = report_products()
+    report_pids = [p.id for p, _d in report_prods]
+    month_display = f"{monthly_cycle.month}-{monthly_cycle.year}" if monthly_cycle else ""
+    mon3 = monthly_cycle.month[:3] if monthly_cycle else ""
+
+    # prefetch entries: (statement_id, bmc_id) -> {product_id: entry}
+    ent = {}
+    bmap = {}
+    q = (StockStatementEntry.objects.filter(statement__in=stmts, product_id__in=report_pids)
+         .select_related("bmc_or_mcc"))
+    if only_bmc is not None:
+        q = q.filter(bmc_or_mcc=only_bmc)
+    for e in q:
+        ent.setdefault((e.statement_id, e.bmc_or_mcc_id), {})[e.product_id] = e
+        bmap[e.bmc_or_mcc_id] = e.bmc_or_mcc
+    bmcs = [only_bmc] if only_bmc is not None else sorted(bmap.values(), key=lambda b: b.name)
+
+    wb = openpyxl.Workbook()
+    wb.remove(wb.active)
+    used = set()
+    if not bmcs or not stmts:
+        ws = wb.create_sheet(_safe_sheet_title("No Data", used))
+        ws["A1"] = "No statement data for this month."
+        bio = io.BytesIO(); wb.save(bio); bio.seek(0)
+        return bio
+
+    def row_from_entry(bmc, e):
+        return {"bmc": bmc.name, "product": None,
+                "opening": e.opening_balance if e else 0, "received": e.received if e else 0,
+                "received_mcc": e.received_mcc if e else 0, "transfer": e.stock_transfer if e else 0,
+                "sale": e.mpp_sale if e else 0, "damage": e.damage if e else 0,
+                "expire": e.expire if e else 0, "closing": e.closing_balance if e else 0,
+                "remark": e.remark if e else ""}
+
+    for bmc in bmcs:
+        ws = wb.create_sheet(_safe_sheet_title(bmc.name, used))
+        ncol = len(REPORT_COLUMNS)
+        ws.merge_cells(start_row=1, start_column=1, end_row=1, end_column=ncol)
+        ws.cell(1, 1, "Shwetdhara Milk Producer Company Limited").font = Font(bold=True, size=13)
+        ws.merge_cells(start_row=2, start_column=1, end_row=2, end_column=ncol)
+        ws.cell(2, 1, f"Input Sale & Stock Report  Month {month_display}").font = Font(bold=True)
+        row = 3
+        # one block per cycle
+        for st in stmts:
+            cyc = st.cycle
+            rng = f"{cyc.start_date.strftime('%d')}-{cyc.end_date.strftime('%d')} {mon3}-{monthly_cycle.year}"
+            emap = ent.get((st.id, bmc.id), {})
+            rows_data = []
+            for prod, display in report_prods:
+                rd = row_from_entry(bmc, emap.get(prod.id))
+                rd["product"] = display
+                rows_data.append(rd)
+            row = _write_stock_block(ws, row, f"Sale Report Cycle-{rng}  |  {bmc.name}", rows_data)
+        # month summary block (opening from first cycle, closing from last, flows summed)
+        first_map = ent.get((stmts[0].id, bmc.id), {})
+        last_map = ent.get((stmts[-1].id, bmc.id), {})
+        srows = []
+        for prod, display in report_prods:
+            o = first_map.get(prod.id)
+            c = last_map.get(prod.id)
+            rd = {"bmc": bmc.name, "product": display,
+                  "opening": o.opening_balance if o else 0, "closing": c.closing_balance if c else 0,
+                  "received": 0, "received_mcc": 0, "transfer": 0, "sale": 0, "damage": 0, "expire": 0, "remark": ""}
+            for st in stmts:
+                e = ent.get((st.id, bmc.id), {}).get(prod.id)
+                if e:
+                    rd["received"] += e.received; rd["received_mcc"] += e.received_mcc
+                    rd["transfer"] += e.stock_transfer; rd["sale"] += e.mpp_sale
+                    rd["damage"] += e.damage; rd["expire"] += e.expire
+            srows.append(rd)
+        _write_stock_block(ws, row, f"Month {month_display} Summary  |  {bmc.name}", srows)
+
+        widths = [7, 22, 34, 12, 18, 16, 16, 11, 13, 13, 13, 16]
+        for c, w in enumerate(widths, start=1):
+            ws.column_dimensions[get_column_letter(c)].width = w
+        ws.freeze_panes = "A3"
+
+    if include_summary and only_bmc is None:
+        build_smpcl_summary(wb, stmts[0], used)
+
+    bio = io.BytesIO()
+    wb.save(bio)
+    bio.seek(0)
+    return bio
 
 
 # ---------------------------------------------------------------------------------------
@@ -789,72 +1151,130 @@ def ingest_filled_report(statement, file_obj):
     return {"updated": updated, "unmatched_rows": unmatched_rows}
 
 
-def ingest_full_report(statement, file_obj):
-    """Admin correction upload: read EVERY editable column back from an uploaded report
-    workbook and overwrite the matching entries (Opening, both Received columns, Stock
-    Transfer, MPP Sale, Damage, Expire). Closing is recomputed from those. Sets the
-    statement's manual-override flag so the values are not auto-recomputed from inventory.
+def ingest_full_report(file_obj):
+    """Robust reader for a full Sale & Stock Report workbook.
 
-    The 'SMPCL SUMMERY' sheet is ignored (it is a rollup, not a per-location source).
-    Matching is by sheet title -> BMC/MCC and Product Name -> Product.
+    A location sheet stacks several blocks vertically — each introduced by a
+    'Sale Report Cycle-DD-DD Mon-YYYY' line, then a column-header row, then data rows,
+    ending at a 'Total' row. Any trailing block with NO cycle line (the month summary) is
+    ignored. Columns are matched by header text, so single 'Received' / split
+    'Received NDS + MCC' and combined 'Damage/Expire' / separate columns all work. BMC/MCC
+    is matched loosely (sheet title or the MCC/BMC column). Product names resolve through the
+    curated aliases, so 'Cattle Feed Sag (50_Kg)' updates 'CF- SAG 50 KG'.
+
+    Fills every (cycle, location, product) it finds across the whole file, sets each touched
+    statement to manual-override, and re-chains affected months. Returns a summary.
     """
     wb = openpyxl.load_workbook(file_obj, data_only=True, read_only=True)
-    bmc_by_name = {b.name.strip().upper(): b for b in BMCOrMCC.objects.all()}
-    prod_cache = build_product_norm_cache()   # for pattern-matching product names
+    bmc_by_norm = {_norm_bmc(b.name): b for b in BMCOrMCC.objects.all()}
+    prod_cache = build_product_norm_cache()
 
-    updated = 0
-    created = 0
+    per_cycle = {}          # {cycle_id: {(bmc_id, product_id): field-values}}
+    cyc_by_id = {}
+    unmatched_locations = set()
     unmatched_rows = 0
+
     for ws in wb.worksheets:
         if ws.title.strip().upper().startswith("SMPCL"):
-            continue   # summary sheet is derived, never a source of truth
+            continue   # summary sheet is derived, never a source
+        sheet_bmc = bmc_by_norm.get(_norm_bmc(ws.title))
         rows = _materialize(ws)
-        sheet_bmc = bmc_by_name.get(ws.title.strip().upper())
-        header_row = None
-        for idx, row in enumerate(rows[:12]):
-            if "product name" in [_norm_header(v) for v in row]:
-                header_row = idx
-                break
-        if header_row is None:
-            continue
 
-        for r in range(header_row + 1, len(rows)):
-            row = rows[r]
-            name_cell = _cell(row, COL_PRODUCT + 1)
-            first_cell = _cell(row, 1)
-            if first_cell and str(first_cell).strip().lower() == "total":
+        cur_cycle = None      # the cycle whose block we're inside
+        cols = None           # column map for the current block
+        in_data = False
+        for row in rows:
+            parsed = None
+            for v in row[:3]:
+                parsed = parse_cycle_header(v)
+                if parsed:
+                    break
+            if parsed:         # 'Sale Report Cycle-…' line -> start of a cycle block
+                sd, ed, month, yr = parsed
+                cur_cycle = (Cycle.objects
+                             .filter(monthly_cycle__month__iexact=month, monthly_cycle__year=yr,
+                                     start_date__day=sd, end_date__day=ed)
+                             .select_related("monthly_cycle").first())
+                cols = None
+                in_data = False
                 continue
-            if not name_cell:
+            hnorm = [re.sub(r"\s+", " ", str(v or "").strip().lower()) for v in row]
+            if "product name" in hnorm:
+                cols = _map_report_columns(row)
+                in_data = True
                 continue
-            bmc = sheet_bmc or bmc_by_name.get(str(_cell(row, 2) or "").strip().upper())
+            first = str(row[0] if row else "").strip().lower()
+            if first == "total":
+                cur_cycle = None   # block ended; a following block with no cycle line = summary -> skip
+                cols = None
+                in_data = False
+                continue
+            if not (in_data and cur_cycle and cols):
+                continue
+
+            def g(field):
+                idx = cols.get(field)
+                return row[idx - 1] if idx and idx - 1 < len(row) else None
+
+            pname = g("product")
+            if not pname or str(pname).strip().lower() in _PRODUCT_NAME_JUNK:
+                continue
+            bmc = sheet_bmc or bmc_by_norm.get(_norm_bmc(g("bmc")))
             if not bmc:
                 unmatched_rows += 1
+                unmatched_locations.add(str(g("bmc") or ws.title))
                 continue
-            # Match product (exact -> loose pattern); create it if still not found.
-            product = resolve_product_by_name(name_cell, prod_cache, create=True)
+            product = resolve_product_by_name(pname, prod_cache, create=True)
             if not product:
                 unmatched_rows += 1
                 continue
-            entry = statement.entries.filter(bmc_or_mcc=bmc, product=product).first()
-            if not entry:
-                entry = StockStatementEntry(statement=statement, bmc_or_mcc=bmc, product=product)
-                created += 1
-            entry.opening_balance = _to_int(_cell(row, COL_OPENING + 1))
-            entry.received = _to_int(_cell(row, COL_RECEIVED + 1))
-            entry.received_mcc = _to_int(_cell(row, COL_RECEIVED_MCC + 1))
-            entry.stock_transfer = _to_int(_cell(row, COL_TRANSFER + 1))
-            entry.mpp_sale = _to_int(_cell(row, COL_MPP_SALE + 1))
-            entry.damage = _to_int(_cell(row, COL_DAMAGE + 1))
-            entry.expire = _to_int(_cell(row, COL_EXPIRE + 1))
-            remark = _cell(row, len(REPORT_COLUMNS))
-            if remark:
-                entry.remark = str(remark)[:255]
-            entry.save()   # recomputes closing from the corrected components
-            updated += 1
+            if "damage_combined" in cols:
+                damage, expire = _to_int(g("damage_combined")), 0
+            else:
+                damage, expire = _to_int(g("damage")), _to_int(g("expire"))
+            remark = g("remark")
+            per_cycle.setdefault(cur_cycle.id, {})[(bmc.id, product.id)] = {
+                "opening_balance": _to_int(g("opening")),
+                "received": _to_int(g("received")),
+                "received_mcc": _to_int(g("received_mcc")),
+                "stock_transfer": _to_int(g("transfer")),
+                "mpp_sale": _to_int(g("sale")),
+                "damage": damage, "expire": expire,
+                "remark": (str(remark)[:255] if remark else ""),
+            }
+            cyc_by_id[cur_cycle.id] = cur_cycle
+    wb.close()
 
-    statement.is_manual_override = True
-    statement.override_uploaded_at = timezone.now()
-    statement.save(update_fields=["is_manual_override", "override_uploaded_at", "updated_at"])
-    # carry the corrected closings forward into later cycles' openings
-    rechain_month(statement.cycle.monthly_cycle)
-    return {"updated": updated, "created": created, "unmatched_rows": unmatched_rows}
+    # ---- apply, one statement per cycle ----
+    updated = created = 0
+    affected_months = {}
+    cycles_filled = {}
+    for cid, entries in per_cycle.items():
+        cyc = cyc_by_id[cid]
+        statement = StockStatement.objects.filter(cycle=cyc).first()
+        if not statement:
+            statement = generate_statement(cyc, user=None)   # seed the cycle's statement
+        for (bmc_id, pid), vals in entries.items():
+            entry = statement.entries.filter(bmc_or_mcc_id=bmc_id, product_id=pid).first()
+            if entry is None:
+                entry = StockStatementEntry(statement=statement, bmc_or_mcc_id=bmc_id, product_id=pid)
+                created += 1
+            for k, v in vals.items():
+                setattr(entry, k, v)
+            entry.save()   # recomputes closing
+            updated += 1
+        ensure_all_locations(statement)   # keep every location visible, even with no data
+        statement.is_manual_override = True
+        statement.override_uploaded_at = timezone.now()
+        statement.save(update_fields=["is_manual_override", "override_uploaded_at", "updated_at"])
+        cycles_filled[cyc.name] = len(entries)
+        affected_months[cyc.monthly_cycle_id] = cyc.monthly_cycle
+
+    for mc in affected_months.values():
+        rechain_month(mc)
+
+    return {
+        "updated": updated, "created": created, "unmatched_rows": unmatched_rows,
+        "cycles_filled": cycles_filled,
+        "unmatched_locations": sorted(unmatched_locations),
+    }

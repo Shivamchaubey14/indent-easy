@@ -31457,20 +31457,29 @@ def location_stock_report_submit(request):
 @login_required(login_url='login')
 @require_GET
 def location_stock_report_download(request):
-    """Download the location user's single-sheet report."""
+    """Download the location user's report — just the selected cycle by default, or the
+    whole month (every cycle stacked) when scope=month, i.e. the 'All cycles' selection."""
     bmc = _resolve_user_bmc(request.user)
     if bmc is None:
         return HttpResponseForbidden("Your account is not linked to any MCC/BMC location.")
     cycle = get_object_or_404(Cycle, id=request.GET.get("cycle"))
     mc = cycle.monthly_cycle
-    if not StockStatement.objects.filter(cycle__monthly_cycle=mc).exists():
-        return HttpResponseForbidden("No statement exists for this month yet.")
-    bio = stock_report_engine.build_month_workbook(mc, only_bmc=bmc, include_summary=False)
-    safe_cycle = re.sub(r"[^A-Za-z0-9_-]+", "_", f"{mc.month}_{mc.year}" if mc else (cycle.name or f"cycle_{cycle.id}"))
+    scope = (request.GET.get("scope") or "cycle").lower()
+    if scope in ("month", "all"):
+        if not StockStatement.objects.filter(cycle__monthly_cycle=mc).exists():
+            return HttpResponseForbidden("No statement exists for this month yet.")
+        bio = stock_report_engine.build_month_workbook(mc, only_bmc=bmc, include_summary=False)
+        safe_period = re.sub(r"[^A-Za-z0-9_-]+", "_", f"{mc.month}_{mc.year}" if mc else (cycle.name or f"cycle_{cycle.id}"))
+    else:
+        statement = StockStatement.objects.filter(cycle=cycle).first()
+        if not statement:
+            return HttpResponseForbidden("No statement exists for this cycle yet.")
+        bio = stock_report_engine.build_workbook(statement, only_bmc=bmc, include_summary=False)
+        safe_period = re.sub(r"[^A-Za-z0-9_-]+", "_", cycle.name or f"cycle_{cycle.id}")
     safe_loc = re.sub(r"[^A-Za-z0-9_-]+", "_", bmc.name or "location")
     response = HttpResponse(
         bio.getvalue(),
         content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
     )
-    response["Content-Disposition"] = f'attachment; filename="Stock_Report_{safe_loc}_{safe_cycle}.xlsx"'
+    response["Content-Disposition"] = f'attachment; filename="Stock_Report_{safe_loc}_{safe_period}.xlsx"'
     return response

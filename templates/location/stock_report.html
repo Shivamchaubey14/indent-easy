@@ -45,6 +45,9 @@
     <p>Pick a month &amp; cycle above to see your products.</p>
   </div>
 
+  <!-- Cycle tabs (shown when "All cycles" is selected) -->
+  <div id="cycleTabs" class="sr-cyc-tabs" style="display:none;"></div>
+
   <!-- Report -->
   <div id="reportArea" style="display:none;">
     <!-- Summary cards -->
@@ -141,6 +144,11 @@
   .sr-remark:disabled { background:#f1f3f5; color:#868e96; }
   .sr-spin { animation:sr-rot 1s linear infinite; }
   @keyframes sr-rot { to { transform:rotate(360deg); } }
+  .sr-cyc-tabs { display:flex; gap:.5rem; margin-bottom:1rem; flex-wrap:wrap; border-bottom:2px solid #e9ecef; }
+  .sr-cyc-tab { background:none; border:none; padding:.55rem 1.1rem; font-size:.9rem; font-weight:600; color:#7f8c8d;
+                cursor:pointer; border-bottom:3px solid transparent; margin-bottom:-2px; }
+  .sr-cyc-tab:hover { color:#313647; }
+  .sr-cyc-tab.active { color:#313647; border-bottom-color:#A3B087; }
   @media (max-width:800px){ .sr-summary{ grid-template-columns:1fr 1fr; } }
   @media (max-width:520px){ .sr-field{ min-width:100%; } }
 </style>
@@ -149,8 +157,10 @@
 (function(){
   const CSRF = document.querySelector('[name=csrfmiddlewaretoken]').value;
   const $ = (id) => document.getElementById(id);
-  let currentCycle = "";
+  let currentCycle = "";       // the cycle currently shown / edited (active tab)
   let editable = true;
+  let cyclesData = [];         // [{id, name, data}] — one cycle, or all cycles of the month
+  let selectionMode = "cycle"; // "cycle" (one selected) or "all" (whole month)
   const MONTH_YEARS = JSON.parse(document.getElementById('monthYearsData').textContent || '[]');
 
   const URLS = {
@@ -254,16 +264,60 @@
     recomputeTotals();
   }
 
-  async function loadCycle(id){
-    currentCycle = id;
-    if(!id){ $('reportArea').style.display='none'; $('emptyPrompt').style.display='block'; $('statusBox').style.display='none'; return; }
+  function updateDownloadLabel(){
+    const b = $('btnDownload');
+    b.innerHTML = selectionMode === 'all'
+      ? '<i class="fas fa-download"></i> Download My Report (whole month)'
+      : '<i class="fas fa-download"></i> Download My Report (this cycle)';
+  }
+
+  // Draw a tab per loaded cycle (only when "All cycles" is chosen); click switches cycle.
+  function renderTabs(){
+    const tabs = $('cycleTabs');
+    if(cyclesData.length <= 1){ tabs.style.display = 'none'; tabs.innerHTML = ''; return; }
+    tabs.style.display = 'flex';
+    tabs.innerHTML = cyclesData.map(cd =>
+      `<button class="sr-cyc-tab ${String(cd.id)===String(currentCycle)?'active':''}" data-cyc="${cd.id}">${cd.name}</button>`
+    ).join('');
+    tabs.querySelectorAll('.sr-cyc-tab').forEach(b =>
+      b.addEventListener('click', () => showCycle(b.dataset.cyc)));
+  }
+
+  // Show one loaded cycle's table (active tab).
+  function showCycle(id){
+    currentCycle = String(id);
+    const cd = cyclesData.find(c => String(c.id)===currentCycle);
+    renderTabs();
+    if(cd) render(cd.data);
+  }
+
+  // Load a single cycle, or every cycle of the selected month ("All cycles").
+  async function loadSelection(val){
+    if(!val){
+      cyclesData = []; currentCycle = ""; selectionMode = "cycle";
+      $('reportArea').style.display='none'; $('cycleTabs').style.display='none';
+      $('emptyPrompt').style.display='block'; $('statusBox').style.display='none';
+      return;
+    }
     $('emptyPrompt').style.display='none'; $('toast').style.display='none';
+    const grp = MONTH_YEARS[$('monthYear').value];
+    let ids;
+    if(val === 'all'){ selectionMode = 'all'; ids = grp ? grp.cycles.map(c => String(c.id)) : []; }
+    else { selectionMode = 'cycle'; ids = [String(val)]; }
+    cyclesData = [];
     try {
-      const res = await fetch(URLS.data + '?cycle=' + encodeURIComponent(id));
-      const data = await res.json();
-      if(!data.success){ toast(data.error || 'Failed to load.', 'err'); return; }
-      render(data);
-    } catch(e){ toast('Could not load cycle data.', 'err'); }
+      for(const id of ids){
+        const res = await fetch(URLS.data + '?cycle=' + encodeURIComponent(id));
+        const data = await res.json();
+        const meta = grp ? (grp.cycles.find(c => String(c.id)===id) || {}) : {};
+        cyclesData.push({ id, name: meta.name || data.cycle_name || 'Cycle', data });
+      }
+    } catch(e){ toast('Could not load cycle data.', 'err'); return; }
+    if(!cyclesData.length){ toast('No cycles to load.', 'err'); return; }
+    currentCycle = String(cyclesData[0].id);
+    updateDownloadLabel();
+    renderTabs();
+    render(cyclesData[0].data);
   }
 
   // ---- cascading Month-Year -> Cycle picker ----
@@ -280,6 +334,9 @@
     cyc.innerHTML = '<option value="">— Choose cycle —</option>';
     const g = MONTH_YEARS[e.target.value];
     if(g){
+      const all = document.createElement('option');
+      all.value = 'all'; all.textContent = 'All cycles of ' + g.label;
+      cyc.appendChild(all);
       g.cycles.forEach(c => {
         const o = document.createElement('option');
         o.value = c.id;
@@ -288,13 +345,15 @@
       });
       cyc.disabled = false;
     } else { cyc.disabled = true; }
-    loadCycle('');
+    loadSelection('');
   });
-  $('cycleSelect').addEventListener('change', e => loadCycle(e.target.value));
+  $('cycleSelect').addEventListener('change', e => loadSelection(e.target.value));
 
   $('btnDownload').addEventListener('click', () => {
     if(!currentCycle) return;
-    window.location = URLS.download + '?cycle=' + encodeURIComponent(currentCycle);
+    let url = URLS.download + '?cycle=' + encodeURIComponent(currentCycle);
+    if(selectionMode === 'all') url += '&scope=month';   // whole month; else just this cycle
+    window.location = url;
   });
 
   $('btnSave').addEventListener('click', async () => {
@@ -314,7 +373,11 @@
       });
       const data = await res.json();
       busy($('btnSave'), false);
-      if(data.success){ render(data); toast(data.message || 'Saved.', 'ok'); }
+      if(data.success){
+        const i = cyclesData.findIndex(c => String(c.id)===String(currentCycle));
+        if(i>=0) cyclesData[i].data = data;   // keep the tab's data fresh for switching
+        render(data); toast(data.message || 'Saved.', 'ok');
+      }
       else toast(data.error || 'Save failed.', 'err');
     } catch(e){ busy($('btnSave'), false); toast('Save failed.', 'err'); }
   });

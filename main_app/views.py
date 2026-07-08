@@ -2392,6 +2392,9 @@ def create_stn(request):
     uom_choices = UOM_CHOICES
 
     if request.method == "POST":
+        # The Generate button submits over AJAX (progress modal) — return JSON on error
+        # so the modal can show it, instead of re-rendering the whole page.
+        is_ajax = request.headers.get("x-requested-with") == "XMLHttpRequest"
         to_location = (request.POST.get("to_location") or "").strip()
         transporter_name = (request.POST.get("transporter_name") or "").strip()
         vehicle_number = (request.POST.get("vehicle_number") or "").strip()
@@ -2429,6 +2432,8 @@ def create_stn(request):
             error_message = "Please add at least one item with a quantity."
 
         if error_message:
+            if is_ajax:
+                return JsonResponse({"success": False, "error": error_message}, status=400)
             return render(request, "create_stn.html", {
                 "location_choices": location_choices,
                 "uom_choices": uom_choices,
@@ -2468,6 +2473,7 @@ def create_stn(request):
         pdf_buffer = _render_stn_pdf(stn, request)
         response = HttpResponse(pdf_buffer.read(), content_type="application/pdf")
         response["Content-Disposition"] = f'attachment; filename="{stn.stn_number}.pdf"'
+        response["X-STN-Number"] = stn.stn_number   # let the AJAX caller name the toast/file
         return response
 
     # GET

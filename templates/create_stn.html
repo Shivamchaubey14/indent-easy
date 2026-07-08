@@ -163,6 +163,20 @@
   </main>
 </div>
 
+<!-- Generate STN progress modal -->
+<div id="stnGenModal" class="stngen-modal" style="display:none;" aria-hidden="true">
+  <div class="stngen-backdrop"></div>
+  <div class="stngen-dialog" role="dialog" aria-modal="true" aria-labelledby="stngenTitle">
+    <div class="stngen-icon"><i class="fas fa-file-pdf"></i></div>
+    <h3 id="stngenTitle">Generating your STN…</h3>
+    <p id="stngenMsg" class="stngen-msg">Please wait while we create the document.</p>
+    <div class="stngen-bar"><div id="stngenFill" class="stngen-fill"></div></div>
+    <div id="stngenActions" class="stngen-actions" style="display:none;">
+      <button type="button" id="stngenClose" class="btn-generate">Close</button>
+    </div>
+  </div>
+</div>
+
 <link href="https://cdnjs.cloudflare.com/ajax/libs/select2/4.0.13/css/select2.min.css" rel="stylesheet" />
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/select2/4.0.13/js/select2.min.js"></script>
@@ -276,12 +290,118 @@
     .main-content { padding: 1rem; }
     .page-title { font-size: 1.5rem; }
   }
+
+  /* Generate STN progress modal */
+  .stngen-modal { position: fixed; inset: 0; z-index: 1000; display: flex; align-items: center; justify-content: center; padding: 1rem; }
+  .stngen-backdrop { position: absolute; inset: 0; background: rgba(20,24,34,.55); backdrop-filter: blur(2px); }
+  .stngen-dialog { position: relative; background: #fff; border-radius: 16px; width: min(420px, 100%); padding: 2rem 1.75rem;
+    text-align: center; box-shadow: 0 24px 60px rgba(0,0,0,.35); border: 2px solid #000; animation: stngen-pop .18s ease; }
+  @keyframes stngen-pop { from { transform: translateY(12px) scale(.97); opacity: 0; } to { transform: none; opacity: 1; } }
+  .stngen-icon { font-size: 2.6rem; color: var(--primary-dark); margin-bottom: .6rem; }
+  .stngen-icon i { animation: stngen-pulse 1.1s ease-in-out infinite; }
+  @keyframes stngen-pulse { 0%,100% { opacity: 1; } 50% { opacity: .45; } }
+  .stngen-dialog h3 { margin: 0 0 .4rem; font-size: 1.25rem; font-weight: 700; color: var(--primary-dark); }
+  .stngen-msg { margin: 0 0 1.2rem; font-size: .92rem; color: var(--text-light); }
+  .stngen-bar { height: 10px; background: #e9ecef; border-radius: 20px; overflow: hidden; }
+  .stngen-fill { height: 100%; width: 0; border-radius: 20px; background: linear-gradient(90deg, var(--accent-green), #8a9975); transition: width .25s ease; }
+  .stngen-actions { margin-top: 1.3rem; }
+  /* success state */
+  .stngen-modal.is-success .stngen-icon { color: var(--success); }
+  .stngen-modal.is-success .stngen-icon i { animation: none; }
+  .stngen-modal.is-success .stngen-fill { background: var(--success); }
+  /* error state */
+  .stngen-modal.is-error .stngen-icon { color: var(--accent-red); }
+  .stngen-modal.is-error .stngen-icon i { animation: none; }
+  .stngen-modal.is-error .stngen-fill { background: var(--accent-red); }
 </style>
 
 <script>
   $(document).ready(function () {
     const productUrl = "{% url 'get_products_by_uom_for_purchase' %}";
     const pristineRow = $("#stnTable tbody tr:first").clone();
+
+    // ---- Generate STN: progress modal -> download PDF -> land on View Your STNs ----
+    (function () {
+      const form = document.getElementById('stnForm');
+      const modal = document.getElementById('stnGenModal');
+      if (!form || !modal) return;
+      const fill = document.getElementById('stngenFill');
+      const titleEl = document.getElementById('stngenTitle');
+      const msgEl = document.getElementById('stngenMsg');
+      const iconEl = modal.querySelector('.stngen-icon');
+      const actions = document.getElementById('stngenActions');
+      const VIEW_STNS_URL = "{% url 'view_stns' %}";
+      let timer = null;
+
+      function open() { modal.style.display = 'flex'; modal.setAttribute('aria-hidden', 'false'); document.body.style.overflow = 'hidden'; }
+      function close() { modal.style.display = 'none'; modal.setAttribute('aria-hidden', 'true'); document.body.style.overflow = ''; }
+      function setPct(p) { fill.style.width = p + '%'; }
+      function reset() {
+        modal.classList.remove('is-error', 'is-success');
+        iconEl.innerHTML = '<i class="fas fa-file-pdf"></i>';
+        titleEl.textContent = 'Generating your STN…';
+        msgEl.textContent = 'Please wait while we create the document.';
+        actions.style.display = 'none';
+        setPct(0);
+      }
+      function creep() {           // simulated progress up to 90% while we wait
+        let p = 0;
+        timer = setInterval(function () {
+          p += Math.max(1, (90 - p) * 0.08);
+          if (p >= 90) { p = 90; clearInterval(timer); timer = null; }
+          setPct(p);
+        }, 120);
+      }
+      function stop() { if (timer) { clearInterval(timer); timer = null; } }
+      function fail(msg) {
+        stop(); setPct(100);
+        modal.classList.add('is-error');
+        iconEl.innerHTML = '<i class="fas fa-triangle-exclamation"></i>';
+        titleEl.textContent = 'Generation failed';
+        msgEl.textContent = msg;
+        actions.style.display = 'block';
+      }
+      function fileName(res) {
+        const cd = res.headers.get('Content-Disposition') || '';
+        const m = /filename="?([^"]+)"?/.exec(cd);
+        return m ? m[1] : ((res.headers.get('X-STN-Number') || 'STN') + '.pdf');
+      }
+
+      document.getElementById('stngenClose').addEventListener('click', close);
+
+      form.addEventListener('submit', async function (e) {
+        e.preventDefault();                       // native required-field checks already passed
+        reset(); open(); creep();
+        try {
+          const res = await fetch(form.action, {
+            method: 'POST',
+            headers: { 'X-Requested-With': 'XMLHttpRequest' },
+            body: new FormData(form),
+          });
+          const ctype = res.headers.get('Content-Type') || '';
+          if (res.ok && ctype.indexOf('pdf') !== -1) {
+            const blob = await res.blob();
+            stop(); setPct(100);
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url; a.download = fileName(res);
+            document.body.appendChild(a); a.click(); a.remove();
+            setTimeout(function () { URL.revokeObjectURL(url); }, 5000);
+            modal.classList.add('is-success');
+            iconEl.innerHTML = '<i class="fas fa-check-circle"></i>';
+            titleEl.textContent = 'STN generated!';
+            msgEl.textContent = 'Your PDF is downloading. Taking you to your STNs…';
+            setTimeout(function () { window.location = VIEW_STNS_URL; }, 1300);
+          } else {
+            let err = 'Could not generate the STN. Please check your entries.';
+            try { const j = await res.json(); if (j && j.error) err = j.error; } catch (_) {}
+            fail(err);
+          }
+        } catch (err) {
+          fail('Network error. Please try again.');
+        }
+      });
+    })();
 
     function reportOnly() { return $("#reportOnlyToggle").is(":checked"); }
 

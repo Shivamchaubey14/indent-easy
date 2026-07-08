@@ -109,7 +109,7 @@
             </div>
           </div>
           <div class="excel-import-actions">
-            <a href="{% url 'download_indent_template' %}" class="btn-excel btn-excel-download"><i class="fas fa-download"></i> Download Item Excel</a>
+            <a href="{% url 'download_indent_template' %}" id="downloadStnExcelLink" class="btn-excel btn-excel-download"><i class="fas fa-download"></i> Download Item Excel</a>
             <input type="file" id="stnExcelFile" accept=".xlsx,.xls" hidden />
             <button type="button" id="chooseStnExcelBtn" class="btn-excel btn-excel-choose"><i class="fas fa-folder-open"></i> <span id="stnExcelFileName">Choose file…</span></button>
             <button type="button" id="uploadStnExcelBtn" class="btn-excel btn-excel-upload"><i class="fas fa-upload"></i> Upload &amp; Load Items</button>
@@ -285,6 +285,13 @@
 
     function reportOnly() { return $("#reportOnlyToggle").is(":checked"); }
 
+    // "Download Item Excel" follows the toggle: only the 35 report items when ticked.
+    $("#downloadStnExcelLink").on("click", function (e) {
+      e.preventDefault();
+      const base = "{% url 'download_indent_template' %}";
+      window.location = base + (reportOnly() ? "?report_only=1" : "");
+    });
+
     // Load the stock-item options for one row: the 35 report items when the toggle is on,
     // otherwise the UOM-filtered catalog.
     function loadStockItems(uom, stockSelect) {
@@ -389,7 +396,7 @@
         uomSelect.val(item.uom);
         const stockSelect = row.find('select[name="stock_item[]"]');
         stockSelect.empty().append(
-          $("<option></option>").val(item.product_id).attr("data-name", item.name).text(item.name).prop("selected", true)
+          $("<option></option>").val(item.product_id).attr("data-name", item.name).text(item.display || item.name).prop("selected", true)
         );
         row.find(".stock-item-name").val(item.name);
         row.find('input[name="quantity[]"]').val(item.quantity);

@@ -146,7 +146,12 @@
                 </div>
               </td>
               <td>{{ stn.transporter_name|default:"—" }}</td>
-              <td>{{ stn.items.count }}</td>
+              <td>
+                <button type="button" class="btn-show-items" data-stn="{{ stn.stn_number }}">
+                  <i class="fas fa-list-ul"></i> Show Items
+                  <span class="items-count">{{ stn.items.count }}</span>
+                </button>
+              </td>
               <td>
                 {% if stn.is_received %}
                 <span class="stn-status received"><i class="fas fa-inbox"></i> Received</span>
@@ -203,6 +208,23 @@
       {% endif %}
     </div>
   </main>
+</div>
+
+<!-- Show Items modal -->
+<div id="stnItemsModal" class="stn-modal" style="display:none;" aria-hidden="true">
+  <div class="stn-modal-backdrop" data-close></div>
+  <div class="stn-modal-dialog" role="dialog" aria-modal="true" aria-labelledby="stnModalTitle">
+    <div class="stn-modal-head">
+      <h3 id="stnModalTitle"><i class="fas fa-truck-loading"></i> <span id="stnModalNumber">STN</span></h3>
+      <button type="button" class="stn-modal-close" data-close aria-label="Close">&times;</button>
+    </div>
+    <div class="stn-modal-body">
+      <div id="stnModalMeta" class="stn-meta-grid"></div>
+      <div id="stnModalContent">
+        <div class="stn-modal-loading"><i class="fas fa-spinner fa-spin"></i> Loading items…</div>
+      </div>
+    </div>
+  </div>
 </div>
 
 <style>
@@ -299,6 +321,44 @@
   .page-link:hover { background: var(--primary-light); color: #fff; }
   .page-info { font-weight: 600; color: var(--primary-dark); }
 
+  /* Show Items button */
+  .btn-show-items { background: var(--primary-dark); color: #fff; border: none; padding: .45rem .8rem; border-radius: 6px;
+    font-size: .85rem; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: .45rem; font-family: 'Lexend', sans-serif; }
+  .btn-show-items:hover { background: var(--primary-light); transform: translateY(-1px); }
+  .btn-show-items i { color: var(--accent-green); }
+  .items-count { background: var(--accent-green); color: #1f2430; border-radius: 20px; padding: .05rem .5rem; font-size: .78rem; font-weight: 700; }
+
+  /* Modal */
+  .stn-modal { position: fixed; inset: 0; z-index: 1000; display: flex; align-items: center; justify-content: center; padding: 1rem; }
+  .stn-modal-backdrop { position: absolute; inset: 0; background: rgba(20,24,34,.55); backdrop-filter: blur(2px); }
+  .stn-modal-dialog { position: relative; background: #fff; border-radius: 16px; width: min(760px, 100%); max-height: 88vh;
+    display: flex; flex-direction: column; box-shadow: 0 24px 60px rgba(0,0,0,.35); border: 2px solid #000; overflow: hidden; animation: stn-pop .18s ease; }
+  @keyframes stn-pop { from { transform: translateY(12px) scale(.98); opacity: 0; } to { transform: none; opacity: 1; } }
+  .stn-modal-head { display: flex; align-items: center; justify-content: space-between; gap: 1rem;
+    padding: 1.1rem 1.4rem; background: linear-gradient(135deg, var(--accent-green) 0%, #8a9975 100%); border-bottom: 2px solid #000; }
+  .stn-modal-head h3 { margin: 0; font-size: 1.2rem; font-weight: 700; color: #313647; display: flex; align-items: center; gap: .5rem; }
+  .stn-modal-close { background: rgba(255,255,255,.4); border: none; width: 34px; height: 34px; border-radius: 8px; font-size: 1.4rem; line-height: 1;
+    color: #313647; cursor: pointer; font-weight: 700; }
+  .stn-modal-close:hover { background: rgba(255,255,255,.75); }
+  .stn-modal-body { padding: 1.3rem 1.4rem; overflow-y: auto; }
+  .stn-meta-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: .7rem 1.2rem; margin-bottom: 1.2rem; }
+  .stn-meta-item { display: flex; flex-direction: column; gap: .1rem; }
+  .stn-meta-item .lbl { font-size: .72rem; text-transform: uppercase; letter-spacing: .4px; color: var(--text-light); font-weight: 600; }
+  .stn-meta-item .val { font-size: .92rem; color: var(--primary-dark); font-weight: 600; }
+  .stn-items-table { width: 100%; border-collapse: collapse; font-size: .88rem; }
+  .stn-items-table th { background: var(--primary-dark); color: #fff; padding: .6rem .7rem; text-align: left; white-space: nowrap; }
+  .stn-items-table th.num, .stn-items-table td.num { text-align: right; }
+  .stn-items-table td { padding: .55rem .7rem; border-bottom: 1px solid var(--border-color); }
+  .stn-items-table tbody tr:nth-child(even) td { background: #f8f9fa; }
+  .stn-items-table tfoot td { font-weight: 700; background: #eef1f5; border-top: 2px solid var(--primary-dark); }
+  .stn-items-table td.short { color: var(--danger); font-weight: 700; }
+  .stn-modal-loading { text-align: center; color: var(--text-light); padding: 2rem; }
+  .stn-modal-error { text-align: center; color: var(--danger); padding: 1.5rem; font-weight: 600; }
+  .stn-badge { display: inline-flex; align-items: center; gap: .3rem; padding: .2rem .6rem; border-radius: 20px; font-size: .78rem; font-weight: 700; }
+  .stn-badge.draft { background: rgba(255,193,7,.18); color: #946200; }
+  .stn-badge.posted { background: rgba(40,167,69,.15); color: #1e7e34; }
+  .stn-badge.received { background: rgba(23,162,184,.15); color: #0c5460; }
+
   @media (max-width: 1200px) {
     .layout-container { flex-direction: column; }
     .sidebar { width: 100%; margin: 0; border-radius: 0; position: relative; top: 0; min-height: auto; }
@@ -310,5 +370,77 @@
     .modern-table th, .modern-table td { padding: .5rem; }
   }
 </style>
+
+<script>
+(function () {
+  const modal = document.getElementById('stnItemsModal');
+  const contentEl = document.getElementById('stnModalContent');
+  const metaEl = document.getElementById('stnModalMeta');
+  const numEl = document.getElementById('stnModalNumber');
+  // Build the item URL from a placeholder so the stn_number is swapped in per row.
+  const urlTemplate = "{% url 'stn_items_json' 'STN_PLACEHOLDER' %}";
+
+  function esc(s) { const d = document.createElement('div'); d.textContent = (s == null ? '' : String(s)); return d.innerHTML; }
+  function openModal() { modal.style.display = 'flex'; modal.setAttribute('aria-hidden', 'false'); document.body.style.overflow = 'hidden'; }
+  function closeModal() { modal.style.display = 'none'; modal.setAttribute('aria-hidden', 'true'); document.body.style.overflow = ''; }
+  function metaRow(lbl, val) { return `<div class="stn-meta-item"><span class="lbl">${esc(lbl)}</span><span class="val">${val}</span></div>`; }
+
+  async function loadItems(stnNumber) {
+    numEl.textContent = stnNumber;
+    metaEl.innerHTML = '';
+    contentEl.innerHTML = '<div class="stn-modal-loading"><i class="fas fa-spinner fa-spin"></i> Loading items…</div>';
+    openModal();
+    try {
+      const res = await fetch(urlTemplate.replace('STN_PLACEHOLDER', encodeURIComponent(stnNumber)));
+      const data = await res.json();
+      if (!data.success) {
+        contentEl.innerHTML = `<div class="stn-modal-error">${esc(data.error || 'Could not load this STN.')}</div>`;
+        return;
+      }
+      metaEl.innerHTML =
+        metaRow('From', esc(data.from_location)) +
+        metaRow('To', esc(data.to_location)) +
+        metaRow('Status', `<span class="stn-badge ${esc(data.status)}">${esc(data.status)}</span>`) +
+        metaRow('Created', esc(data.created_at)) +
+        metaRow('Transporter', esc(data.transporter_name)) +
+        metaRow('Vehicle', esc(data.vehicle_number)) +
+        metaRow('Driver', esc(data.driver_name)) +
+        (data.grn_number ? metaRow('GRN No.', esc(data.grn_number)) : '');
+
+      const rows = (data.items || []).map(function (it) {
+        const recv = it.received_quantity == null ? '—' : it.received_quantity;
+        const short = it.shortfall == null ? '' : it.shortfall;
+        const shortCls = (short !== '' && short > 0) ? 'num short' : 'num';
+        return `<tr>
+          <td>${it.sr}</td>
+          <td>${esc(it.stock_item)}</td>
+          <td>${esc(it.uom)}</td>
+          <td class="num">${it.quantity}</td>
+          <td class="num">${recv}</td>
+          <td class="num">${it.rejected_quantity}</td>
+          <td class="${shortCls}">${short}</td>
+        </tr>`;
+      }).join('');
+
+      contentEl.innerHTML = `
+        <table class="stn-items-table">
+          <thead><tr><th>#</th><th>Stock Item</th><th>UOM</th>
+            <th class="num">Dispatched</th><th class="num">Received</th><th class="num">Rejected</th><th class="num">Shortfall</th></tr></thead>
+          <tbody>${rows || '<tr><td colspan="7" style="text-align:center;color:#7f8c8d;">No items on this STN.</td></tr>'}</tbody>
+          <tfoot><tr><td colspan="3">Total (${data.item_count} item${data.item_count === 1 ? '' : 's'})</td>
+            <td class="num">${data.total_quantity}</td><td class="num"></td><td class="num"></td><td class="num"></td></tr></tfoot>
+        </table>`;
+    } catch (e) {
+      contentEl.innerHTML = '<div class="stn-modal-error">Failed to load items. Please try again.</div>';
+    }
+  }
+
+  document.querySelectorAll('.btn-show-items').forEach(function (btn) {
+    btn.addEventListener('click', function () { loadItems(btn.dataset.stn); });
+  });
+  modal.querySelectorAll('[data-close]').forEach(function (el) { el.addEventListener('click', closeModal); });
+  document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && modal.style.display === 'flex') closeModal(); });
+})();
+</script>
 
 {% endblock %}

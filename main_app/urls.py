@@ -45,6 +45,7 @@ urlpatterns = [
     path("download-dispatch-excel/", views.download_dispatch_excel, name="download_dispatch_excel"),
     path("create-stn/", views.create_stn, name="create_stn"),
     path("view-stns/", views.view_stns, name="view_stns"),
+    path("stn-items/<str:stn_number>/", views.stn_items_json, name="stn_items_json"),
     path("incoming-stns/", views.incoming_stns, name="incoming_stns"),
     path("final-post-stn/<str:stn_number>/", views.final_post_stn, name="final_post_stn"),
     path("download-incoming-stn-excel/<str:stn_number>/", views.download_incoming_stn_excel, name="download_incoming_stn_excel"),

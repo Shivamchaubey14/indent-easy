@@ -2678,6 +2678,63 @@ def view_stns(request):
 
 
 @login_required(login_url="login")
+@require_GET
+def stn_items_json(request, stn_number):
+    """Item detail for one STN, for the 'Show Items' modal on View Your STNs.
+
+    Returns the header (route, transporter, status) and every line item with its
+    dispatched / received / rejected quantities. Visible to the STN's creator, the
+    destination location, or a superuser.
+    """
+    stn = get_object_or_404(
+        StockTransferNote.objects.prefetch_related("items"), stn_number=stn_number
+    )
+    allowed = (
+        request.user.is_superuser
+        or stn.created_by_id == request.user.id
+        or (stn.to_location or "").strip().lower() == (request.user.location or "").strip().lower()
+    )
+    if not allowed:
+        return JsonResponse({"success": False, "error": "You don't have access to this STN."}, status=403)
+
+    if stn.is_received:
+        status = "received"
+    elif stn.is_posted:
+        status = "posted"
+    else:
+        status = "draft"
+
+    items = []
+    for i, it in enumerate(stn.items.all(), start=1):
+        items.append({
+            "sr": i,
+            "stock_item": it.stock_item,
+            "uom": it.uom or "—",
+            "quantity": it.quantity,
+            "received_quantity": it.received_quantity,   # None until received
+            "rejected_quantity": it.rejected_quantity or 0,
+            "shortfall": it.shortfall,                   # None until received
+        })
+
+    return JsonResponse({
+        "success": True,
+        "stn_number": stn.stn_number,
+        "from_location": stn.from_location,
+        "to_location": stn.to_location,
+        "transporter_name": stn.transporter_name or "—",
+        "vehicle_number": stn.vehicle_number or "—",
+        "driver_name": stn.driver_name or "—",
+        "driver_contact": stn.driver_contact or "—",
+        "grn_number": stn.grn_number or "",
+        "created_at": stn.created_at.strftime("%d %b %Y, %I:%M %p") if stn.created_at else "",
+        "status": status,
+        "item_count": len(items),
+        "total_quantity": sum(it["quantity"] for it in items),
+        "items": items,
+    })
+
+
+@login_required(login_url="login")
 def incoming_stns(request):
     """
     'Incoming STNs' — Stock Transfer Notes addressed to the current user's

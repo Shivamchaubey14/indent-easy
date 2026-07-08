@@ -304,6 +304,13 @@
             ></div>
           </div>
 
+          <!-- Report-items-only filter: scope the picker to the 35 Sale & Stock Report items -->
+          <label class="report-only-toggle">
+            <input type="checkbox" id="reportOnlyToggle" />
+            <span><i class="fas fa-filter"></i> Report items only
+              <small>(show just the 35 Sale &amp; Stock Report products)</small></span>
+          </label>
+
           <div class="table-container">
             <table class="product-table" id="productTable">
               <thead>
@@ -1049,6 +1056,23 @@
     overflow-x: auto;
     -webkit-overflow-scrolling: touch;
   }
+
+  .report-only-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.55rem;
+    margin: 0 0 1rem;
+    padding: 0.55rem 0.9rem;
+    background: rgba(163, 176, 135, 0.12);
+    border: 1px solid rgba(163, 176, 135, 0.45);
+    border-radius: 10px;
+    cursor: pointer;
+    font-weight: 600;
+    color: #435663;
+  }
+  .report-only-toggle input { width: 16px; height: 16px; cursor: pointer; }
+  .report-only-toggle i { color: #A3B087; }
+  .report-only-toggle small { font-weight: 400; color: #7f8c8d; }
 
   .product-table {
     width: 100%;
@@ -2694,6 +2718,12 @@
 
       // Setup remark field functionality for new row
       setupRemarkField(newRow);
+
+      // If "Report items only" is on, load the fixed 35 into the new row too.
+      if ($("#reportOnlyToggle").is(":checked")) {
+        fetchStockItemsForUOM(newRow.find('select[name="uom[]"]').val(),
+                              newRow.find('select[name="stock_item[]"]'));
+      }
     });
 
     // Remove Row Functionality
@@ -2713,6 +2743,8 @@
       row.find('.remark-input').val('').removeData('dropdown-value');
     }
 
+    function reportOnly() { return $("#reportOnlyToggle").is(":checked"); }
+
     // UOM Change Handler
     $("#productTable").on("change", 'select[name="uom[]"]', function () {
       const uom = $(this).val();
@@ -2723,30 +2755,41 @@
       fetchStockItemsForUOM(uom, stockItemSelect);
     });
 
+    // When "Report items only" is toggled, reload every row's stock-item list.
+    $("#reportOnlyToggle").on("change", function () {
+      $('#productTable tbody tr').each(function () {
+        const uom = $(this).find('select[name="uom[]"]').val();
+        const stockItemSelect = $(this).find('select[name="stock_item[]"]');
+        fetchStockItemsForUOM(uom, stockItemSelect);
+      });
+    });
+
     function fetchStockItemsForUOM(uom, stockItemSelect) {
-      if (uom) {
-        $.ajax({
-          url: "{% url 'get_products_by_uom_for_purchase' %}",
-          method: "GET",
-          data: { uom: uom },
-          success: function (response) {
-            console.log(response);
-            stockItemSelect
-              .empty()
-              .append(
-                '<option value="" disabled selected>Select Stock Item</option>'
-              );
-            response.products.forEach((product) => {
-              stockItemSelect.append(
-                `<option value="${product.id}" data-name="${product.name}">${product.name}</option>`
-              );
-            });
-          },
-          error: function () {
-            alert("Failed to fetch stock items for the selected UOM.");
-          },
-        });
-      }
+      const report = reportOnly();
+      // Report-items-only ignores the UOM cascade — always show the fixed 35.
+      if (!uom && !report) return;
+      $.ajax({
+        url: "{% url 'get_products_by_uom_for_purchase' %}",
+        method: "GET",
+        data: report ? { report_only: 1 } : { uom: uom },
+        success: function (response) {
+          const prev = stockItemSelect.val();
+          stockItemSelect
+            .empty()
+            .append(
+              '<option value="" disabled selected>Select Stock Item</option>'
+            );
+          response.products.forEach((product) => {
+            stockItemSelect.append(
+              `<option value="${product.id}" data-name="${product.name}">${product.name}</option>`
+            );
+          });
+          if (prev) stockItemSelect.val(prev).trigger("change");
+        },
+        error: function () {
+          alert("Failed to fetch stock items.");
+        },
+      });
     }
 
     // Stock Item Change Handler

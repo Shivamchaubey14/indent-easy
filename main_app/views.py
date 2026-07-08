@@ -2195,10 +2195,17 @@ def download_indent_template(request):
         cell.alignment = Alignment(horizontal="center", vertical="center")
         cell.border = border
 
-    # One row per active product, name + UOM pre-filled, quantity/remark blank
-    products = Product.objects.filter(is_active=True).order_by("name")
-    for product in products:
-        ws.append([product.name, product.uom or "NONE", "", ""])
+    # One row per product, name + UOM pre-filled, quantity/remark blank.
+    # report_only -> just the 35 Sale & Stock Report items, printed by their exact report
+    # names (e.g. "Cattle Feed Sag (50_Kg)"); otherwise every active product by real name.
+    report_only = request.GET.get("report_only", "").strip().lower() in ("1", "true", "yes")
+    if report_only:
+        from . import stock_report as stock_report_engine
+        for product, display in stock_report_engine.report_products():
+            ws.append([display, product.uom or "NONE", "", ""])
+    else:
+        for product in Product.objects.filter(is_active=True).order_by("name"):
+            ws.append([product.name, product.uom or "NONE", "", ""])
 
     # Column widths for readability
     for col, width in {"A": 45, "B": 14, "C": 12, "D": 35}.items():
@@ -2211,7 +2218,8 @@ def download_indent_template(request):
     wb.save(output)
     output.seek(0)
 
-    filename = f"indent_template_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
+    kind = "report_items" if report_only else "all_products"
+    filename = f"indent_template_{kind}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
     response = HttpResponse(
         output.read(),
         content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
@@ -2258,6 +2266,9 @@ def import_indent_excel(request):
 
     # Cache active products by name for fast, exact matching
     product_map = {p.name.strip(): p for p in Product.objects.filter(is_active=True)}
+    # Alias-aware fallback for sheets printed with report names.
+    from . import stock_report as stock_report_engine
+    _report_norm_cache = stock_report_engine.build_product_norm_cache()
 
     rows = []
     errors = []
@@ -2285,7 +2296,12 @@ def import_indent_excel(request):
         if quantity <= 0:
             continue  # zero / negative => treated as not requested
 
+        # Exact active-product name first; then fall back to the report-name aliases so a
+        # sheet printed with report names ("Cattle Feed Sag (50_Kg)") still resolves to the
+        # real product ("CF- SAG 50 KG").
         product = product_map.get(name)
+        if not product:
+            product = stock_report_engine.resolve_product_by_name(name, _report_norm_cache, create=False)
         if not product:
             errors.append(f"Row {row_idx}: product '{name}' not found or inactive.")
             continue
@@ -2293,6 +2309,7 @@ def import_indent_excel(request):
         rows.append({
             "product_id": product.id,
             "name": product.name,
+            "display": stock_report_engine.report_display_name(product.name),
             "uom": product.uom or (uom_val or "NONE"),
             "quantity": quantity,
             "remark": remark,

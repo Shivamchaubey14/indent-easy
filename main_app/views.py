@@ -12576,7 +12576,22 @@ def get_products_by_uom_for_purchase(request):
     # 1️⃣ EXTRACT & NORMALIZE UOM
     # ------------------------------------------------------------
     uom = request.GET.get("uom", "").strip().upper()
-    print("Received UOM from request:", uom)
+    report_only = request.GET.get("report_only", "").strip().lower() in ("1", "true", "yes")
+    print("Received UOM from request:", uom, "| report_only:", report_only)
+
+    # ------------------------------------------------------------
+    # 2️⃣ REPORT-ITEMS-ONLY: the 35 Sale & Stock Report products, in report order
+    # ------------------------------------------------------------
+    # When the user turns on "Report items only", ignore the UOM cascade and return
+    # exactly the fixed report product set so the indent / STN is scoped to those items
+    # (whose values flow back into the Sale & Stock Report).
+    if report_only:
+        from . import stock_report as stock_report_engine
+        ids = stock_report_engine.report_product_ids()
+        by_id = {p["id"]: p for p in Product.objects.filter(id__in=ids).values("id", "name")}
+        products = [by_id[i] for i in ids if i in by_id]   # keep the report's order
+        print("=== END get_products_by_uom_for_purchase (report_only) ===\n")
+        return JsonResponse({"products": products})
 
     # ------------------------------------------------------------
     # 2️⃣ BASE QUERYSET (ALL PRODUCTS)

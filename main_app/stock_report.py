@@ -244,6 +244,12 @@ def report_products():
     return out
 
 
+def report_product_ids():
+    """The real Product ids for the fixed report set, in report order — used to scope the
+    indent / stock-transfer product pickers to just these items."""
+    return [p.id for p, _d in report_products()]
+
+
 def ensure_all_locations(statement):
     """Create zero entries so EVERY MCC/BMC shows EVERY report product, even a location with
     no data (so e.g. DURJANPURGHAT still appears with all zeros). Additive only — never

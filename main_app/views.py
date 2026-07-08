@@ -12587,9 +12587,13 @@ def get_products_by_uom_for_purchase(request):
     # (whose values flow back into the Sale & Stock Report).
     if report_only:
         from . import stock_report as stock_report_engine
-        ids = stock_report_engine.report_product_ids()
-        by_id = {p["id"]: p for p in Product.objects.filter(id__in=ids).values("id", "name")}
-        products = [by_id[i] for i in ids if i in by_id]   # keep the report's order
+        # display = the exact Sale & Stock Report name (e.g. "Cattle Feed Sag (50_Kg)");
+        # name/id = the real catalog product it maps to (e.g. "CF- SAG 50 KG") so the indent /
+        # STN, vendor lookup and inventory keep resolving as before.
+        products = [
+            {"id": p.id, "name": p.name, "display": display}
+            for p, display in stock_report_engine.report_products()
+        ]
         print("=== END get_products_by_uom_for_purchase (report_only) ===\n")
         return JsonResponse({"products": products})
 

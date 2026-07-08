@@ -297,7 +297,8 @@
           const prev = stockSelect.val();
           stockSelect.empty().append('<option value="" disabled selected>Select Stock Item</option>');
           (resp.products || []).forEach(function (p) {
-            stockSelect.append($("<option></option>").val(p.id).attr("data-name", p.name).text(p.name));
+            // Show the exact report name when present; keep the real product as the value.
+            stockSelect.append($("<option></option>").val(p.id).attr("data-name", p.name).text(p.display || p.name));
           });
           if (prev) stockSelect.val(prev).trigger("change");
         },

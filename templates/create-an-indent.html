@@ -2780,8 +2780,10 @@
               '<option value="" disabled selected>Select Stock Item</option>'
             );
           response.products.forEach((product) => {
+            // Show the exact report name when present; keep the real product as the value.
+            const label = product.display || product.name;
             stockItemSelect.append(
-              `<option value="${product.id}" data-name="${product.name}">${product.name}</option>`
+              `<option value="${product.id}" data-name="${product.name}">${label}</option>`
             );
           });
           if (prev) stockItemSelect.val(prev).trigger("change");

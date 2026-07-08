@@ -67,7 +67,7 @@
   <!-- Empty prompt -->
   <div id="emptyPrompt" class="sr-empty">
     <i class="fas fa-hand-pointer"></i>
-    <p>Pick a cycle above to begin.</p>
+    <p>Pick a month (and a cycle, or “All cycles”) to see the locations.</p>
   </div>
 
   <!-- Workflow -->
@@ -157,8 +157,9 @@
       </div>
     </div>
 
-    <!-- Entries -->
-    <div id="entriesArea"></div>
+    <!-- Location cards + detail -->
+    <div id="locationCards" class="sr-loc-grid"></div>
+    <div id="locationDetail" style="display:none;"></div>
   </div>
 </div>
   </main>
@@ -264,6 +265,29 @@
                       background:rgba(90,75,122,.1); color:#5a4b7a; border:1px solid rgba(90,75,122,.3); }
   .sr-spin { animation:sr-rot 1s linear infinite; }
   @keyframes sr-rot { to { transform:rotate(360deg); } }
+  /* location cards + detail */
+  .sr-loc-grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(220px,1fr)); gap:1rem; }
+  .sr-loc-card { background:#fff; border:1px solid #e9ecef; border-radius:14px; padding:1.1rem 1.2rem;
+                 box-shadow:0 2px 8px rgba(0,0,0,.05); cursor:pointer; transition:all .18s ease;
+                 display:flex; flex-direction:column; gap:.6rem; border-left:4px solid #A3B087; }
+  .sr-loc-card:hover { transform:translateY(-3px); box-shadow:0 8px 20px rgba(0,0,0,.1); border-left-color:#313647; }
+  .sr-loc-name { font-weight:700; color:#313647; font-size:1rem; display:flex; align-items:center; gap:.5rem; }
+  .sr-loc-name i { color:#A3B087; }
+  .sr-loc-meta { display:flex; justify-content:space-between; align-items:center; font-size:.8rem; color:#7f8c8d; }
+  .sr-loc-meta b { color:#313647; }
+  .sr-loc-lockstate { padding:.2rem .55rem; border-radius:20px; font-size:.72rem; font-weight:600; }
+  .sr-loc-lockstate.open { background:rgba(40,167,69,.12); color:#1e7e34; }
+  .sr-loc-lockstate.locked { background:rgba(255,193,7,.15); color:#b8860b; }
+  .sr-loc-go { font-size:.82rem; font-weight:600; color:#435663; display:flex; align-items:center; gap:.4rem; }
+  .sr-loc-card:hover .sr-loc-go { color:#313647; }
+  .sr-detail-head { display:flex; align-items:center; gap:1rem; margin-bottom:1rem; flex-wrap:wrap; }
+  .sr-detail-title { font-size:1.2rem; font-weight:700; color:#313647; margin:0; display:flex; align-items:center; gap:.5rem; }
+  .sr-detail-title i { color:#A3B087; }
+  .sr-cyc-tabs { display:flex; gap:.5rem; margin-bottom:1rem; flex-wrap:wrap; border-bottom:2px solid #e9ecef; }
+  .sr-cyc-tab { background:none; border:none; padding:.55rem 1.1rem; font-size:.9rem; font-weight:600; color:#7f8c8d;
+                cursor:pointer; border-bottom:3px solid transparent; margin-bottom:-2px; }
+  .sr-cyc-tab:hover { color:#313647; }
+  .sr-cyc-tab.active { color:#313647; border-bottom-color:#A3B087; }
   @media (max-width:900px){ .sr-layout{ flex-direction:column; } .sr-side{ width:auto; border-radius:0; } }
   @media (max-width:800px){ .sr-steps,.sr-summary{ grid-template-columns:1fr 1fr; } }
   @media (max-width:520px){ .sr-summary{ grid-template-columns:1fr 1fr; } .sr-steps{ grid-template-columns:1fr; } }
@@ -273,7 +297,10 @@
 (function(){
   const CSRF = document.querySelector('[name=csrfmiddlewaretoken]').value;
   const $ = (id) => document.getElementById(id);
-  let currentCycle = "";
+  let currentCycle = "";       // primary cycle (for the workflow steps / uploads)
+  let cyclesData = [];         // [{id, name, data}] — one or all cycles of the month
+  let openBmc = null;          // location currently open in detail, or null (cards view)
+  let detailCycle = "";        // active cycle tab inside the detail view
   const MONTH_YEARS = JSON.parse(document.getElementById('monthYearsData').textContent || '[]');
 
   const URLS = {
@@ -323,9 +350,10 @@
     const foot = table.querySelector('tfoot .total-row');
     if(foot){ foot.querySelector('.tdmg').textContent=d; foot.querySelector('.texp').textContent=e; foot.querySelector('.tcls').textContent=c; }
   }
-  async function saveLocation(bmcId, btn){
+  async function saveLocation(bmcId, btn, cycleId){
+    cycleId = cycleId || currentCycle;
     const table = document.querySelector(`.sr-table-scroll[data-group="${bmcId}"] table`);
-    if(!table || !currentCycle) return;
+    if(!table || !cycleId) return;
     const items = Array.from(table.querySelectorAll('tbody tr')).map(tr=>({
       id: num(tr.dataset.id),
       damage: num(tr.querySelector('.damage').value),
@@ -336,24 +364,25 @@
     try {
       const res = await fetch(URLS.adminSubmit, {
         method:'POST', headers:{'X-CSRFToken':CSRF, 'Content-Type':'application/json'},
-        body: JSON.stringify({ cycle: currentCycle, bmc: bmcId, items })
+        body: JSON.stringify({ cycle: cycleId, bmc: bmcId, items })
       });
       const data = await res.json();
       busy(btn, false);
-      if(data.success){ render(data); toast(data.message || 'Saved.', 'ok'); }
+      if(data.success){ applyCycleData(cycleId, data); toast(data.message || 'Saved.', 'ok'); }
       else toast(data.error || 'Save failed.', 'err');
     } catch(e){ busy(btn, false); toast('Save failed.', 'err'); }
   }
-  async function toggleLock(bmcId, openFlag, btn){
-    if(!currentCycle) return;
+  async function toggleLock(bmcId, openFlag, btn, cycleId){
+    cycleId = cycleId || currentCycle;
+    if(!cycleId) return;
     if(btn) busy(btn, true, openFlag ? 'Opening…' : 'Locking…');
     try {
       const res = await fetch(URLS.toggleLock, {
         method:'POST', headers:{'X-CSRFToken':CSRF, 'Content-Type':'application/json'},
-        body: JSON.stringify({ cycle: currentCycle, bmc: bmcId, open: openFlag, scope:'one' })
+        body: JSON.stringify({ cycle: cycleId, bmc: bmcId, open: openFlag, scope:'one' })
       });
       const data = await res.json();
-      if(data.success){ render(data); toast(data.message, 'ok'); }
+      if(data.success){ applyCycleData(cycleId, data); toast(data.message, 'ok'); }
       else { if(btn) busy(btn, false); toast(data.error || 'Failed.', 'err'); }
     } catch(e){ if(btn) busy(btn, false); toast('Failed to update lock.', 'err'); }
   }
@@ -367,7 +396,7 @@
       });
       const data = await res.json();
       busy(btn, false);
-      if(data.success){ render(data); toast(data.message, 'ok'); }
+      if(data.success){ applyCycleData(currentCycle, data); toast(data.message, 'ok'); }
       else toast(data.error || 'Failed.', 'err');
     } catch(e){ busy(btn, false); toast('Failed to update lock.', 'err'); }
   }
@@ -388,7 +417,10 @@
 
     if(data.exists === false){
       $('summaryCards').style.display = 'none';
-      $('entriesArea').innerHTML = '';
+      $('locationCards').innerHTML = '';
+      $('locationCards').style.display = 'none';
+      $('locationDetail').style.display = 'none';
+      $('lockToolbar').style.display = 'none';
       $('unmatchedCard').style.display = 'none';
       $('saleFileInfo').textContent = '';
       badge.textContent = 'Not generated';
@@ -426,69 +458,127 @@
       $('unmatchedCard').style.display = 'none';
     }
 
-    // entries grouped by bmc — Damage/Expire editable inline per location (locked once Finalized)
     const editable = data.status !== 'FINALIZED';
-    const parts = [];
-    (data.groups||[]).forEach(g => {
-      const dis = editable ? '' : 'disabled';
-      const rows = g.rows.map((r,i) => {
-        const clc = 'num closing' + (r.closing<0?' neg':'');
-        return `<tr data-id="${r.id}" data-opening="${r.opening}" data-received="${r.received}" data-received-mcc="${r.received_mcc}" data-transfer="${r.transfer}" data-sale="${r.sale}">
-          <td>${i+1}</td><td>${n(r.product)}</td>
-          <td class="num">${r.opening}</td><td class="num">${r.received}</td><td class="num">${r.received_mcc}</td><td class="num">${r.transfer}</td>
-          <td class="num">${r.sale}</td>
-          <td class="num"><input type="number" min="0" class="sr-inp damage" value="${r.damage}" ${dis}></td>
-          <td class="num"><input type="number" min="0" class="sr-inp expire" value="${r.expire}" ${dis}></td>
-          <td class="${clc}">${r.closing}</td>
-          <td><input type="text" class="sr-remark remark" value="${n(r.remark)}" ${dis}></td>
-        </tr>`;
-      }).join('');
-      const t = g.totals;
-      const lockBtn = editable
-        ? (g.open
-            ? `<button class="sr-btn sr-lockpill open sr-toggle-lock" data-bmc="${g.bmc_id}" data-open="0"><i class="fas fa-lock-open"></i> Open for location · lock</button>`
-            : `<button class="sr-btn sr-lockpill locked sr-toggle-lock" data-bmc="${g.bmc_id}" data-open="1"><i class="fas fa-lock"></i> Locked · open for location</button>`)
-        : '';
-      const saveBtn = editable
-        ? `<button class="sr-btn sr-btn-primary sr-save-loc" data-bmc="${g.bmc_id}"><i class="fas fa-save"></i> Save ${n(g.bmc)}</button>`
-        : '';
-      parts.push(`
-        <div class="sr-bmc-head"><span><i class="fas fa-industry"></i> ${n(g.bmc)}</span><span class="sr-bmc-actions">${lockBtn}${saveBtn}</span></div>
-        <div class="sr-table-scroll" data-group="${g.bmc_id}"><table class="sr-table">
-          <thead><tr>
-            <th>#</th><th>Product</th><th class="num">Opening</th>
-            <th class="num">Received<br>NDS/Other Co.</th><th class="num">Received<br>MCC/BMC</th>
-            <th class="num">Transfer</th><th class="num">MPP Sale</th><th class="num edit">Damage</th>
-            <th class="num edit">Expire</th><th class="num">Closing</th><th>Remark</th>
-          </tr></thead>
-          <tbody>${rows}</tbody>
-          <tfoot><tr class="total-row"><td colspan="2">Total</td>
-              <td class="num">${t.opening}</td><td class="num">${t.received}</td><td class="num">${t.received_mcc}</td><td class="num">${t.transfer}</td>
-              <td class="num">${t.sale}</td><td class="num tdmg">${t.damage}</td><td class="num texp">${t.expire}</td>
-              <td class="num tcls">${t.closing}</td><td></td></tr></tfoot>
-        </table></div>`);
-    });
-    $('entriesArea').innerHTML = parts.join('');
     $('lockToolbar').style.display = editable ? 'block' : 'none';
+    // show the location CARDS (click one to open its table); or the open location's detail
+    if(openBmc) renderLocationDetail(); else renderLocationCards();
+  }
 
-    document.querySelectorAll('#entriesArea .damage, #entriesArea .expire').forEach(inp => {
-      inp.addEventListener('input', e => recomputeRow(e.target.closest('tr')));
-    });
-    document.querySelectorAll('#entriesArea .sr-save-loc').forEach(btn => {
-      btn.addEventListener('click', () => saveLocation(btn.dataset.bmc, btn));
-    });
-    document.querySelectorAll('#entriesArea .sr-toggle-lock').forEach(btn => {
-      btn.addEventListener('click', () => toggleLock(btn.dataset.bmc, btn.dataset.open === '1', btn));
-    });
+  // ---- location cards + detail ----
+  function locationList(){
+    const map = {};
+    cyclesData.forEach(cd => (cd.data.groups||[]).forEach(g => { map[g.bmc_id] = g.bmc; }));
+    return Object.entries(map).map(([id,name])=>({id, name}))
+                 .sort((a,b)=> a.name.localeCompare(b.name));
+  }
+  function groupFor(cycleId, bmcId){
+    const cd = cyclesData.find(c => String(c.id)===String(cycleId));
+    return cd ? (cd.data.groups||[]).find(g => String(g.bmc_id)===String(bmcId)) : null;
+  }
+  function renderLocationCards(){
+    openBmc = null;
+    $('locationDetail').style.display = 'none';
+    const cards = $('locationCards');
+    cards.style.display = 'grid';
+    const primary = cyclesData[0];
+    cards.innerHTML = locationList().map(l => {
+      const g = groupFor(primary.id, l.id);
+      const close = g ? g.totals.closing : 0;
+      const open = g ? g.open : false;
+      return `<div class="sr-loc-card" data-bmc="${l.id}">
+        <div class="sr-loc-name"><i class="fas fa-industry"></i> ${l.name}</div>
+        <div class="sr-loc-meta">
+          <span>Closing <b>${close}</b></span>
+          <span class="sr-loc-lockstate ${open?'open':'locked'}"><i class="fas fa-${open?'lock-open':'lock'}"></i> ${open?'Open':'Locked'}</span>
+        </div>
+        <div class="sr-loc-go">View report <i class="fas fa-arrow-right"></i></div>
+      </div>`;
+    }).join('');
+    cards.querySelectorAll('.sr-loc-card').forEach(c =>
+      c.addEventListener('click', () => openLocation(c.dataset.bmc)));
+  }
+  function openLocation(bmcId){
+    openBmc = String(bmcId);
+    detailCycle = String(currentCycle || (cyclesData[0] && cyclesData[0].id) || '');
+    renderLocationDetail();
+  }
+  function renderLocationDetail(){
+    $('locationCards').style.display = 'none';
+    const d = $('locationDetail'); d.style.display = 'block';
+    const loc = locationList().find(l => String(l.id)===openBmc);
+    const name = loc ? loc.name : '';
+    const tabs = cyclesData.length > 1
+      ? '<div class="sr-cyc-tabs">' + cyclesData.map(cd =>
+          `<button class="sr-cyc-tab ${String(cd.id)===detailCycle?'active':''}" data-cyc="${cd.id}">${cd.name}</button>`).join('') + '</div>'
+      : '';
+    const cd = cyclesData.find(c => String(c.id)===detailCycle);
+    const g = cd ? (cd.data.groups||[]).find(x => String(x.bmc_id)===openBmc) : null;
+    const editable = cd && cd.data.status !== 'FINALIZED';
+    d.innerHTML = `
+      <div class="sr-detail-head">
+        <button class="sr-btn sr-btn-ghost" id="backToCards"><i class="fas fa-arrow-left"></i> All locations</button>
+        <h3 class="sr-detail-title"><i class="fas fa-industry"></i> ${name}</h3>
+      </div>
+      ${tabs}
+      <div id="detailTable"></div>`;
+    $('backToCards').addEventListener('click', renderLocationCards);
+    d.querySelectorAll('.sr-cyc-tab').forEach(b =>
+      b.addEventListener('click', () => { detailCycle = String(b.dataset.cyc); renderLocationDetail(); }));
+    $('detailTable').innerHTML = g ? buildLocationTable(g, editable) : '<p class="sr-sub">No data for this location in this cycle.</p>';
+    if(g){
+      document.querySelectorAll('#detailTable .damage, #detailTable .expire').forEach(inp =>
+        inp.addEventListener('input', e => recomputeRow(e.target.closest('tr'))));
+      const sb = $('detSave'); if(sb) sb.addEventListener('click', () => saveLocation(sb.dataset.bmc, sb, detailCycle));
+      const lb = $('detLock'); if(lb) lb.addEventListener('click', () => toggleLock(lb.dataset.bmc, lb.dataset.open==='1', lb, detailCycle));
+    }
+  }
+  function buildLocationTable(g, editable){
+    const dis = editable ? '' : 'disabled';
+    const rows = g.rows.map((r,i) => {
+      const clc = 'num closing' + (r.closing<0?' neg':'');
+      return `<tr data-id="${r.id}" data-opening="${r.opening}" data-received="${r.received}" data-received-mcc="${r.received_mcc}" data-transfer="${r.transfer}" data-sale="${r.sale}">
+        <td>${i+1}</td><td>${n(r.product)}</td>
+        <td class="num">${r.opening}</td><td class="num">${r.received}</td><td class="num">${r.received_mcc}</td><td class="num">${r.transfer}</td>
+        <td class="num">${r.sale}</td>
+        <td class="num"><input type="number" min="0" class="sr-inp damage" value="${r.damage}" ${dis}></td>
+        <td class="num"><input type="number" min="0" class="sr-inp expire" value="${r.expire}" ${dis}></td>
+        <td class="${clc}">${r.closing}</td>
+        <td><input type="text" class="sr-remark remark" value="${n(r.remark)}" ${dis}></td></tr>`;
+    }).join('');
+    const t = g.totals;
+    const lockBtn = editable ? (g.open
+        ? `<button class="sr-btn sr-lockpill open" id="detLock" data-bmc="${g.bmc_id}" data-open="0"><i class="fas fa-lock-open"></i> Open for location · lock</button>`
+        : `<button class="sr-btn sr-lockpill locked" id="detLock" data-bmc="${g.bmc_id}" data-open="1"><i class="fas fa-lock"></i> Locked · open for location</button>`) : '';
+    const saveBtn = editable ? `<button class="sr-btn sr-btn-primary" id="detSave" data-bmc="${g.bmc_id}"><i class="fas fa-save"></i> Save Damage/Expire</button>` : '';
+    return `<div class="sr-bmc-head"><span></span><span class="sr-bmc-actions">${lockBtn}${saveBtn}</span></div>
+      <div class="sr-table-scroll" data-group="${g.bmc_id}"><table class="sr-table">
+        <thead><tr><th>#</th><th>Product</th><th class="num">Opening</th>
+          <th class="num">Received<br>NDS/Other Co.</th><th class="num">Received<br>MCC/BMC</th>
+          <th class="num">Transfer</th><th class="num">MPP Sale</th><th class="num edit">Damage</th>
+          <th class="num edit">Expire</th><th class="num">Closing</th><th>Remark</th></tr></thead>
+        <tbody>${rows}</tbody>
+        <tfoot><tr class="total-row"><td colspan="2">Total</td>
+          <td class="num">${t.opening}</td><td class="num">${t.received}</td><td class="num">${t.received_mcc}</td><td class="num">${t.transfer}</td>
+          <td class="num">${t.sale}</td><td class="num tdmg">${t.damage}</td><td class="num texp">${t.expire}</td>
+          <td class="num tcls">${t.closing}</td><td></td></tr></tfoot></table></div>`;
+  }
+
+  function applyCycleData(cid, data){
+    const i = cyclesData.findIndex(c => String(c.id)===String(cid));
+    if(i>=0) cyclesData[i].data = data;
+    else cyclesData.push({id: String(cid), name: 'Cycle', data});
+    render(cyclesData[0].data);
   }
 
   function lockSteps(lock){
     ['step2','step3','step4'].forEach(id => $(id).classList.toggle('locked', lock));
   }
 
-  async function loadCycle(id){
-    currentCycle = id;
-    if(!id){
+  // Load a single cycle by id, or 'all' cycles of the currently-selected month.
+  async function loadSelection(val){
+    openBmc = null;
+    if(!val){
+      cyclesData = []; currentCycle = "";
       $('workflow').style.display = 'none';
       $('emptyPrompt').style.display = 'block';
       $('statusBox').style.display = 'none';
@@ -497,13 +587,23 @@
     $('emptyPrompt').style.display = 'none';
     $('workflow').style.display = 'block';
     $('toast').style.display = 'none';
+    const grp = MONTH_YEARS[$('monthYear').value];
+    let ids;
+    if(val === 'all'){ ids = grp ? grp.cycles.map(c => String(c.id)) : []; }
+    else { ids = [String(val)]; }
+    currentCycle = ids[0] || "";
+    cyclesData = [];
     try {
-      const res = await fetch(URLS.data + '?cycle=' + encodeURIComponent(id));
-      const data = await res.json();
-      if(!data.success){ toast(data.error || 'Failed to load.', 'err'); return; }
-      render(data);
-      if(!data.exists){ toast('No statement yet for this cycle. Start with Step 1.', 'info'); }
-    } catch(e){ toast('Could not load cycle data.', 'err'); }
+      for(const id of ids){
+        const res = await fetch(URLS.data + '?cycle=' + encodeURIComponent(id));
+        const data = await res.json();
+        const meta = grp ? (grp.cycles.find(c => String(c.id)===id) || {}) : {};
+        cyclesData.push({ id, name: meta.name || 'Cycle', data });
+      }
+    } catch(e){ toast('Could not load cycle data.', 'err'); return; }
+    if(!cyclesData.length){ toast('No cycles to load.', 'err'); return; }
+    render(cyclesData[0].data);
+    if(cyclesData[0].data.exists === false){ toast('No statement yet for this cycle. Start with Step 1.', 'info'); }
   }
 
   // ---- events ----
@@ -521,6 +621,9 @@
     cyc.innerHTML = '<option value="">— Choose cycle —</option>';
     const g = MONTH_YEARS[e.target.value];
     if(g){
+      const all = document.createElement('option');
+      all.value = 'all'; all.textContent = 'All cycles of ' + g.label;
+      cyc.appendChild(all);
       g.cycles.forEach(c => {
         const o = document.createElement('option');
         o.value = c.id;
@@ -531,9 +634,23 @@
     } else {
       cyc.disabled = true;
     }
-    loadCycle('');   // reset until a cycle is chosen
+    loadSelection('');   // reset until a cycle / all is chosen
   });
-  $('cycleSelect').addEventListener('change', e => loadCycle(e.target.value));
+  $('cycleSelect').addEventListener('change', e => loadSelection(e.target.value));
+  // programmatically select a cycle by id (used after an upload routes to another cycle)
+  function selectCycle(cycleId){
+    cycleId = String(cycleId);
+    for(let i=0;i<MONTH_YEARS.length;i++){
+      if(MONTH_YEARS[i].cycles.some(c => String(c.id)===cycleId)){
+        $('monthYear').value = i;
+        $('monthYear').dispatchEvent(new Event('change'));
+        $('cycleSelect').value = cycleId;
+        loadSelection(cycleId);
+        return true;
+      }
+    }
+    return false;
+  }
   $('openAllBtn').addEventListener('click', () => bulkLock(true, $('openAllBtn')));
   $('lockAllBtn').addEventListener('click', () => bulkLock(false, $('lockAllBtn')));
 
@@ -543,7 +660,7 @@
     const fd = new FormData(); fd.append('cycle', currentCycle);
     const data = await postForm(URLS.generate, fd);
     busy($('btnGenerate'), false);
-    if(data.success){ render(data); toast(data.message || 'Generated.', 'ok'); }
+    if(data.success){ applyCycleData(currentCycle, data); toast(data.message || 'Generated.', 'ok'); }
     else toast(data.error || 'Failed.', 'err');
   });
 
@@ -561,7 +678,7 @@
     const fd = new FormData(); fd.append('cycle', currentCycle); fd.append('file', f);
     const data = await postForm(URLS.uploadSale, fd);
     busy($('btnUploadSale'), false);
-    if(data.success){ render(data); toast(data.message, 'ok'); $('saleFile').value=''; $('saleName').textContent=''; $('btnUploadSale').disabled=true; }
+    if(data.success){ applyCycleData(currentCycle, data); toast(data.message, 'ok'); $('saleFile').value=''; $('saleName').textContent=''; $('btnUploadSale').disabled=true; }
     else toast(data.error || 'Failed.', 'err');
   });
 
@@ -585,7 +702,7 @@
     const fd = new FormData(); fd.append('cycle', currentCycle); fd.append('file', f);
     const data = await postForm(URLS.uploadFilled, fd);
     busy($('btnUploadFilled'), false);
-    if(data.success){ render(data); toast(data.message, 'ok'); $('filledFile').value=''; $('filledName').textContent=''; $('btnUploadFilled').disabled=true; }
+    if(data.success){ applyCycleData(currentCycle, data); toast(data.message, 'ok'); $('filledFile').value=''; $('filledName').textContent=''; $('btnUploadFilled').disabled=true; }
     else toast(data.error || 'Failed.', 'err');
   });
 
@@ -603,8 +720,12 @@
     const fd = new FormData(); fd.append('cycle', currentCycle); fd.append('file', f);
     const data = await postForm(URLS.uploadFull, fd);
     busy($('btnUploadFull'), false);
-    if(data.success){ render(data); toast(data.message, 'ok'); $('fullFile').value=''; $('fullName').textContent=''; $('btnUploadFull').disabled=true; }
-    else toast(data.error || 'Failed.', 'err');
+    if(data.success){
+      toast(data.message, 'ok');
+      $('fullFile').value=''; $('fullName').textContent=''; $('btnUploadFull').disabled=true;
+      // the file can fill several cycles — reload the whole current selection
+      loadSelection($('cycleSelect').value || currentCycle);
+    } else toast(data.error || 'Failed.', 'err');
   });
 
   // unmatched toggle

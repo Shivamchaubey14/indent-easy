@@ -30959,20 +30959,26 @@ def _open_location_ids(statement):
 
 
 def _serialize_statement(statement):
-    """Compact JSON view of a statement + its entries (grouped by BMC/MCC) + unmatched sale rows."""
+    """Compact JSON view of a statement + its entries (grouped by BMC/MCC) + unmatched sale rows.
+    Restricted to the fixed report product list, in the standard report order."""
     open_ids = _open_location_ids(statement)
+    report_idx = stock_report_engine.report_product_index()   # {real name lower: (order, display)}
     entries = (statement.entries
                .select_related("bmc_or_mcc", "product")
-               .order_by("bmc_or_mcc__name", "product__name"))
+               .order_by("bmc_or_mcc__name"))
     groups = {}
     for e in entries:
+        ri = report_idx.get(e.product.name.strip().lower())
+        if ri is None:
+            continue   # only the standard report products are shown
+        order, display = ri
         g = groups.setdefault(e.bmc_or_mcc.name, {"bmc": e.bmc_or_mcc.name, "bmc_id": e.bmc_or_mcc_id,
                                                   "open": e.bmc_or_mcc_id in open_ids, "rows": [],
                                                   "totals": {"opening": 0, "received": 0, "received_mcc": 0,
                                                              "transfer": 0, "sale": 0, "damage": 0,
                                                              "expire": 0, "closing": 0}})
         g["rows"].append({
-            "id": e.id, "product": e.product.name,
+            "id": e.id, "product": display, "_order": order,
             "opening": e.opening_balance, "received": e.received, "received_mcc": e.received_mcc,
             "transfer": e.stock_transfer,
             "sale": e.mpp_sale, "damage": e.damage, "expire": e.expire,
@@ -30982,6 +30988,8 @@ def _serialize_statement(statement):
         t["opening"] += e.opening_balance; t["received"] += e.received; t["received_mcc"] += e.received_mcc
         t["transfer"] += e.stock_transfer; t["sale"] += e.mpp_sale
         t["damage"] += e.damage; t["expire"] += e.expire; t["closing"] += e.closing_balance
+    for g in groups.values():
+        g["rows"].sort(key=lambda r: r.pop("_order"))
 
     unmatched = [{
         "plant": a.sap_plant, "mcc": a.sap_mcc_name,
@@ -31093,20 +31101,21 @@ def stock_report_upload_sale(request):
 @login_required(login_url='login')
 @require_GET
 def stock_report_download(request):
-    """Step 3: download the formatted report workbook (one sheet per BMC/MCC)."""
+    """Download the whole month's report (one sheet per BMC/MCC with every cycle stacked,
+    plus the SMPCL summary) — same layout as the uploaded file."""
     if not request.user.is_superuser:
         return HttpResponseForbidden("You don't have permission to access the stock report.")
     cycle = get_object_or_404(Cycle, id=request.GET.get("cycle"))
-    statement = StockStatement.objects.filter(cycle=cycle).first()
-    if not statement:
+    mc = cycle.monthly_cycle
+    if not StockStatement.objects.filter(cycle__monthly_cycle=mc).exists():
         return HttpResponseForbidden("Generate the statement first.")
-    bio = stock_report_engine.build_workbook(statement, include_summary=True)
-    safe_cycle = re.sub(r"[^A-Za-z0-9_-]+", "_", cycle.name or f"cycle_{cycle.id}")
+    bio = stock_report_engine.build_month_workbook(mc, include_summary=True)
+    safe = re.sub(r"[^A-Za-z0-9_-]+", "_", f"{mc.month}_{mc.year}" if mc else (cycle.name or f"cycle_{cycle.id}"))
     response = HttpResponse(
         bio.getvalue(),
         content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
     )
-    response["Content-Disposition"] = f'attachment; filename="Sale_Stock_Report_{safe_cycle}.xlsx"'
+    response["Content-Disposition"] = f'attachment; filename="Sale_Stock_Report_{safe}.xlsx"'
     return response
 
 
@@ -31152,29 +31161,47 @@ def stock_report_upload_full(request):
     """
     if not request.user.is_superuser:
         return _stock_report_forbidden()
-    cycle = get_object_or_404(Cycle, id=request.POST.get("cycle"))
+    selected_cycle = get_object_or_404(Cycle, id=request.POST.get("cycle"))
     upload = request.FILES.get("file")
     if not upload:
         return JsonResponse({"success": False, "error": "No file uploaded."}, status=400)
     if not upload.name.lower().endswith((".xlsx", ".xls")):
         return JsonResponse({"success": False, "error": "Please upload an .xlsx / .xls file."}, status=400)
 
-    statement = StockStatement.objects.filter(cycle=cycle).first()
-    if not statement:
-        return JsonResponse({"success": False, "error": "Generate the statement first, then upload a corrected copy."}, status=400)
-
     raw = upload.read()
     try:
+        # The reader handles the whole workbook: every location sheet, every cycle block.
         with transaction.atomic():
-            result = stock_report_engine.ingest_full_report(statement, io.BytesIO(raw))
-        data = _serialize_statement(statement)
+            result = stock_report_engine.ingest_full_report(io.BytesIO(raw))
+        filled = result.get("cycles_filled", {})
+        if not filled:
+            return JsonResponse({"success": False, "error": (
+                "No cycle data found in the file. Each sheet needs a 'Sale Report Cycle-DD-DD "
+                "Mon-YYYY' line, and the cycle(s) must exist in the system.")}, status=400)
+
+        # Show the selected cycle if the file filled it, else the first cycle it did fill.
+        show_cycle = selected_cycle
+        if selected_cycle.name not in filled:
+            first_name = next(iter(filled))
+            show_cycle = (Cycle.objects.filter(name=first_name,
+                          monthly_cycle=selected_cycle.monthly_cycle).first()
+                          or Cycle.objects.filter(name=first_name).first() or selected_cycle)
+        statement = StockStatement.objects.filter(cycle=show_cycle).first()
+        data = _serialize_statement(statement) if statement else {"exists": True, "groups": []}
+
+        cyc_list = ", ".join(f"{k} ({v} rows)" for k, v in filled.items())
+        loc_note = ""
+        if result.get("unmatched_locations"):
+            loc_note = " Unmatched locations: " + ", ".join(result["unmatched_locations"][:6]) + "."
         data.update({
             "success": True, "exists": True,
-            "message": (f"Report updated from Excel: {result['updated']} entries overwritten"
-                        + (f", {result.get('created', 0)} new created" if result.get('created') else "")
+            "cycle_id": show_cycle.id, "cycle_name": show_cycle.name,
+            "message": (f"Uploaded from Excel — filled {len(filled)} cycle(s): {cyc_list}. "
+                        f"{result['updated']} entries updated"
+                        + (f", {result['created']} created" if result.get('created') else "")
                         + (f", {result['unmatched_rows']} rows skipped." if result['unmatched_rows'] else ".")
-                        + " Later cycles' openings were carried forward. Auto-refresh is paused —"
-                        + " click Generate / Refresh to recompute from inventory."),
+                        + loc_note
+                        + " Openings carried forward; auto-refresh paused (Generate/Refresh to recompute)."),
             "result": result,
         })
         return JsonResponse(data)
@@ -31305,16 +31332,19 @@ def _resolve_user_bmc(user):
 
 
 def _serialize_location_statement(statement, bmc):
-    """JSON view of one location's rows within a statement."""
-    entries = (statement.entries.filter(bmc_or_mcc=bmc)
-               .select_related("product")
-               .order_by("product__name"))
+    """JSON view of one location's rows within a statement (fixed report products, in order)."""
+    report_idx = stock_report_engine.report_product_index()
+    entries = (statement.entries.filter(bmc_or_mcc=bmc).select_related("product"))
     rows = []
     totals = {"opening": 0, "received": 0, "received_mcc": 0, "transfer": 0,
               "sale": 0, "damage": 0, "expire": 0, "closing": 0}
     for e in entries:
+        ri = report_idx.get(e.product.name.strip().lower())
+        if ri is None:
+            continue
+        order, display = ri
         rows.append({
-            "id": e.id, "product": e.product.name,
+            "id": e.id, "product": display, "_order": order,
             "opening": e.opening_balance, "received": e.received, "received_mcc": e.received_mcc,
             "transfer": e.stock_transfer,
             "sale": e.mpp_sale, "damage": e.damage, "expire": e.expire,
@@ -31324,6 +31354,7 @@ def _serialize_location_statement(statement, bmc):
         totals["received_mcc"] += e.received_mcc
         totals["transfer"] += e.stock_transfer; totals["sale"] += e.mpp_sale
         totals["damage"] += e.damage; totals["expire"] += e.expire; totals["closing"] += e.closing_balance
+    rows.sort(key=lambda r: r.pop("_order"))
     is_open = bmc.id in _open_location_ids(statement)
     finalized = statement.status == StockStatement.STATUS_FINALIZED
     return {
@@ -31431,11 +31462,11 @@ def location_stock_report_download(request):
     if bmc is None:
         return HttpResponseForbidden("Your account is not linked to any MCC/BMC location.")
     cycle = get_object_or_404(Cycle, id=request.GET.get("cycle"))
-    statement = StockStatement.objects.filter(cycle=cycle).first()
-    if not statement:
-        return HttpResponseForbidden("No statement exists for this cycle yet.")
-    bio = stock_report_engine.build_workbook(statement, only_bmc=bmc)
-    safe_cycle = re.sub(r"[^A-Za-z0-9_-]+", "_", cycle.name or f"cycle_{cycle.id}")
+    mc = cycle.monthly_cycle
+    if not StockStatement.objects.filter(cycle__monthly_cycle=mc).exists():
+        return HttpResponseForbidden("No statement exists for this month yet.")
+    bio = stock_report_engine.build_month_workbook(mc, only_bmc=bmc, include_summary=False)
+    safe_cycle = re.sub(r"[^A-Za-z0-9_-]+", "_", f"{mc.month}_{mc.year}" if mc else (cycle.name or f"cycle_{cycle.id}"))
     safe_loc = re.sub(r"[^A-Za-z0-9_-]+", "_", bmc.name or "location")
     response = HttpResponse(
         bio.getvalue(),

@@ -303,11 +303,11 @@
                           </button>
                         </div>
                       {% elif requisition.status == "APPROVED FOR TRANSFER" %}
-                        <a href="{% url 'do_grn_against_stn' requisition.stn_number %}" 
-                           class="action-btn-small primary">
-                          <i class="fas fa-clipboard-check"></i>
-                          <span>GRN via STN</span>
-                        </a>
+                        {# Legacy status — stock now moves through the STN create/receive flow #}
+                        <div class="grn-info">
+                          <i class="fas fa-exchange-alt"></i>
+                          <span>Handled via Stock Transfer</span>
+                        </div>
                       {% elif requisition.status not in "APPROVED,REJECTED,PO GENERATED,APPROVED FOR TRANSFER" %}
                         <div class="action-buttons">
                           <button class="action-btn-small edit-btn" 

@@ -184,13 +184,6 @@ urlpatterns = [
         views.dispatch_selected_items,
         name="dispatch_selected_items",
     ),
-    path("save_grn_of_stn/", views.save_grn_of_stn, name="save_grn_of_stn"),
-    path(
-        "do_grn_against_stn/<path:stn_number>",
-        views.do_grn_against_stn,
-        name="do_grn_against_stn",
-    ),
-    path("get_stn_data/", views.get_stn_data, name="get_stn_data"),
     path(
         "inventory-by-location/",
         views.inventory_by_location,

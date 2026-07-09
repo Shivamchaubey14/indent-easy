@@ -8,7 +8,7 @@
   <aside class="sr-side">
     <div class="sr-side-content">
       <div class="sr-side-welcome">
-        <h2 class="sr-side-title">Welcome! <span>👋</span></h2>
+        <h2 class="sr-side-title">Welcome! <span class="sr-wave">👋</span></h2>
         <p class="sr-side-name">{{ request.user.first_name }} {{ request.user.last_name }}</p>
         <div class="sr-side-badges">
           <span class="sr-side-badge"><i class="fas fa-id-badge"></i> {{ request.user.employee_code }}</span>
@@ -196,20 +196,25 @@
 <style>
   .sr-layout { display:flex; align-items:stretch; min-height:calc(100vh - 90px); background:#fff; }
   .sr-main { flex:1; min-width:0; }
-  .sr-side { width:300px; flex-shrink:0; background:#313647; color:#fff; padding:2rem 1.5rem; border-radius:0 20px 20px 0; }
-  .sr-side-content { display:flex; flex-direction:column; gap:1.75rem; }
-  .sr-side-welcome { text-align:center; padding-bottom:1.25rem; border-bottom:1px solid rgba(255,255,255,.1); }
-  .sr-side-title { font-size:1.35rem; font-weight:600; color:#A3B087; margin:0 0 .4rem; }
-  .sr-side-name { font-size:1.05rem; color:#FFF8D4; font-weight:500; margin:0 0 .8rem; }
+  /* Sidebar — mirrors .sidebar / .action-btn on the Admin Dashboard; keep the two in sync */
+  .sr-side { width:320px; flex-shrink:0; background:#313647; color:#fff; padding:2rem 1.5rem; border-radius:0 20px 20px 0;
+             box-shadow:2px 0 20px rgba(0,0,0,.1); position:sticky; top:90px; min-height:calc(100vh - 90px);
+             overflow-y:auto; margin-top:40px; margin-left:10px; }
+  .sr-side-content { display:flex; flex-direction:column; gap:2rem; }
+  .sr-side-welcome { text-align:center; padding-bottom:1.5rem; border-bottom:1px solid rgba(255,255,255,.1); }
+  .sr-side-title { font-size:1.5rem; font-weight:600; color:#A3B087; margin:0 0 .5rem; }
+  .sr-side-title .sr-wave { display:inline-block; animation:sr-wave 1.5s ease-in-out infinite; }
+  @keyframes sr-wave { 0%,100% { transform:rotate(0deg); } 25% { transform:rotate(15deg); } 75% { transform:rotate(-10deg); } }
+  .sr-side-name { font-size:1.1rem; color:#FFF8D4; font-weight:500; margin:0 0 1rem; }
   .sr-side-badges { display:flex; flex-direction:column; gap:.5rem; align-items:center; }
-  .sr-side-badge { display:inline-flex; align-items:center; gap:.5rem; padding:.35rem .8rem; background:rgba(163,176,135,.12); border-radius:20px; font-size:.82rem; color:rgba(255,255,255,.9); }
+  .sr-side-badge { display:inline-flex; align-items:center; gap:.5rem; padding:.4rem .8rem; background:rgba(163,176,135,.1); border-radius:20px; font-size:.85rem; color:rgba(255,255,255,.9); }
   .sr-side-badge i { color:#A3B087; }
-  .sr-side-group { display:flex; flex-direction:column; gap:.7rem; }
-  .sr-side-heading { font-size:1.05rem; color:#FFF8D4; font-weight:500; margin:0 0 .3rem; }
-  .sr-side-btn { display:flex; align-items:center; gap:.75rem; padding:.8rem 1rem; background:rgba(163,176,135,.1); color:#FFF8D4; text-decoration:none; border-radius:10px; border:1px solid rgba(163,176,135,.2); transition:all .25s ease; font-size:.9rem; }
-  .sr-side-btn:hover { background:rgba(163,176,135,.22); color:#fff; transform:translateX(4px); }
+  .sr-side-group { display:flex; flex-direction:column; gap:.75rem; }
+  .sr-side-heading { font-size:1.1rem; color:#FFF8D4; font-weight:500; margin:0 0 .5rem; }
+  .sr-side-btn { display:flex; align-items:center; gap:.75rem; padding:.875rem 1rem; background:rgba(163,176,135,.1); color:#FFF8D4; text-decoration:none; border-radius:10px; border:1px solid rgba(163,176,135,.2); transition:all .3s ease; }
+  .sr-side-btn:hover { background:rgba(163,176,135,.2); color:#fff; transform:translateX(5px); }
   .sr-side-btn.active { background:rgba(163,176,135,.3); color:#fff; border-color:#A3B087; box-shadow:0 0 0 2px #A3B087; }
-  .sr-side-btn i { color:#A3B087; font-size:1.05rem; width:18px; text-align:center; }
+  .sr-side-btn i { color:#A3B087; font-size:1.1rem; width:18px; text-align:center; }
   .sr-side-btn span { flex:1; }
   .sr-modal-overlay { position:fixed; inset:0; background:rgba(49,54,71,.55); display:flex; align-items:center; justify-content:center; z-index:1000; padding:1rem; }
   .sr-modal { background:#fff; border-radius:14px; padding:1.4rem 1.5rem; width:100%; max-width:430px; box-shadow:0 12px 40px rgba(0,0,0,.25); display:flex; flex-direction:column; gap:.9rem; }

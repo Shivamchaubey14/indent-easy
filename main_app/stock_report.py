@@ -38,6 +38,7 @@ from .models import (
     MPPWithCode,
     Product,
     ProductMapping,
+    StockReportProduct,
     StockStatement,
     StockStatementEntry,
     MPPSaleAggregate,
@@ -220,20 +221,9 @@ REPORT_ORDER = [
 ]
 
 
-def report_product_index():
-    """{real product-name (lower): (order, smpcl_display_name)} for the fixed report list.
-    Used to restrict and order the report to the standard product set."""
-    cache = build_product_norm_cache()
-    idx = {}
-    for pos, smpcl in enumerate(REPORT_ORDER):
-        p = resolve_product_by_name(smpcl, cache, create=False)
-        if p:
-            idx.setdefault(p.name.strip().lower(), (pos, smpcl))
-    return idx
-
-
 def report_products():
-    """Ordered [(Product, display_name)] for the fixed report set (skips any unresolved)."""
+    """Ordered [(Product, display_name)] for the report — the fixed REPORT_ORDER set plus
+    any admin-added StockReportProduct extras, each inserted at its saved position."""
     cache = build_product_norm_cache()
     out, seen = [], set()
     for smpcl in REPORT_ORDER:
@@ -241,22 +231,52 @@ def report_products():
         if p and p.id not in seen:
             out.append((p, smpcl))
             seen.add(p.id)
+    for extra in StockReportProduct.objects.select_related("product").order_by("position", "id"):
+        p = extra.product
+        if p.id in seen:
+            continue
+        pos = min(max(extra.position, 0), len(out))
+        out.insert(pos, (p, extra.display_name or p.name))
+        seen.add(p.id)
     return out
+
+
+def report_product_index():
+    """{real product-name (lower): (order, display_name)} for the report product list.
+    Used to restrict and order the report to the standard product set."""
+    idx = {}
+    for pos, (p, display) in enumerate(report_products()):
+        idx.setdefault(p.name.strip().lower(), (pos, display))
+    return idx
+
+
+def report_location_restrictions():
+    """{product_id: set(bmc_ids)} for admin-added report products that are limited to
+    specific locations. Products absent from the dict show for every location."""
+    restrict = {}
+    for extra in StockReportProduct.objects.prefetch_related("locations"):
+        loc_ids = {b.id for b in extra.locations.all()}
+        if loc_ids:
+            restrict[extra.product_id] = loc_ids
+    return restrict
 
 
 def ensure_all_locations(statement):
     """Create zero entries so EVERY MCC/BMC shows EVERY report product, even a location with
     no data (so e.g. DURJANPURGHAT still appears with all zeros). Additive only — never
-    touches existing entries, so it's safe on a manually-overridden statement."""
+    touches existing entries, so it's safe on a manually-overridden statement.
+    Admin-added products limited to specific locations are only created there."""
     pids = [p.id for p, _d in report_products()]
     if not pids:
         return 0
+    restrict = report_location_restrictions()
     existing = {(e.bmc_or_mcc_id, e.product_id) for e in statement.entries.all()}
     to_create = [
         StockStatementEntry(statement=statement, bmc_or_mcc_id=b.id, product_id=pid)
         for b in BMCOrMCC.objects.all()
         for pid in pids
         if (b.id, pid) not in existing
+        and (pid not in restrict or b.id in restrict[pid])
     ]
     if to_create:
         StockStatementEntry.objects.bulk_create(to_create, batch_size=1000)

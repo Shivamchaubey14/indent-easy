@@ -31244,6 +31244,62 @@ def stock_report_download_sale(request):
 
 
 @login_required(login_url='login')
+@require_GET
+def stock_report_product_options(request):
+    """Options for the 'Add Product to Report' modal: the current report order, the
+    products not yet on the report, and every location."""
+    if not request.user.is_superuser:
+        return JsonResponse({"success": False, "error": "Not allowed."}, status=403)
+    current = stock_report_engine.report_products()
+    in_report = {p.id for p, _d in current}
+    return JsonResponse({
+        "success": True,
+        "report": [{"position": i, "product_id": p.id, "display": d}
+                   for i, (p, d) in enumerate(current)],
+        "products": [{"id": p.id, "name": p.name}
+                     for p in Product.objects.exclude(id__in=in_report).order_by("name")],
+        "locations": [{"id": b.id, "name": b.name} for b in BMCOrMCC.objects.order_by("name")],
+    })
+
+
+@login_required(login_url='login')
+@require_POST
+def stock_report_add_product(request):
+    """Admin adds a NEW product to the Sale & Stock Report: pick the product, where it sits
+    in the report order, and whether it applies to every location or just one. Zero entries
+    are created on every statement that is still editable, so the product shows up at once;
+    freshly generated statements include it automatically via ensure_all_locations()."""
+    if not request.user.is_superuser:
+        return JsonResponse({"success": False, "error": "Not allowed."}, status=403)
+    try:
+        payload = json.loads(request.body.decode("utf-8"))
+    except (ValueError, AttributeError):
+        return JsonResponse({"success": False, "error": "Invalid data."}, status=400)
+    product = get_object_or_404(Product, id=payload.get("product_id"))
+    if product.name.strip().lower() in stock_report_engine.report_product_index():
+        return JsonResponse({"success": False,
+                             "error": f'"{product.name}" is already on the report.'}, status=400)
+    try:
+        position = max(0, int(payload.get("position")))
+    except (TypeError, ValueError):
+        position = len(stock_report_engine.report_products())   # default: at the end
+    display = str(payload.get("display_name") or "").strip()[:255]
+    scope = (payload.get("scope") or "all").lower()
+    bmc = None
+    if scope == "one":
+        bmc = get_object_or_404(BMCOrMCC, id=payload.get("bmc_id"))
+    with transaction.atomic():
+        extra, _created = StockReportProduct.objects.update_or_create(
+            product=product, defaults={"display_name": display, "position": position})
+        extra.locations.set([bmc] if bmc else [])
+        for st in StockStatement.objects.exclude(status=StockStatement.STATUS_FINALIZED):
+            stock_report_engine.ensure_all_locations(st)
+    where = f"only for {bmc.name}" if bmc else "for all locations"
+    return JsonResponse({"success": True,
+                         "message": f'Added "{display or product.name}" to the report {where}.'})
+
+
+@login_required(login_url='login')
 @require_POST
 def stock_report_upload_filled(request):
     """Step 4: read Damage/Expire back from the filled report, recompute Closing, finalize."""

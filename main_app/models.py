@@ -2406,6 +2406,26 @@ class StockStatementEntry(models.Model):
         return f"{self.bmc_or_mcc.name} / {self.product.name} = {self.closing_balance}"
 
 
+class StockReportProduct(models.Model):
+    """
+    Admin-added extension of the fixed Sale & Stock Report product list (REPORT_ORDER in
+    stock_report.py). Each row inserts one extra product into the report at `position`
+    (a 0-based index within the combined order). If `locations` is empty the product shows
+    for every MCC/BMC; otherwise only for the selected locations.
+    """
+    product = models.OneToOneField('Product', on_delete=models.CASCADE, related_name='report_extra')
+    display_name = models.CharField(max_length=255, blank=True, default='')
+    position = models.PositiveIntegerField(default=0)
+    locations = models.ManyToManyField('BMCOrMCC', blank=True, related_name='extra_report_products')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['position', 'id']
+
+    def __str__(self):
+        return f"{self.display_name or self.product.name} @ {self.position}"
+
+
 class MPPSaleAggregate(models.Model):
     """
     Per-MPP x product aggregation of the uploaded SAP sale export (the drill-down that

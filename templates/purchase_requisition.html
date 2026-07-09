@@ -289,6 +289,9 @@
         <div class="selected-info" id="selectedInfo" style="display: none;">
           <i class="fas fa-check-circle"></i>
           <span id="selectedCount">0</span> items selected
+          <button type="button" class="bulk-po-btn" id="bulkPoBtn" data-bs-toggle="modal" data-bs-target="#bulkPOModal">
+            <i class="fas fa-file-invoice"></i> Add PO for Selected
+          </button>
         </div>
         <div class="table-filters">
           <button class="filter-btn active" data-filter="all">
@@ -307,6 +310,9 @@
         <table class="modern-table" id="purchaseTable">
           <thead>
             <tr>
+              <th class="checkbox-col">
+                <input type="checkbox" id="selectAllPO" class="table-checkbox" title="Select all approved items" />
+              </th>
               <th>Requisition No.</th>
               <th>Date & Time</th>
               <th>Details</th>
@@ -321,9 +327,20 @@
           <tbody>
             {% if requisitions %}
               {% for requisition in requisitions %}
-                <tr class="table-row" 
+                <tr class="table-row"
                     id="requisition-{{ requisition.id }}"
                     data-status="{{ requisition.status|default:'PENDING' }}">
+                  <td class="checkbox-col">
+                    {% if requisition.status == "APPROVED" %}
+                      <input type="checkbox"
+                             class="table-checkbox po-select-checkbox"
+                             value="{{ requisition.id }}"
+                             data-req="{{ requisition.requisition_number }}"
+                             data-item="{{ requisition.stock_item }}"
+                             data-qty="{{ requisition.quantity }}"
+                             data-vendors="{% for pv in requisition.product_vendors %}{{ pv.vendors|join:'||' }}{% endfor %}">
+                    {% endif %}
+                  </td>
                   <td>
                     <div class="requisition-number-cell">
                       <span class="req-number">
@@ -454,7 +471,7 @@
               {% endfor %}
             {% else %}
               <tr>
-                <td colspan="9" class="empty-state">
+                <td colspan="10" class="empty-state">
                   <div class="empty-state-content">
                     <i class="fas fa-inbox"></i>
                     <h3>No Requisitions Found</h3>
@@ -670,6 +687,118 @@
   </div>
   {% endif %}
 {% endfor %}
+
+<!-- Bulk Add PO Modal: one PO number covering every selected approved item -->
+<div class="modal fade" id="bulkPOModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered modal-lg modal-dialog-scrollable">
+    <div class="modal-content modern-modal">
+      <div class="modal-header">
+        <h5 class="modal-title">
+          <i class="fas fa-file-invoice"></i>
+          Add PO for Selected Items
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <form method="post" action="{% url 'view_purchase_requisitions' %}" id="bulkPurchaseForm">
+          {% csrf_token %}
+          <input type="hidden" name="sap_po_selected" value="false">
+          <input type="hidden" name="sap_po_id" value="">
+          <div id="bulkReqIds"></div>
+
+          <div class="form-section product-section">
+            <div class="section-header">
+              <i class="fas fa-boxes"></i>
+              <h6>Selected Items (<span id="bulkItemCount">0</span>)</h6>
+            </div>
+            <ul class="bulk-items-list" id="bulkItemsList"></ul>
+            <small class="form-text">
+              <i class="fas fa-info-circle"></i>
+              All the items above will be stamped with the SAME PO number.
+            </small>
+          </div>
+
+          <div class="form-grid">
+            <div class="form-column">
+              <div class="form-section">
+                <div class="section-header">
+                  <i class="fas fa-pencil-alt"></i>
+                  <h6>PO Number</h6>
+                </div>
+                <div class="form-group">
+                  <label for="bulk_po_number">
+                    <i class="fas fa-file-invoice"></i>
+                    PO Number (SAP Format)
+                  </label>
+                  <input type="text"
+                         id="bulk_po_number"
+                         name="po_number"
+                         class="form-control"
+                         placeholder="Enter 10-digit SAP PO Number"
+                         required
+                         pattern="[0-9]{10}"
+                         title="Please enter a 10-digit SAP PO number" />
+                  <div class="form-text">
+                    <i class="fas fa-info-circle"></i>
+                    Enter the 10-digit SAP PO number (e.g., 4500000001)
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="form-column">
+              <div class="form-section">
+                <div class="section-header">
+                  <i class="fas fa-building"></i>
+                  <h6>Vendor &amp; Notification</h6>
+                </div>
+                <div class="form-group">
+                  <label for="bulk_party_name">
+                    <i class="fas fa-user-tie"></i>
+                    Vendor Name
+                  </label>
+                  <select id="bulk_party_name" name="party_name" class="form-control" required>
+                    <option value="" disabled selected>Select Vendor</option>
+                  </select>
+                  <div class="form-text">
+                    <i class="fas fa-info-circle"></i>
+                    Vendors offered are those mapped to the selected products
+                  </div>
+                </div>
+                <div class="form-group">
+                  <label for="bulk_email">
+                    <i class="fas fa-at"></i>
+                    Notification Email
+                  </label>
+                  <input type="text"
+                         id="bulk_email"
+                         name="email"
+                         class="form-control"
+                         placeholder="Enter recipient email(s) separated by commas"
+                         required />
+                  <div class="form-text">
+                    <i class="fas fa-info-circle"></i>
+                    Vendor email will be auto-filled based on selection
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="form-actions">
+            <button type="button" class="btn-secondary" data-bs-dismiss="modal">
+              <i class="fas fa-times"></i>
+              <span class="btn-text">Cancel</span>
+            </button>
+            <button type="submit" class="btn-primary" id="bulkSubmitBtn">
+              <i class="fas fa-paper-plane"></i>
+              <span class="btn-text">Submit PO for All</span>
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
@@ -1992,6 +2121,54 @@
 
   .selected-info i {
     color: var(--success);
+  }
+
+  .bulk-po-btn {
+    margin-left: 0.75rem;
+    padding: 0.45rem 0.9rem;
+    border: none;
+    border-radius: 8px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    background: var(--primary-dark);
+    color: white;
+    white-space: nowrap;
+  }
+
+  .bulk-po-btn:hover {
+    background: var(--primary-light);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(49, 54, 71, 0.3);
+  }
+
+  .checkbox-col {
+    width: 40px;
+    text-align: center;
+  }
+
+  .table-checkbox {
+    width: 17px;
+    height: 17px;
+    cursor: pointer;
+    accent-color: var(--accent-green);
+  }
+
+  .bulk-items-list {
+    margin: 0 0 0.5rem;
+    padding-left: 1.2rem;
+    max-height: 160px;
+    overflow-y: auto;
+    font-size: 0.9rem;
+    color: var(--text-dark);
+  }
+
+  .bulk-items-list li {
+    margin-bottom: 0.25rem;
   }
 
   .table-filters {
@@ -4145,7 +4322,10 @@ $(document).ready(function () {
               productInfo = '<div class="product-name">' + requisition.stock_item + '</div>';
             }
 
+            // Search results can't carry the vendor list, so their checkbox stays off —
+            // clear the search to bulk-select these rows.
             var row = '<tr class="table-row" data-status="' + requisition.status + '">' +
+              '<td class="checkbox-col"></td>' +
               '<td><div class="requisition-number-cell"><span class="req-number">' + requisition.requisition_number + '</span></div></td>' +
               '<td><div class="datetime-cell"><span class="date-text">' + requisition.date_of_request + '</span><span class="time-text">' + requisition.time_of_request + '</span></div></td>' +
               '<td><div class="details-cell"><div class="detail-row"><i class="fas fa-user"></i><span>' + requisition.employee_name + '</span></div><div class="detail-row"><i class="fas fa-building"></i><span>' + requisition.department + '</span></div><div class="detail-row"><i class="fas fa-map-marker-alt"></i><span>' + requisition.location + '</span></div></div></td>' +
@@ -4161,7 +4341,7 @@ $(document).ready(function () {
           console.log('[UI] Added', data.results.length, 'rows to table');
         } else {
           console.log('[SEARCH] No results found for query');
-          $('#purchaseTable tbody').append('<tr><td colspan="9" class="empty-state"><div class="empty-state-content"><i class="fas fa-inbox"></i><h3>No Results Found</h3><p>No requisitions match your search criteria.</p></div></td></tr>');
+          $('#purchaseTable tbody').append('<tr><td colspan="10" class="empty-state"><div class="empty-state-content"><i class="fas fa-inbox"></i><h3>No Results Found</h3><p>No requisitions match your search criteria.</p></div></td></tr>');
         }
       },
       error: function(xhr, errmsg, err) {
@@ -4176,6 +4356,56 @@ $(document).ready(function () {
     });
   });
   
+  // ================= BULK PO SELECTION =================
+  // Checkboxes on APPROVED rows feed the "Add PO for Selected" modal: one PO number
+  // gets stamped on every selected requisition (backend: requisition_ids[]).
+  function updatePoSelection() {
+    const count = $('.po-select-checkbox:checked').length;
+    $('#selectedCount').text(count);
+    $('#selectedInfo').toggle(count > 0);
+  }
+  $(document).on('change', '.po-select-checkbox', updatePoSelection);
+  $('#selectAllPO').on('change', function () {
+    $('.po-select-checkbox').prop('checked', this.checked);
+    updatePoSelection();
+  });
+
+  // Fill the bulk modal each time it opens: item list, hidden ids, vendor union
+  $('#bulkPOModal').on('show.bs.modal', function () {
+    const boxes = $('.po-select-checkbox:checked');
+    const list = $('#bulkItemsList').empty();
+    const idsBox = $('#bulkReqIds').empty();
+    const vendorSet = {};
+    boxes.each(function () {
+      const b = $(this);
+      list.append($('<li>').text(b.data('req') + ' — ' + b.data('item') + ' × ' + b.data('qty')));
+      idsBox.append($('<input>', { type: 'hidden', name: 'requisition_ids[]', value: b.val() }));
+      String(b.data('vendors') || '').split('||').forEach(function (v) {
+        if (v) vendorSet[v] = true;
+      });
+    });
+    $('#bulkItemCount').text(boxes.length);
+    const sel = $('#bulk_party_name')
+      .empty()
+      .append('<option value="" disabled selected>Select Vendor</option>');
+    Object.keys(vendorSet).sort().forEach(function (v) {
+      sel.append($('<option>', { value: v, text: v }));
+    });
+    $('#bulk_email').val('');
+  });
+
+  // Don't open an empty modal
+  $('#bulkPoBtn').on('click', function (e) {
+    if (!$('.po-select-checkbox:checked').length) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+  });
+
+  $('#bulkPurchaseForm').on('submit', function () {
+    $('#bulkSubmitBtn').prop('disabled', true);
+  });
+
   console.log('[INIT] All JavaScript initialization complete');
 });
 </script>

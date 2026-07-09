@@ -9925,30 +9925,41 @@ def view_purchase_requisitions(request):
         po_number = request.POST.get("po_number")
         party_name = request.POST.get("party_name")
         email = request.POST.get("email")
-        requisition_id = request.POST.get("requisition_id")
         sap_po_selected = request.POST.get("sap_po_selected", "false") == "true"
         sap_po_id = request.POST.get("sap_po_id")
 
-        if not requisition_id:
+        # One PO can cover several items: the bulk modal posts requisition_ids[],
+        # the per-row modal posts a single requisition_id. Same handling either way.
+        requisition_ids = request.POST.getlist("requisition_ids[]")
+        single_id = request.POST.get("requisition_id")
+        if not requisition_ids and single_id:
+            requisition_ids = [single_id]
+
+        if not requisition_ids:
             return redirect("view_purchase_requisitions")
 
-        try:
-            requisition = PurchaseRequisition.objects.get(id=requisition_id)
-
+        # Keep only requisitions that are HOD-approved and don't have a PO yet
+        requisitions_to_po = []
+        for rid in requisition_ids:
+            try:
+                r = PurchaseRequisition.objects.get(id=rid)
+            except (PurchaseRequisition.DoesNotExist, ValueError):
+                continue
             hod_approval = HODApproval.objects.filter(
-                requisition=requisition,
-                status="APPROVED"
-            ).first()
+                requisition=r, status="APPROVED").first()
+            if hod_approval and r.status != "PO GENERATED":
+                requisitions_to_po.append(r)
 
-            if not hod_approval or requisition.status == "PO GENERATED":
-                return redirect("view_purchase_requisitions")
+        if not requisitions_to_po:
+            return redirect("view_purchase_requisitions")
 
-            # ========== SAP PO VALIDATION (NO is_used UPDATE) ==========
-            if sap_po_selected and sap_po_id:
-                try:
-                    sap_po = SAPMaterialPOMapping.objects.get(id=sap_po_id)
+        # ========== SAP PO VALIDATION (NO is_used UPDATE) ==========
+        if sap_po_selected and sap_po_id:
+            try:
+                sap_po = SAPMaterialPOMapping.objects.get(id=sap_po_id)
 
-                    # Resolve requisition product group
+                # Validate the group match for every item this PO will cover
+                for requisition in requisitions_to_po:
                     product_group = None
                     indent_mapping = ProductMapping.objects.filter(
                         system='INDENT_EASY',
@@ -9963,7 +9974,6 @@ def view_purchase_requisitions(request):
                         if relation and relation.group:
                             product_group = relation.group
 
-                    # Validate group match
                     if product_group and sap_po.product_group != product_group:
                         messages.error(
                             request,
@@ -9971,25 +9981,28 @@ def view_purchase_requisitions(request):
                         )
                         return redirect("view_purchase_requisitions")
 
-                    # ✅ AUDIT ONLY (DO NOT SET is_used = True)
-                    sap_po.used_in_requisition = requisition
-                    sap_po.used_by = request.user
-                    sap_po.used_at = timezone.now()
-                    sap_po.save(update_fields=[
-                        'used_in_requisition',
-                        'used_by',
-                        'used_at'
-                    ])
+                # ✅ AUDIT ONLY (DO NOT SET is_used = True)
+                sap_po.used_in_requisition = requisitions_to_po[0]
+                sap_po.used_by = request.user
+                sap_po.used_at = timezone.now()
+                sap_po.save(update_fields=[
+                    'used_in_requisition',
+                    'used_by',
+                    'used_at'
+                ])
 
-                except SAPMaterialPOMapping.DoesNotExist:
-                    messages.error(request, "Selected SAP PO not found")
-                    return redirect("view_purchase_requisitions")
+            except SAPMaterialPOMapping.DoesNotExist:
+                messages.error(request, "Selected SAP PO not found")
+                return redirect("view_purchase_requisitions")
 
-            # ========== PO NUMBER GENERATION ==========
-            unique_id = uuid.uuid4()
-            po_number_with_unique_id = f"{po_number}:{unique_id}"
+        # ========== PO NUMBER GENERATION ==========
+        # One shared unique id: every selected item carries the SAME po_number, so
+        # the GRN screen sees them as one multi-item PO.
+        unique_id = uuid.uuid4()
+        po_number_with_unique_id = f"{po_number}:{unique_id}"
 
-            with transaction.atomic():
+        with transaction.atomic():
+            for requisition in requisitions_to_po:
                 requisition.po_number = po_number_with_unique_id
                 requisition.status = "PO GENERATED"
                 requisition.save()
@@ -9997,7 +10010,7 @@ def view_purchase_requisitions(request):
                 # ========== BUSINESS CRITICAL: CHECK FOR INTERNAL SUPPRESSION REMARK ==========
                 # Check if remark contains "Please Don't Mail To Vendor"
                 is_suppressed_remark = is_internal_suppression_remark(requisition.remark)
-                
+
                 # Create PurchaseDepartment with mail_sent = True if suppressed remark found
                 PurchaseDepartment.objects.create(
                     requisition=requisition,
@@ -10008,20 +10021,23 @@ def view_purchase_requisitions(request):
                     email=email,
                     mail_sent=is_suppressed_remark  # Automatically mark as sent if suppressed
                 )
-                
+
                 # Log the suppression for audit trail
                 if is_suppressed_remark:
                     print(f"SUPPRESSION: Auto-set mail_sent=True for requisition {requisition.requisition_number}")
                     print(f"REASON: Remark contains internal suppression instruction: '{requisition.remark}'")
 
+        if len(requisitions_to_po) > 1:
+            messages.success(
+                request,
+                f"PO {po_number} generated for {len(requisitions_to_po)} items."
+            )
+        else:
             messages.success(
                 request,
                 f"PO generated successfully: {po_number}"
             )
-            return redirect("view_purchase_requisitions")
-
-        except PurchaseRequisition.DoesNotExist:
-            return redirect("view_purchase_requisitions")
+        return redirect("view_purchase_requisitions")
 
     # ================= FETCH REQUISITIONS =================
     requisitions = (

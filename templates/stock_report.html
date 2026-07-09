@@ -184,6 +184,13 @@
       <select id="sapCycle" class="sr-select" disabled><option value="">— Choose cycle —</option></select>
     </div>
     <div id="sapModalMsg" class="sr-modal-msg"></div>
+    <div id="sapProgress" class="sr-progress" style="display:none;">
+      <div class="sr-progress-info">
+        <span id="sapProgressLabel">Preparing download…</span>
+        <span id="sapProgressPct">0%</span>
+      </div>
+      <div class="sr-progress-bar"><div id="sapProgressFill" class="sr-progress-fill"></div></div>
+    </div>
     <div class="sr-modal-actions">
       <button id="sapModalCancel" class="sr-btn sr-btn-ghost">Cancel</button>
       <button id="btnDownloadSap" class="sr-btn sr-btn-primary" disabled><i class="fas fa-file-download"></i> Download Excel</button>
@@ -223,6 +230,12 @@
   .sr-modal .sr-field { min-width:0; }
   .sr-modal-msg { display:none; background:rgba(220,53,69,.1); color:#c82333; border:1px solid rgba(220,53,69,.35); border-radius:9px; padding:.6rem .8rem; font-size:.85rem; }
   .sr-modal-actions { display:flex; justify-content:flex-end; gap:.6rem; margin-top:.2rem; }
+  .sr-progress { display:flex; flex-direction:column; gap:.45rem; }
+  .sr-progress-info { display:flex; justify-content:space-between; align-items:center; font-size:.85rem; font-weight:600; color:#313647; }
+  .sr-progress-bar { height:10px; background:rgba(163,176,135,.18); border-radius:20px; overflow:hidden; }
+  .sr-progress-fill { height:100%; width:0%; background:linear-gradient(135deg, #A3B087 0%, #8a9975 100%); border-radius:20px; transition:width .2s ease; }
+  .sr-progress-fill.indet { width:40%; animation:sr-indet 1.2s ease-in-out infinite; }
+  @keyframes sr-indet { from { margin-left:-40%; } to { margin-left:100%; } }
   .sr-wrap { max-width: 1200px; margin: 0 auto; padding: 2rem 1.5rem; color: #2c3e50; }
   /* Hero header — mirrors .page-header on the Admin Dashboard */
   .sr-header { background:linear-gradient(135deg, #A3B087 0%, #8a9975 100%); border-radius:20px; padding:1.5rem 2rem;
@@ -755,6 +768,7 @@
       cycleSel.innerHTML = '<option value="">— Choose cycle —</option>';
       cycleSel.disabled = true; btn.disabled = true;
       msg.style.display = 'none';
+      resetProgress();
       overlay.style.display = 'flex';
     });
     $('sapModalClose').addEventListener('click', close);
@@ -781,10 +795,21 @@
       btn.disabled = !cycleSel.value;
       msg.style.display = 'none';
     });
+    const prog = $('sapProgress'), fill = $('sapProgressFill'),
+          pctEl = $('sapProgressPct'), lbl = $('sapProgressLabel');
+    function resetProgress(){
+      prog.style.display = 'none';
+      fill.classList.remove('indet');
+      fill.style.width = '0%';
+      pctEl.textContent = '0%';
+      lbl.textContent = 'Preparing download…';
+    }
     btn.addEventListener('click', async () => {
-      if(!cycleSel.value) return;
-      busy(btn, true, 'Downloading…');
+      if(!cycleSel.value || btn.disabled) return;
+      busy(btn, true, 'Downloading…');            // disables the button until we're done
       msg.style.display = 'none';
+      resetProgress();
+      prog.style.display = 'flex';
       try {
         const res = await fetch(URLS.downloadSale + '?cycle=' + encodeURIComponent(cycleSel.value));
         if(!res.ok){
@@ -792,9 +817,37 @@
             ? await res.text()
             : 'Could not download the file (error ' + res.status + ').';
           msg.style.display = 'block';
+          resetProgress();
           return;
         }
-        const blob = await res.blob();
+        lbl.textContent = 'Downloading Excel…';
+        const total = parseInt(res.headers.get('Content-Length') || '0', 10);
+        let blob;
+        if(res.body && res.body.getReader){
+          if(!total){ fill.classList.add('indet'); pctEl.textContent = ''; }
+          const reader = res.body.getReader();
+          const chunks = [];
+          let received = 0;
+          while(true){
+            const {done, value} = await reader.read();
+            if(done) break;
+            chunks.push(value);
+            received += value.length;
+            if(total){
+              const p = Math.min(100, Math.round(received / total * 100));
+              fill.style.width = p + '%';
+              pctEl.textContent = p + '%';
+            }
+          }
+          blob = new Blob(chunks, {type: res.headers.get('Content-Type') || 'application/octet-stream'});
+        } else {
+          fill.classList.add('indet'); pctEl.textContent = '';
+          blob = await res.blob();
+        }
+        fill.classList.remove('indet');
+        fill.style.width = '100%';
+        pctEl.textContent = '100%';
+        lbl.textContent = 'Done — check your downloads.';
         const dispo = res.headers.get('Content-Disposition') || '';
         const m = dispo.match(/filename="?([^"]+)"?/);
         const a = document.createElement('a');
@@ -802,9 +855,11 @@
         a.download = m ? m[1] : 'SAP_Sale_Report.xlsx';
         document.body.appendChild(a); a.click(); a.remove();
         URL.revokeObjectURL(a.href);
+        setTimeout(resetProgress, 2000);
       } catch(err){
         msg.textContent = 'Could not download the file. Please try again.';
         msg.style.display = 'block';
+        resetProgress();
       } finally {
         busy(btn, false);
       }

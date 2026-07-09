@@ -53,7 +53,7 @@ from django.utils.timezone import localtime, make_aware, is_naive
 from openpyxl.utils import get_column_letter
 from datetime import datetime, time
 from .models import PurchaseRequisition, HODApproval, PurchaseDepartment, DoGRN, Product
-from django.http import Http404, HttpResponse, HttpResponseForbidden, JsonResponse
+from django.http import Http404, HttpResponse, HttpResponseForbidden, HttpResponseNotFound, JsonResponse
 from django.shortcuts import get_list_or_404, get_object_or_404, redirect, render
 from django.utils import timezone
 from django.contrib.admin.views.decorators import staff_member_required
@@ -31215,6 +31215,31 @@ def stock_report_download(request):
         content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
     )
     response["Content-Disposition"] = f'attachment; filename="Sale_Stock_Report_{safe}.xlsx"'
+    return response
+
+
+@login_required(login_url='login')
+@require_GET
+def stock_report_download_sale(request):
+    """Download the raw SAP sale export that was uploaded for a cycle, exactly as uploaded."""
+    if not request.user.is_superuser:
+        return HttpResponseForbidden("You don't have permission to access the stock report.")
+    cycle = get_object_or_404(Cycle, id=request.GET.get("cycle"))
+    statement = StockStatement.objects.filter(cycle=cycle).first()
+    if not statement or not statement.sale_file:
+        return HttpResponseNotFound("No SAP sale file has been uploaded for this cycle yet.")
+    try:
+        with statement.sale_file.open("rb") as f:
+            content = f.read()
+    except (FileNotFoundError, OSError):
+        return HttpResponseNotFound("The SAP sale file for this cycle is missing on the server. Please re-upload it.")
+    filename = statement.sale_file_name or os.path.basename(statement.sale_file.name)
+    if filename.lower().endswith(".xls"):
+        content_type = "application/vnd.ms-excel"
+    else:
+        content_type = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    response = HttpResponse(content, content_type=content_type)
+    response["Content-Disposition"] = f'attachment; filename="{filename.replace(chr(34), "")}"'
     return response
 
 

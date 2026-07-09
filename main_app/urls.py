@@ -12,6 +12,7 @@ urlpatterns = [
     path("stock-report/generate/", views.stock_report_generate, name="stock_report_generate"),
     path("stock-report/upload-sale/", views.stock_report_upload_sale, name="stock_report_upload_sale"),
     path("stock-report/download/", views.stock_report_download, name="stock_report_download"),
+    path("stock-report/download-sale/", views.stock_report_download_sale, name="stock_report_download_sale"),
     path("stock-report/upload-filled/", views.stock_report_upload_filled, name="stock_report_upload_filled"),
     path("stock-report/upload-full/", views.stock_report_upload_full, name="stock_report_upload_full"),
     path("stock-report/submit-damage/", views.stock_report_admin_submit, name="stock_report_admin_submit"),

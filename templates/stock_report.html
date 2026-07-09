@@ -28,6 +28,7 @@
       <div class="sr-side-group">
         <h3 class="sr-side-heading">Reports</h3>
         <a href="#" class="sr-side-btn" id="sapSaleReportBtn"><i class="fas fa-file-download"></i><span>SAP Sale Report</span></a>
+        <a href="#" class="sr-side-btn" id="addProductBtn"><i class="fas fa-plus-circle"></i><span>Add Product to Report</span></a>
       </div>
     </div>
   </aside>
@@ -198,6 +199,46 @@
   </div>
 </div>
 
+<!-- Add Product to Report modal: put a new product on the report, at a chosen position,
+     for every location or a single one -->
+<div id="addProdOverlay" class="sr-modal-overlay" style="display:none;">
+  <div class="sr-modal">
+    <div class="sr-modal-head">
+      <span><i class="fas fa-plus-circle"></i> Add Product to Report</span>
+      <button id="addProdClose" class="sr-modal-close" title="Close">&times;</button>
+    </div>
+    <p class="sr-step-desc" style="margin:0;">Put a new product on the Sale &amp; Stock Report — pick where it appears and whether it applies to every location or just one. It starts with zero balances and flows into every non-finalized cycle.</p>
+    <div class="sr-field">
+      <label for="apProduct">Product</label>
+      <select id="apProduct" class="sr-select"><option value="">— Choose product —</option></select>
+    </div>
+    <div class="sr-field">
+      <label for="apDisplay">Report name (optional)</label>
+      <input type="text" id="apDisplay" class="sr-select" placeholder="Defaults to the product name">
+    </div>
+    <div class="sr-field">
+      <label for="apPosition">Place in report</label>
+      <select id="apPosition" class="sr-select"></select>
+    </div>
+    <div class="sr-field">
+      <label>Applies to</label>
+      <div class="sr-radio-row">
+        <label class="sr-radio"><input type="radio" name="apScope" value="all" checked> All locations</label>
+        <label class="sr-radio"><input type="radio" name="apScope" value="one"> Single location</label>
+      </div>
+    </div>
+    <div class="sr-field" id="apLocField" style="display:none;">
+      <label for="apLocation">Location</label>
+      <select id="apLocation" class="sr-select"><option value="">— Choose location —</option></select>
+    </div>
+    <div id="apMsg" class="sr-modal-msg"></div>
+    <div class="sr-modal-actions">
+      <button id="apCancel" class="sr-btn sr-btn-ghost">Cancel</button>
+      <button id="btnAddProduct" class="sr-btn sr-btn-primary" disabled><i class="fas fa-plus"></i> Add to Report</button>
+    </div>
+  </div>
+</div>
+
 <style>
   .sr-layout { display:flex; align-items:stretch; min-height:calc(100vh - 90px); background:#fff; }
   .sr-main { flex:1; min-width:0; }
@@ -229,6 +270,10 @@
   .sr-modal-close:hover { color:#313647; }
   .sr-modal .sr-field { min-width:0; }
   .sr-modal-msg { display:none; background:rgba(220,53,69,.1); color:#c82333; border:1px solid rgba(220,53,69,.35); border-radius:9px; padding:.6rem .8rem; font-size:.85rem; }
+  .sr-modal-msg.ok { background:rgba(40,167,69,.1); color:#1e7e34; border-color:rgba(40,167,69,.35); }
+  .sr-radio-row { display:flex; gap:1.2rem; flex-wrap:wrap; }
+  .sr-radio { display:inline-flex; align-items:center; gap:.45rem; font-size:.92rem; color:#2c3e50; font-weight:500; cursor:pointer; margin:0; }
+  .sr-radio input { accent-color:#A3B087; width:16px; height:16px; cursor:pointer; margin:0; }
   .sr-modal-actions { display:flex; justify-content:flex-end; gap:.6rem; margin-top:.2rem; }
   .sr-progress { display:flex; flex-direction:column; gap:.45rem; }
   .sr-progress-info { display:flex; justify-content:space-between; align-items:center; font-size:.85rem; font-weight:600; color:#313647; }
@@ -293,9 +338,12 @@
   .sr-toast.info { background:rgba(23,162,184,.1); color:#0b7285; border:1px solid rgba(23,162,184,.35); }
   .sr-table-scroll { overflow-x:auto; margin-top:.8rem; }
   .sr-table { width:100%; border-collapse:collapse; font-size:.82rem; }
-  .sr-table th, .sr-table td { border:1px solid #e9ecef; padding:.45rem .6rem; text-align:left; white-space:nowrap; }
+  /* Cells wrap (product/remark can take two lines) so the table fits without a horizontal
+     scrollbar; only numbers stay on one line. The scroll container remains as a safety
+     net for very narrow screens. */
+  .sr-table th, .sr-table td { border:1px solid #e9ecef; padding:.45rem .6rem; text-align:left; }
   .sr-table th { background:#313647; color:#fff; font-weight:600; position:sticky; top:0; }
-  .sr-table td.num, .sr-table th.num { text-align:right; }
+  .sr-table td.num, .sr-table th.num { text-align:right; white-space:nowrap; }
   .sr-table tr:nth-child(even) td { background:#f8f9fa; }
   .sr-table tr.total-row td { background:#D9E1F2 !important; font-weight:700; }
   .sr-table td.neg { color:#dc3545; font-weight:600; }
@@ -369,6 +417,8 @@
     uploadSale:  "{% url 'stock_report_upload_sale' %}",
     download:    "{% url 'stock_report_download' %}",
     downloadSale:"{% url 'stock_report_download_sale' %}",
+    productOptions:"{% url 'stock_report_product_options' %}",
+    addProduct: "{% url 'stock_report_add_product' %}",
     uploadFilled:"{% url 'stock_report_upload_filled' %}",
     uploadFull:  "{% url 'stock_report_upload_full' %}",
     adminSubmit: "{% url 'stock_report_admin_submit' %}",
@@ -863,6 +913,89 @@
       } finally {
         busy(btn, false);
       }
+    });
+  })();
+
+  // ---- Add Product to Report modal (admin): choose product, position, and scope ----
+  (function initAddProduct(){
+    const overlay = $('addProdOverlay');
+    const prodSel = $('apProduct'), disp = $('apDisplay'), posSel = $('apPosition'),
+          locField = $('apLocField'), locSel = $('apLocation'),
+          btn = $('btnAddProduct'), msg = $('apMsg');
+    function showMsg(text, ok){
+      msg.textContent = text;
+      msg.className = 'sr-modal-msg' + (ok ? ' ok' : '');
+      msg.style.display = 'block';
+    }
+    function close(){ overlay.style.display = 'none'; }
+    function scope(){ return document.querySelector('input[name="apScope"]:checked').value; }
+    function validate(){ btn.disabled = !prodSel.value || (scope()==='one' && !locSel.value); }
+    async function open(){
+      prodSel.innerHTML = '<option value="">— Choose product —</option>';
+      posSel.innerHTML = '';
+      locSel.innerHTML = '<option value="">— Choose location —</option>';
+      disp.value = ''; msg.style.display = 'none'; btn.disabled = true;
+      document.querySelector('input[name="apScope"][value="all"]').checked = true;
+      locField.style.display = 'none';
+      overlay.style.display = 'flex';
+      try {
+        const res = await fetch(URLS.productOptions);
+        const data = await res.json();
+        if(!data.success) throw new Error(data.error || 'failed');
+        data.products.forEach(p => {
+          const o = document.createElement('option');
+          o.value = p.id; o.textContent = p.name;
+          prodSel.appendChild(o);
+        });
+        const end = document.createElement('option');
+        end.value = data.report.length;
+        end.textContent = 'At the end (position ' + (data.report.length + 1) + ')';
+        posSel.appendChild(end);
+        data.report.forEach(r => {
+          const o = document.createElement('option');
+          o.value = r.position;
+          o.textContent = 'Position ' + (r.position + 1) + ' — before ' + r.display;
+          posSel.appendChild(o);
+        });
+        data.locations.forEach(l => {
+          const o = document.createElement('option');
+          o.value = l.id; o.textContent = l.name;
+          locSel.appendChild(o);
+        });
+      } catch(e){ showMsg('Could not load the product list. Please try again.'); }
+    }
+    $('addProductBtn').addEventListener('click', e => { e.preventDefault(); open(); });
+    $('addProdClose').addEventListener('click', close);
+    $('apCancel').addEventListener('click', close);
+    overlay.addEventListener('click', e => { if(e.target === overlay) close(); });
+    prodSel.addEventListener('change', validate);
+    locSel.addEventListener('change', validate);
+    document.querySelectorAll('input[name="apScope"]').forEach(r =>
+      r.addEventListener('change', () => { locField.style.display = scope()==='one' ? '' : 'none'; validate(); }));
+    btn.addEventListener('click', async () => {
+      if(btn.disabled) return;
+      busy(btn, true, 'Adding…');
+      msg.style.display = 'none';
+      try {
+        const res = await fetch(URLS.addProduct, {
+          method:'POST', headers:{'X-CSRFToken':CSRF, 'Content-Type':'application/json'},
+          body: JSON.stringify({
+            product_id: prodSel.value,
+            display_name: disp.value,
+            position: posSel.value,
+            scope: scope(),
+            bmc_id: locSel.value || null,
+          })
+        });
+        const data = await res.json();
+        if(data.success){
+          showMsg(data.message, true);
+          const sel = $('cycleSelect').value;
+          if(sel) loadSelection(sel);    // refresh the open view so the new row shows up
+          setTimeout(close, 1600);
+        } else showMsg(data.error || 'Failed to add the product.');
+      } catch(e){ showMsg('Failed to add the product. Please try again.'); }
+      finally { busy(btn, false); }
     });
   })();
 

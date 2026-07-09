@@ -86,6 +86,7 @@ urlpatterns = [
         name="update_requisition",
     ),
     path("hod_requisitions", views.hod_requisitions_view, name="hod_requisitions"),
+    path("hod/requisitions/approve-selected/", views.approve_requisitions_bulk, name="approve_requisitions_bulk"),
     path(
         "hod/requisitions/approve/<int:pk>/",
         views.approve_requisition,

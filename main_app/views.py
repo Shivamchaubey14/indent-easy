@@ -6421,6 +6421,66 @@ def approve_requisition(request, pk):
         
         # Regular request error handling
         return redirect("hod_requisitions")
+@login_required(login_url='login')
+def approve_requisitions_bulk(request):
+    """HOD approves several requisitions in one go. Same effect as approving each one
+    individually (audit record + APPROVED status), with one summary email to purchase
+    instead of one email per item."""
+    if not request.user.is_hod:
+        return HttpResponseForbidden("You are not authorized to approve requisitions.")
+    if request.method != "POST":
+        return JsonResponse({"error": "Invalid request method"}, status=400)
+    ids = request.POST.getlist("requisition_ids[]")
+    if not ids:
+        return JsonResponse({"error": "No requisitions selected."}, status=400)
+
+    approved = []
+    with transaction.atomic():
+        requisitions = (PurchaseRequisition.objects.filter(id__in=ids)
+                        .exclude(status__in=["APPROVED", "REJECTED", "PO GENERATED",
+                                             "APPROVED FOR TRANSFER"]))
+        for requisition in requisitions:
+            HODApproval.objects.update_or_create(
+                requisition=requisition,
+                defaults={
+                    "status": "APPROVED",
+                    "approved_by": request.user,
+                    "approval_date": now(),
+                },
+            )
+            requisition.status = "APPROVED"
+            requisition.save()
+            approved.append(requisition)
+
+    if not approved:
+        return JsonResponse(
+            {"error": "Nothing to approve — the selected requisitions are already processed."},
+            status=400)
+
+    try:
+        lines = [
+            f"- {r.requisition_number} | {r.stock_item} x {r.quantity} | "
+            f"To: {r.location} | Expected: {r.expected_delivery_date}"
+            for r in approved
+        ]
+        message = ("The following requisitions were approved:\n\n"
+                   + "\n".join(lines)
+                   + f"\n\nApproved by: {request.user.get_full_name()}")
+        EmailMessage(
+            subject=f"{len(approved)} Requisition(s) Approved",
+            body=message,
+            from_email=settings.DEFAULT_FROM_EMAIL,
+            to=["purchase@shwetdharamilk.com"],
+        ).send(fail_silently=False)
+    except Exception:
+        pass   # email failure must not block the approvals
+
+    return JsonResponse({
+        "message": f"Approved {len(approved)} requisition(s).",
+        "approved": [r.id for r in approved],
+    })
+
+
 # =========== HOD REQUISITION REJECTION HANDLER ==============
 # Secure rejection system for HODs to decline purchase requisitions
 # Maintains audit trail while updating requisition status

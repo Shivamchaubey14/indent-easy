@@ -74,7 +74,10 @@
       <div class="table-header-actions">
         <div class="selected-info" id="selectedInfo" style="display: none;">
           <i class="fas fa-check-circle"></i>
-          <span id="selectedCount">0</span> items selected for STN
+          <span id="selectedCount">0</span> items selected
+          <button type="button" class="bulk-approve-btn" id="bulkApproveBtn">
+            <i class="fas fa-check-double"></i> Approve Selected
+          </button>
         </div>
         <div class="table-filters">
           <button class="filter-btn active" data-filter="all">
@@ -252,15 +255,7 @@
                                 <i class="fas fa-check"></i>
                                 <span>Approve</span>
                               </button>
-                              <button class="action-btn-small approve-stn-btn" 
-                                      data-requisition-id="{{ requisition.id }}"
-                                      style="display: none;"
-                                      data-bs-toggle="tooltip" 
-                                      title="Approve for STN">
-                                <i class="fas fa-exchange-alt"></i>
-                                <span>STN</span>
-                              </button>
-                              <button class="action-btn-small reject-btn" 
+                              <button class="action-btn-small reject-btn"
                                       data-requisition-id="{{ requisition.id }}"
                                       data-bs-toggle="tooltip" 
                                       title="Reject">
@@ -344,41 +339,6 @@
       </div>
     </div>
   </main>
-</div>
-
-<!-- From Location Modal -->
-<div class="modal fade" id="fromLocationModal" tabindex="-1" aria-hidden="true">
-  <div class="modal-dialog modal-dialog-centered">
-    <div class="modal-content modern-modal">
-      <div class="modal-header">
-        <h5 class="modal-title">
-          <i class="fas fa-map-marker-alt"></i>
-          Select From Location
-        </h5>
-        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-      </div>
-      <div class="modal-body">
-        <p>Please select the source location for this transfer:</p>
-        <div class="form-group">
-          <label for="fromLocationDropdown">From Location</label>
-          <select id="fromLocationDropdown" class="form-control">
-            <option value="" disabled selected>SELECT A LOCATION FROM DROPDOWN</option>
-            {% for location in locations %}
-              <option value="{{ location }}">{{ location }}</option>
-            {% endfor %}
-          </select>
-        </div>
-      </div>
-      <div class="modal-footer">
-        <button type="button" class="btn-secondary" data-bs-dismiss="modal">
-          Cancel
-        </button>
-        <button type="button" class="btn-primary" id="confirmFromLocation">
-          Confirm
-        </button>
-      </div>
-    </div>
-  </div>
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
@@ -1002,15 +962,32 @@
     box-shadow: 0 4px 12px rgba(40, 167, 69, 0.3);
   }
 
-  .action-btn-small.approve-stn-btn {
-    background: var(--accent-green);
+  .bulk-approve-btn {
+    margin-left: 0.75rem;
+    padding: 0.45rem 0.9rem;
+    border: none;
+    border-radius: 8px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    background: var(--success);
     color: white;
+    white-space: nowrap;
   }
 
-  .action-btn-small.approve-stn-btn:hover {
-    background: #8a9975;
+  .bulk-approve-btn:hover:not(:disabled) {
+    background: #218838;
     transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(138, 153, 117, 0.3);
+    box-shadow: 0 4px 12px rgba(40, 167, 69, 0.3);
+  }
+
+  .bulk-approve-btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
   }
 
   .action-btn-small.reject-btn {
@@ -1268,20 +1245,15 @@ $(document).ready(function () {
   // Initialize tooltips
   $('[data-bs-toggle="tooltip"]').tooltip();
 
-  let currentRequisitionId = null;
-  let currentToLocation = null;
-
-  // Select All Checkbox
+  // Select All Checkbox — selection feeds the bulk "Approve Selected" button
   $("#selectAll").change(function () {
     $(".requisition-checkbox").prop("checked", $(this).prop("checked"));
     updateSelectedCount();
-    toggleActionButtons();
   });
 
   // Individual Checkbox
   $(".requisition-checkbox").change(function () {
     updateSelectedCount();
-    toggleActionButtons();
   });
 
   function updateSelectedCount() {
@@ -1292,22 +1264,6 @@ $(document).ready(function () {
     } else {
       $("#selectedInfo").hide();
     }
-  }
-
-  function toggleActionButtons() {
-    $(".requisition-checkbox").each(function() {
-      const row = $(this).closest('tr');
-      const approveBtn = row.find('.approve-btn');
-      const approveStnBtn = row.find('.approve-stn-btn');
-      
-      if ($(this).is(':checked')) {
-        approveBtn.hide();
-        approveStnBtn.show();
-      } else {
-        approveBtn.show();
-        approveStnBtn.hide();
-      }
-    });
   }
 
   // Filter Buttons
@@ -1336,12 +1292,43 @@ $(document).ready(function () {
   });
 
   function disableAllActionButtons() {
-    $('.approve-btn, .approve-stn-btn, .reject-btn').prop('disabled', true);
+    $('.approve-btn, .reject-btn, #bulkApproveBtn').prop('disabled', true);
   }
 
   function enableAllActionButtons() {
-    $('.approve-btn, .approve-stn-btn, .reject-btn').prop('disabled', false);
+    $('.approve-btn, .reject-btn, #bulkApproveBtn').prop('disabled', false);
   }
+
+  // Bulk approve — approve every checked requisition in one request
+  $('#bulkApproveBtn').on('click', function () {
+    const ids = $('.requisition-checkbox:checked').map(function () { return this.value; }).get();
+    if (!ids.length) return;
+    if (!confirm('Approve ' + ids.length + ' selected requisition(s)?')) return;
+    disableAllActionButtons();
+    const btn = $(this);
+    const loader = $('<div class="spinner-border spinner-border-sm text-light ms-2" role="status"><span class="visually-hidden">Loading...</span></div>');
+    btn.append(loader);
+    $.ajax({
+      url: '{% url "approve_requisitions_bulk" %}',
+      method: 'POST',
+      traditional: true,
+      data: {
+        csrfmiddlewaretoken: '{{ csrf_token }}',
+        'requisition_ids[]': ids,
+        idempotency_key: window.IdemKeys.get('bulk-approve-' + ids.join('-'))
+      },
+      success: function (response) {
+        alert(response.message || 'Selected requisitions approved.');
+        location.reload();
+      },
+      error: function (xhr) {
+        const err = (xhr.responseJSON && xhr.responseJSON.error) || 'Failed to approve the selected requisitions.';
+        alert(err);
+        enableAllActionButtons();
+        loader.remove();
+      }
+    });
+  });
 
   // Approve Button
   $('.approve-btn').on('click', function (e) {
@@ -1372,67 +1359,6 @@ $(document).ready(function () {
         alert('Error: ' + error);
         enableAllActionButtons();
         loader.remove();
-      }
-    });
-  });
-
-  // Approve STN Button
-  $('.approve-stn-btn').on('click', function (e) {
-    e.preventDefault();
-    var clickedButton = $(this);
-    var row = clickedButton.closest('tr');
-    var requisitionId = clickedButton.data('requisition-id');
-    var toLocation = row.find('.requisition-checkbox').data('to-location');
-    
-    currentRequisitionId = requisitionId;
-    currentToLocation = toLocation;
-    
-    // Show the from location modal
-    $('#fromLocationModal').modal('show');
-  });
-
-  // Confirm From Location
-  $('#confirmFromLocation').on('click', function() {
-    var fromLocation = $('#fromLocationDropdown').val();
-    
-    if (!fromLocation) {
-      alert('Please select a from location.');
-      return;
-    }
-    
-    if (fromLocation === currentToLocation) {
-      alert('From location cannot be the same as to location.');
-      return;
-    }
-    
-    var clickedButton = $('.approve-stn-btn[data-requisition-id="' + currentRequisitionId + '"]');
-    var loader = $('<div class="spinner-border spinner-border-sm text-light ms-2" role="status"><span class="visually-hidden">Loading...</span></div>');
-
-    // Disable all action buttons in the table
-    disableAllActionButtons();
-    clickedButton.append(loader);
-
-    $.ajax({
-      url: '{% url "approve_requisition" 0 %}'.replace('0', currentRequisitionId),
-      method: 'POST',
-      data: {
-        csrfmiddlewaretoken: '{{ csrf_token }}',
-        requisition_id: currentRequisitionId,
-        from_location: fromLocation,
-        idempotency_key: window.IdemKeys.get('approve-stn-' + currentRequisitionId)
-      },
-      success: function (response) {
-        console.log('Requisition approved for STN successfully:', response);
-        alert('Requisition approved for STN and email sent successfully.');
-        $('#fromLocationModal').modal('hide');
-        location.reload();
-      },
-      error: function (xhr, status, error) {
-        console.error('Error approving requisition for STN:', error);
-        alert('Error: ' + error);
-        enableAllActionButtons();
-        loader.remove();
-        $('#fromLocationModal').modal('hide');
       }
     });
   });

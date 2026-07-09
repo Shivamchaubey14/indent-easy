@@ -393,7 +393,23 @@ def submit_grn(request):
                     status=400
                 )
 
-            
+            # --------------------------------------------------------
+            # SUBSECTION: Backdated GRN support
+            # --------------------------------------------------------
+            # The chalan/invoice date IS the GRN date. When it's in the past the
+            # records are stamped with that date (never a future one), so cycle
+            # reports like the Sale & Stock Report count the GRN in the right range.
+            from django.utils.dateparse import parse_date
+            grn_date = parse_date(str(chalan_date)) if chalan_date else None
+            today = timezone.localdate()
+            if grn_date and grn_date > today:
+                print(f"WARNING: Chalan date {grn_date} is in the future; clamping to today")
+                grn_date = today
+                chalan_date = today.isoformat()
+            backdated = bool(grn_date and grn_date < today)
+            print(f"GRN date: {grn_date} | backdated: {backdated}")
+
+
             # ------------------------------------------------------------
             # SECTION 2: PROCESS UPLOADED FILES
             # ------------------------------------------------------------
@@ -574,6 +590,9 @@ def submit_grn(request):
                 print(f"Inventory updated - New quantity: {inventory.quantity}")
                 
                 # Create inventory history record for audit trail
+                history_notes = f"GRN for PO: {po_number}, Received: {item['receivedQuantity']} units, Product: {inventory_product_name}"
+                if backdated:
+                    history_notes += f" | Backdated GRN entered on {today}"
                 history = InventoryHistory.objects.create(
                     inventory=inventory,
                     action='GRN',
@@ -581,9 +600,16 @@ def submit_grn(request):
                     previous_quantity=previous_quantity,
                     new_quantity=inventory.quantity,
                     reference_number=grn_number,
-                    notes=f"GRN for PO: {po_number}, Received: {item['receivedQuantity']} units, Product: {inventory_product_name}",
+                    notes=history_notes,
                     performed_by=request.user
                 )
+                if backdated:
+                    # auto_now_add stamps 'now'; re-stamp with the backdated GRN date so
+                    # cycle-ranged reports (Sale & Stock Report) count it in the right cycle.
+                    # timetz() carries tzinfo only when USE_TZ is on, so this works either way.
+                    backdated_dt = datetime.combine(grn_date, timezone.now().timetz())
+                    InventoryHistory.objects.filter(pk=history.pk).update(created_at=backdated_dt)
+                    print(f"Inventory history {history.id} backdated to {backdated_dt}")
                 print(f"Inventory history record created: {history.id}")
             
             print(f"\nTotal GRN records created: {len(grn_data)}")

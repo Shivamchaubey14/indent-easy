@@ -33,13 +33,10 @@
   </aside>
   <main class="sr-main">
 <div class="sr-wrap">
-  <!-- Header -->
+  <!-- Header (mirrors .page-header on the Admin Dashboard) -->
   <div class="sr-header">
-    <div>
-      <h1 class="sr-title"><i class="fas fa-file-invoice"></i> Sale &amp; Stock Report</h1>
-      <p class="sr-sub">Generate the monthly-cycle stock statement, upload the SAP sale, then finalize Damage/Expire.</p>
-    </div>
-    <a href="{% url 'admin_dashboard' %}" class="sr-btn sr-btn-ghost"><i class="fas fa-arrow-left"></i> Admin Dashboard</a>
+    <h1 class="sr-title"><i class="fas fa-file-invoice"></i> Sale &amp; Stock Report</h1>
+    <p class="sr-sub">Generate the monthly-cycle stock statement, upload the SAP sale, then finalize Damage/Expire.</p>
   </div>
 
   <!-- Cycle picker -->
@@ -226,10 +223,12 @@
   .sr-modal-msg { display:none; background:rgba(220,53,69,.1); color:#c82333; border:1px solid rgba(220,53,69,.35); border-radius:9px; padding:.6rem .8rem; font-size:.85rem; }
   .sr-modal-actions { display:flex; justify-content:flex-end; gap:.6rem; margin-top:.2rem; }
   .sr-wrap { max-width: 1200px; margin: 0 auto; padding: 1.5rem; color: #2c3e50; }
-  .sr-header { display:flex; justify-content:space-between; align-items:flex-start; gap:1rem; margin-bottom:1.25rem; flex-wrap:wrap; }
-  .sr-title { font-size:1.6rem; font-weight:700; color:#313647; margin:0; }
-  .sr-title i { color:#A3B087; }
-  .sr-sub { color:#7f8c8d; margin:.35rem 0 0; font-size:.9rem; }
+  /* Hero header — mirrors .page-header on the Admin Dashboard */
+  .sr-header { background:linear-gradient(135deg, #A3B087 0%, #8a9975 100%); border-radius:20px; padding:1.5rem 2rem;
+               box-shadow:0 8px 32px rgba(163,176,135,.2); border:2px solid black; text-align:center; margin-bottom:1.5rem; }
+  .sr-title { font-size:2rem; font-weight:700; color:#313647; margin:0 0 .5rem; display:flex; align-items:center; justify-content:center; gap:.75rem; }
+  .sr-title i { font-size:1.75rem; }
+  .sr-sub { color:#313647; margin:0; font-size:1rem; font-weight:400; }
   .sr-card { background:#fff; border:1px solid #e9ecef; border-radius:14px; padding:1.1rem 1.25rem; margin-bottom:1.1rem; box-shadow:0 2px 8px rgba(0,0,0,.04); }
   .sr-card-head { display:flex; justify-content:space-between; align-items:center; font-weight:600; color:#313647; }
   .sr-clickable { cursor:pointer; }

@@ -31252,6 +31252,10 @@ def stock_report_product_options(request):
         return JsonResponse({"success": False, "error": "Not allowed."}, status=403)
     current = stock_report_engine.report_products()
     in_report = {p.id for p, _d in current}
+    pos_of = {p.id: i for i, (p, _d) in enumerate(current)}
+    extras = (StockReportProduct.objects
+              .select_related("product").prefetch_related("locations")
+              .order_by("position", "id"))
     return JsonResponse({
         "success": True,
         "report": [{"position": i, "product_id": p.id, "display": d}
@@ -31259,6 +31263,13 @@ def stock_report_product_options(request):
         "products": [{"id": p.id, "name": p.name}
                      for p in Product.objects.exclude(id__in=in_report).order_by("name")],
         "locations": [{"id": b.id, "name": b.name} for b in BMCOrMCC.objects.order_by("name")],
+        "extras": [{
+            "product_id": ex.product_id,
+            "name": ex.product.name,
+            "display": ex.display_name or ex.product.name,
+            "position": pos_of.get(ex.product_id, ex.position),
+            "locations": [{"id": b.id, "name": b.name} for b in ex.locations.all()],
+        } for ex in extras],
     })
 
 
@@ -31276,7 +31287,10 @@ def stock_report_add_product(request):
     except (ValueError, AttributeError):
         return JsonResponse({"success": False, "error": "Invalid data."}, status=400)
     product = get_object_or_404(Product, id=payload.get("product_id"))
-    if product.name.strip().lower() in stock_report_engine.report_product_index():
+    # An admin-added product may be saved again (that's an edit); only the fixed base
+    # list is off-limits.
+    is_extra = StockReportProduct.objects.filter(product=product).exists()
+    if not is_extra and product.name.strip().lower() in stock_report_engine.report_product_index():
         return JsonResponse({"success": False,
                              "error": f'"{product.name}" is already on the report.'}, status=400)
     try:
@@ -31289,14 +31303,40 @@ def stock_report_add_product(request):
     if scope == "one":
         bmc = get_object_or_404(BMCOrMCC, id=payload.get("bmc_id"))
     with transaction.atomic():
-        extra, _created = StockReportProduct.objects.update_or_create(
+        extra, created = StockReportProduct.objects.update_or_create(
             product=product, defaults={"display_name": display, "position": position})
         extra.locations.set([bmc] if bmc else [])
         for st in StockStatement.objects.exclude(status=StockStatement.STATUS_FINALIZED):
             stock_report_engine.ensure_all_locations(st)
+    verb = "Added" if created else "Updated"
     where = f"only for {bmc.name}" if bmc else "for all locations"
     return JsonResponse({"success": True,
-                         "message": f'Added "{display or product.name}" to the report {where}.'})
+                         "message": f'{verb} "{display or product.name}" on the report {where}.'})
+
+
+@login_required(login_url='login')
+@require_POST
+def stock_report_remove_product(request):
+    """Remove an admin-added product from the report (the fixed base list can't be removed).
+    All-zero entries are cleaned off non-finalized statements; entries holding data are kept
+    (they just stop showing), so re-adding the product brings its numbers straight back."""
+    if not request.user.is_superuser:
+        return JsonResponse({"success": False, "error": "Not allowed."}, status=403)
+    try:
+        payload = json.loads(request.body.decode("utf-8"))
+    except (ValueError, AttributeError):
+        return JsonResponse({"success": False, "error": "Invalid data."}, status=400)
+    extra = get_object_or_404(StockReportProduct, product_id=payload.get("product_id"))
+    name = extra.display_name or extra.product.name
+    with transaction.atomic():
+        StockStatementEntry.objects.filter(
+            product_id=extra.product_id,
+            statement__in=StockStatement.objects.exclude(status=StockStatement.STATUS_FINALIZED),
+            opening_balance=0, received=0, received_mcc=0, stock_transfer=0,
+            mpp_sale=0, damage=0, expire=0, remark="",
+        ).delete()
+        extra.delete()
+    return JsonResponse({"success": True, "message": f'Removed "{name}" from the report.'})
 
 
 @login_required(login_url='login')

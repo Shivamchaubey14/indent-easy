@@ -15,6 +15,7 @@ urlpatterns = [
     path("stock-report/download-sale/", views.stock_report_download_sale, name="stock_report_download_sale"),
     path("stock-report/product-options/", views.stock_report_product_options, name="stock_report_product_options"),
     path("stock-report/add-product/", views.stock_report_add_product, name="stock_report_add_product"),
+    path("stock-report/remove-product/", views.stock_report_remove_product, name="stock_report_remove_product"),
     path("stock-report/upload-filled/", views.stock_report_upload_filled, name="stock_report_upload_filled"),
     path("stock-report/upload-full/", views.stock_report_upload_full, name="stock_report_upload_full"),
     path("stock-report/submit-damage/", views.stock_report_admin_submit, name="stock_report_admin_submit"),

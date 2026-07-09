@@ -231,6 +231,10 @@
       <label for="apLocation">Location</label>
       <select id="apLocation" class="sr-select"><option value="">— Choose location —</option></select>
     </div>
+    <div id="apExtras" class="sr-extras" style="display:none;">
+      <div class="sr-extras-head"><i class="fas fa-list"></i> Products you added</div>
+      <div id="apExtrasList"></div>
+    </div>
     <div id="apMsg" class="sr-modal-msg"></div>
     <div class="sr-modal-actions">
       <button id="apCancel" class="sr-btn sr-btn-ghost">Cancel</button>
@@ -274,6 +278,19 @@
   .sr-radio-row { display:flex; gap:1.2rem; flex-wrap:wrap; }
   .sr-radio { display:inline-flex; align-items:center; gap:.45rem; font-size:.92rem; color:#2c3e50; font-weight:500; cursor:pointer; margin:0; }
   .sr-radio input { accent-color:#A3B087; width:16px; height:16px; cursor:pointer; margin:0; }
+  .sr-extras { border-top:1px solid rgba(163,176,135,.3); padding-top:.8rem; display:flex; flex-direction:column; gap:.5rem; }
+  .sr-extras-head { font-size:.85rem; font-weight:600; color:#313647; display:flex; align-items:center; gap:.5rem; }
+  .sr-extras-head i { color:#A3B087; }
+  .sr-extra-row { display:flex; align-items:center; gap:.6rem; background:rgba(163,176,135,.07); border:1px solid rgba(163,176,135,.2); border-radius:9px; padding:.45rem .65rem; }
+  .sr-extra-info { flex:1; min-width:0; }
+  .sr-extra-name { font-size:.86rem; font-weight:600; color:#313647; }
+  .sr-extra-meta { font-size:.74rem; color:#7f8c8d; }
+  .sr-extra-btn { border:none; border-radius:7px; padding:.3rem .55rem; font-size:.74rem; font-weight:600; cursor:pointer; display:inline-flex; align-items:center; gap:.3rem; }
+  .sr-extra-edit { background:rgba(163,176,135,.25); color:#313647; }
+  .sr-extra-edit:hover { background:rgba(163,176,135,.4); }
+  .sr-extra-remove { background:rgba(220,53,69,.1); color:#c82333; }
+  .sr-extra-remove:hover { background:rgba(220,53,69,.2); }
+  .sr-extra-remove.confirm { background:#c82333; color:#fff; }
   .sr-modal-actions { display:flex; justify-content:flex-end; gap:.6rem; margin-top:.2rem; }
   .sr-progress { display:flex; flex-direction:column; gap:.45rem; }
   .sr-progress-info { display:flex; justify-content:space-between; align-items:center; font-size:.85rem; font-weight:600; color:#313647; }
@@ -419,6 +436,7 @@
     downloadSale:"{% url 'stock_report_download_sale' %}",
     productOptions:"{% url 'stock_report_product_options' %}",
     addProduct: "{% url 'stock_report_add_product' %}",
+    removeProduct:"{% url 'stock_report_remove_product' %}",
     uploadFilled:"{% url 'stock_report_upload_filled' %}",
     uploadFull:  "{% url 'stock_report_upload_full' %}",
     adminSubmit: "{% url 'stock_report_admin_submit' %}",
@@ -930,39 +948,114 @@
     function close(){ overlay.style.display = 'none'; }
     function scope(){ return document.querySelector('input[name="apScope"]:checked').value; }
     function validate(){ btn.disabled = !prodSel.value || (scope()==='one' && !locSel.value); }
-    async function open(){
+    function resetForm(){
+      prodSel.value = ''; disp.value = '';
+      msg.style.display = 'none'; btn.disabled = true;
+      btn.innerHTML = '<i class="fas fa-plus"></i> Add to Report';
+      document.querySelector('input[name="apScope"][value="all"]').checked = true;
+      locField.style.display = 'none';
+      if(posSel.options.length) posSel.value = posSel.options[0].value;
+      locSel.value = '';
+    }
+    async function refreshOptions(){
       prodSel.innerHTML = '<option value="">— Choose product —</option>';
       posSel.innerHTML = '';
       locSel.innerHTML = '<option value="">— Choose location —</option>';
-      disp.value = ''; msg.style.display = 'none'; btn.disabled = true;
-      document.querySelector('input[name="apScope"][value="all"]').checked = true;
-      locField.style.display = 'none';
-      overlay.style.display = 'flex';
+      const res = await fetch(URLS.productOptions);
+      const data = await res.json();
+      if(!data.success) throw new Error(data.error || 'failed');
+      data.products.forEach(p => {
+        const o = document.createElement('option');
+        o.value = p.id; o.textContent = p.name;
+        prodSel.appendChild(o);
+      });
+      const end = document.createElement('option');
+      end.value = data.report.length;
+      end.textContent = 'At the end (position ' + (data.report.length + 1) + ')';
+      posSel.appendChild(end);
+      data.report.forEach(r => {
+        const o = document.createElement('option');
+        o.value = r.position;
+        o.textContent = 'Position ' + (r.position + 1) + ' — before ' + r.display;
+        posSel.appendChild(o);
+      });
+      data.locations.forEach(l => {
+        const o = document.createElement('option');
+        o.value = l.id; o.textContent = l.name;
+        locSel.appendChild(o);
+      });
+      renderExtras(data.extras || []);
+    }
+    function renderExtras(extras){
+      const box = $('apExtras'), list = $('apExtrasList');
+      if(!extras.length){ box.style.display = 'none'; list.innerHTML = ''; return; }
+      box.style.display = 'flex';
+      list.innerHTML = extras.map(x => {
+        const where = x.locations.length ? ('only ' + x.locations.map(l => l.name).join(', ')) : 'all locations';
+        return `<div class="sr-extra-row" data-id="${x.product_id}">
+          <div class="sr-extra-info">
+            <div class="sr-extra-name">${x.display}</div>
+            <div class="sr-extra-meta">Position ${x.position + 1} · ${where}</div>
+          </div>
+          <button class="sr-extra-btn sr-extra-edit"><i class="fas fa-pen"></i> Edit</button>
+          <button class="sr-extra-btn sr-extra-remove"><i class="fas fa-trash"></i> Remove</button>
+        </div>`;
+      }).join('');
+      list.querySelectorAll('.sr-extra-edit').forEach(b =>
+        b.addEventListener('click', () =>
+          startEdit(extras.find(x => String(x.product_id) === b.closest('.sr-extra-row').dataset.id))));
+      list.querySelectorAll('.sr-extra-remove').forEach(b =>
+        b.addEventListener('click', () => removeExtra(b)));
+    }
+    function startEdit(x){
+      if(!x) return;
+      // the product is already on the report, so it's missing from the picker — inject it
+      if(!prodSel.querySelector('option[value="' + x.product_id + '"]')){
+        const o = document.createElement('option');
+        o.value = x.product_id; o.textContent = x.name;
+        prodSel.appendChild(o);
+      }
+      prodSel.value = x.product_id;
+      disp.value = x.display === x.name ? '' : x.display;
+      posSel.value = String(x.position);
+      const one = x.locations.length > 0;
+      document.querySelector('input[name="apScope"][value="' + (one ? 'one' : 'all') + '"]').checked = true;
+      locField.style.display = one ? '' : 'none';
+      if(one) locSel.value = String(x.locations[0].id);
+      btn.innerHTML = '<i class="fas fa-save"></i> Save Changes';
+      msg.style.display = 'none';
+      validate();
+    }
+    async function removeExtra(b){
+      if(!b.classList.contains('confirm')){         // first click arms, second removes
+        b.classList.add('confirm');
+        b.innerHTML = '<i class="fas fa-trash"></i> Sure?';
+        setTimeout(() => { b.classList.remove('confirm'); b.innerHTML = '<i class="fas fa-trash"></i> Remove'; }, 3000);
+        return;
+      }
+      const id = b.closest('.sr-extra-row').dataset.id;
+      busy(b, true, '…');
       try {
-        const res = await fetch(URLS.productOptions);
+        const res = await fetch(URLS.removeProduct, {
+          method:'POST', headers:{'X-CSRFToken':CSRF, 'Content-Type':'application/json'},
+          body: JSON.stringify({ product_id: id })
+        });
         const data = await res.json();
-        if(!data.success) throw new Error(data.error || 'failed');
-        data.products.forEach(p => {
-          const o = document.createElement('option');
-          o.value = p.id; o.textContent = p.name;
-          prodSel.appendChild(o);
-        });
-        const end = document.createElement('option');
-        end.value = data.report.length;
-        end.textContent = 'At the end (position ' + (data.report.length + 1) + ')';
-        posSel.appendChild(end);
-        data.report.forEach(r => {
-          const o = document.createElement('option');
-          o.value = r.position;
-          o.textContent = 'Position ' + (r.position + 1) + ' — before ' + r.display;
-          posSel.appendChild(o);
-        });
-        data.locations.forEach(l => {
-          const o = document.createElement('option');
-          o.value = l.id; o.textContent = l.name;
-          locSel.appendChild(o);
-        });
-      } catch(e){ showMsg('Could not load the product list. Please try again.'); }
+        if(data.success){
+          resetForm();
+          await refreshOptions();
+          showMsg(data.message, true);
+          const sel = $('cycleSelect').value;
+          if(sel) loadSelection(sel);   // refresh the open view so the row disappears
+        } else { busy(b, false); showMsg(data.error || 'Failed to remove the product.'); }
+      } catch(e){ busy(b, false); showMsg('Failed to remove the product. Please try again.'); }
+    }
+    async function open(){
+      $('apExtras').style.display = 'none'; $('apExtrasList').innerHTML = '';
+      resetForm();
+      overlay.style.display = 'flex';
+      try { await refreshOptions(); }
+      catch(e){ showMsg('Could not load the product list. Please try again.'); }
     }
     $('addProductBtn').addEventListener('click', e => { e.preventDefault(); open(); });
     $('addProdClose').addEventListener('click', close);
@@ -989,10 +1082,11 @@
         });
         const data = await res.json();
         if(data.success){
+          resetForm();
+          try { await refreshOptions(); } catch(e){}   // list the new/updated product
           showMsg(data.message, true);
           const sel = $('cycleSelect').value;
           if(sel) loadSelection(sel);    // refresh the open view so the new row shows up
-          setTimeout(close, 1600);
         } else showMsg(data.error || 'Failed to add the product.');
       } catch(e){ showMsg('Failed to add the product. Please try again.'); }
       finally { busy(btn, false); }

@@ -169,6 +169,30 @@
   </main>
 </div>
 
+<!-- SAP Sale Report modal: pick month + cycle, download the SAP excel uploaded for that cycle -->
+<div id="sapModalOverlay" class="sr-modal-overlay" style="display:none;">
+  <div class="sr-modal">
+    <div class="sr-modal-head">
+      <span><i class="fas fa-file-download"></i> SAP Sale Report</span>
+      <button id="sapModalClose" class="sr-modal-close" title="Close">&times;</button>
+    </div>
+    <p class="sr-step-desc" style="margin:0;">Pick the month and cycle — you'll get the SAP sale Excel exactly as it was uploaded for that cycle.</p>
+    <div class="sr-field">
+      <label for="sapMonthYear">Month &amp; Year</label>
+      <select id="sapMonthYear" class="sr-select"><option value="">— Choose month —</option></select>
+    </div>
+    <div class="sr-field">
+      <label for="sapCycle">Cycle</label>
+      <select id="sapCycle" class="sr-select" disabled><option value="">— Choose cycle —</option></select>
+    </div>
+    <div id="sapModalMsg" class="sr-modal-msg"></div>
+    <div class="sr-modal-actions">
+      <button id="sapModalCancel" class="sr-btn sr-btn-ghost">Cancel</button>
+      <button id="btnDownloadSap" class="sr-btn sr-btn-primary" disabled><i class="fas fa-file-download"></i> Download Excel</button>
+    </div>
+  </div>
+</div>
+
 <style>
   .sr-layout { display:flex; align-items:stretch; min-height:calc(100vh - 90px); background:#fff; }
   .sr-main { flex:1; min-width:0; }
@@ -187,6 +211,15 @@
   .sr-side-btn.active { background:rgba(163,176,135,.3); color:#fff; border-color:#A3B087; box-shadow:0 0 0 2px #A3B087; }
   .sr-side-btn i { color:#A3B087; font-size:1.05rem; width:18px; text-align:center; }
   .sr-side-btn span { flex:1; }
+  .sr-modal-overlay { position:fixed; inset:0; background:rgba(49,54,71,.55); display:flex; align-items:center; justify-content:center; z-index:1000; padding:1rem; }
+  .sr-modal { background:#fff; border-radius:14px; padding:1.4rem 1.5rem; width:100%; max-width:430px; box-shadow:0 12px 40px rgba(0,0,0,.25); display:flex; flex-direction:column; gap:.9rem; }
+  .sr-modal-head { display:flex; justify-content:space-between; align-items:center; font-weight:700; color:#313647; font-size:1.05rem; }
+  .sr-modal-head i { color:#A3B087; }
+  .sr-modal-close { border:none; background:none; font-size:1.5rem; line-height:1; color:#7f8c8d; cursor:pointer; padding:0 .2rem; }
+  .sr-modal-close:hover { color:#313647; }
+  .sr-modal .sr-field { min-width:0; }
+  .sr-modal-msg { display:none; background:rgba(220,53,69,.1); color:#c82333; border:1px solid rgba(220,53,69,.35); border-radius:9px; padding:.6rem .8rem; font-size:.85rem; }
+  .sr-modal-actions { display:flex; justify-content:flex-end; gap:.6rem; margin-top:.2rem; }
   .sr-wrap { max-width: 1200px; margin: 0 auto; padding: 1.5rem; color: #2c3e50; }
   .sr-header { display:flex; justify-content:space-between; align-items:flex-start; gap:1rem; margin-bottom:1.25rem; flex-wrap:wrap; }
   .sr-title { font-size:1.6rem; font-weight:700; color:#313647; margin:0; }
@@ -312,6 +345,7 @@
     generate:    "{% url 'stock_report_generate' %}",
     uploadSale:  "{% url 'stock_report_upload_sale' %}",
     download:    "{% url 'stock_report_download' %}",
+    downloadSale:"{% url 'stock_report_download_sale' %}",
     uploadFilled:"{% url 'stock_report_upload_filled' %}",
     uploadFull:  "{% url 'stock_report_upload_full' %}",
     adminSubmit: "{% url 'stock_report_admin_submit' %}",
@@ -691,6 +725,81 @@
     if(!currentCycle) return;
     window.location = URLS.download + '?cycle=' + encodeURIComponent(currentCycle);
   });
+
+  // ---- SAP Sale Report modal: pick month + cycle, download the uploaded SAP excel ----
+  (function initSapModal(){
+    const overlay = $('sapModalOverlay');
+    const monthSel = $('sapMonthYear');
+    const cycleSel = $('sapCycle');
+    const btn = $('btnDownloadSap');
+    const msg = $('sapModalMsg');
+    MONTH_YEARS.forEach((g, i) => {
+      const o = document.createElement('option');
+      o.value = i; o.textContent = g.label;
+      monthSel.appendChild(o);
+    });
+    function close(){ overlay.style.display = 'none'; }
+    $('sapSaleReportBtn').addEventListener('click', e => {
+      e.preventDefault();
+      monthSel.value = '';
+      cycleSel.innerHTML = '<option value="">— Choose cycle —</option>';
+      cycleSel.disabled = true; btn.disabled = true;
+      msg.style.display = 'none';
+      overlay.style.display = 'flex';
+    });
+    $('sapModalClose').addEventListener('click', close);
+    $('sapModalCancel').addEventListener('click', close);
+    overlay.addEventListener('click', e => { if(e.target === overlay) close(); });
+    monthSel.addEventListener('change', e => {
+      cycleSel.innerHTML = '<option value="">— Choose cycle —</option>';
+      msg.style.display = 'none';
+      const g = MONTH_YEARS[e.target.value];
+      if(g){
+        g.cycles.forEach(c => {
+          const o = document.createElement('option');
+          o.value = c.id;
+          o.textContent = c.name + (c.range ? ` (${c.range})` : '');
+          cycleSel.appendChild(o);
+        });
+        cycleSel.disabled = false;
+      } else {
+        cycleSel.disabled = true;
+      }
+      btn.disabled = true;
+    });
+    cycleSel.addEventListener('change', () => {
+      btn.disabled = !cycleSel.value;
+      msg.style.display = 'none';
+    });
+    btn.addEventListener('click', async () => {
+      if(!cycleSel.value) return;
+      busy(btn, true, 'Downloading…');
+      msg.style.display = 'none';
+      try {
+        const res = await fetch(URLS.downloadSale + '?cycle=' + encodeURIComponent(cycleSel.value));
+        if(!res.ok){
+          msg.textContent = res.status === 404
+            ? await res.text()
+            : 'Could not download the file (error ' + res.status + ').';
+          msg.style.display = 'block';
+          return;
+        }
+        const blob = await res.blob();
+        const dispo = res.headers.get('Content-Disposition') || '';
+        const m = dispo.match(/filename="?([^"]+)"?/);
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = m ? m[1] : 'SAP_Sale_Report.xlsx';
+        document.body.appendChild(a); a.click(); a.remove();
+        URL.revokeObjectURL(a.href);
+      } catch(err){
+        msg.textContent = 'Could not download the file. Please try again.';
+        msg.style.display = 'block';
+      } finally {
+        busy(btn, false);
+      }
+    });
+  })();
 
   // filled file
   $('pickFilled').addEventListener('click', ()=> $('filledFile').click());

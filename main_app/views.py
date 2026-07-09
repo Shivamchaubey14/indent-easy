@@ -31261,7 +31261,8 @@ def stock_report_product_options(request):
         "report": [{"position": i, "product_id": p.id, "display": d}
                    for i, (p, d) in enumerate(current)],
         "products": [{"id": p.id, "name": p.name}
-                     for p in Product.objects.exclude(id__in=in_report).order_by("name")],
+                     for p in Product.objects.filter(is_active=True)
+                                             .exclude(id__in=in_report).order_by("name")],
         "locations": [{"id": b.id, "name": b.name} for b in BMCOrMCC.objects.order_by("name")],
         "extras": [{
             "product_id": ex.product_id,

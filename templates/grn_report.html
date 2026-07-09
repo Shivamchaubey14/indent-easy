@@ -186,7 +186,8 @@
                                 </tr>
                                 <tr>
                                     <td style="word-wrap: break-word; max-width: 50%;"><strong>Supplier Address:</strong> {{ vendor.address }}</td>
-                                    <td style="text-align: right;"><strong>GRN Date:</strong> {{ grns.0.created_at|date:"d M, Y" }}</td>
+                                    {# date_of_receipt is the chalan/GRN date the user entered — honours backdated GRNs #}
+                                    <td style="text-align: right;"><strong>GRN Date:</strong> {{ grns.0.date_of_receipt|date:"d M, Y" }}</td>
                                 </tr>
                                 <tr>
                                     <td><strong>Chaalan/Invoice Number:</strong> {{ chaalan_numbers.0 }}</td>
@@ -204,6 +205,11 @@
                                         <td style="text-align: right;"><strong>Location:</strong> {{ location }}</td>
                                     </tr>
                                 {% endif %}
+                                <tr>
+                                    {# Who performed the GRN, and when it was actually entered — verifies backdated GRNs #}
+                                    <td><strong>GRN Done By:</strong> {{ grns.0.employee_name }}{% if grns.0.employee_code %} ({{ grns.0.employee_code }}){% endif %}</td>
+                                    <td style="text-align: right;"><strong>Entry Date:</strong> {{ grns.0.created_at|date:"d M, Y" }}</td>
+                                </tr>
                             </table>
                         </div>
 
@@ -246,7 +252,7 @@
                                     {% endif %}
                                 </div>
                                 Received By
-                                
+                                {% if grns.0.employee_name %}<br><strong>{{ grns.0.employee_name }}</strong>{% endif %}
                             </div>
                             
                             <div class="signature-container">

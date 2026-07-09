@@ -4,17 +4,17 @@
 {% csrf_token %}
 
 <div class="sr-wrap">
-  <!-- Header -->
+  <a href="{% url 'create-an-indent' %}" class="sr-btn sr-btn-ghost sr-back"><i class="fas fa-arrow-left"></i> Back to Menu</a>
+
+  <!-- Header (mirrors .page-header on the Admin Dashboard) -->
   <div class="sr-header">
-    <div>
-      <h1 class="sr-title"><i class="fas fa-warehouse"></i> My Sale &amp; Stock Report</h1>
-      <p class="sr-sub">Location: <strong>{{ location }}</strong> — review your products, enter Damage / Expire, and download your report.</p>
-    </div>
-    <a href="{% url 'create-an-indent' %}" class="sr-btn sr-btn-ghost"><i class="fas fa-arrow-left"></i> Back to Menu</a>
+    <h1 class="sr-title"><i class="fas fa-warehouse"></i> My Sale &amp; Stock Report</h1>
+    <p class="sr-sub">Location: <strong>{{ location }}</strong> — review your products, enter Damage / Expire, and download your report.</p>
   </div>
 
   <!-- Cycle picker -->
-  <div class="sr-card">
+  <div class="sr-card sr-picker">
+    <div class="sr-picker-head"><i class="fas fa-calendar-days"></i> Reporting Period</div>
     <div class="sr-cycle-row">
       <div class="sr-field">
         <label for="monthYear">Month &amp; Year</label>
@@ -87,16 +87,23 @@
 </div>
 
 <style>
-  .sr-wrap { max-width: 1200px; margin: 0 auto; padding: 1.5rem; color:#2c3e50; }
-  .sr-header { display:flex; justify-content:space-between; align-items:flex-start; gap:1rem; margin-bottom:1.25rem; flex-wrap:wrap; }
-  .sr-title { font-size:1.6rem; font-weight:700; color:#313647; margin:0; }
-  .sr-title i { color:#A3B087; }
-  .sr-sub { color:#7f8c8d; margin:.35rem 0 0; font-size:.9rem; }
+  .sr-wrap { max-width: 1200px; margin: 0 auto; padding: 2rem 1.5rem; color:#2c3e50; }
+  .sr-back { margin-bottom:1rem; }
+  /* Hero header — mirrors .page-header on the Admin Dashboard */
+  .sr-header { background:linear-gradient(135deg, #A3B087 0%, #8a9975 100%); border-radius:20px; padding:1.5rem 2rem;
+               box-shadow:0 8px 32px rgba(163,176,135,.2); border:2px solid black; text-align:center; margin-bottom:1.5rem; }
+  .sr-title { font-size:2rem; font-weight:700; color:#313647; margin:0 0 .5rem; display:flex; align-items:center; justify-content:center; gap:.75rem; }
+  .sr-title i { font-size:1.75rem; }
+  .sr-sub { color:#313647; margin:0; font-size:1rem; font-weight:400; }
   .sr-card { background:#fff; border:1px solid #e9ecef; border-radius:14px; padding:1.1rem 1.25rem; margin-bottom:1.1rem; box-shadow:0 2px 8px rgba(0,0,0,.04); }
+  /* Cycle picker — mirrors .filters-section / .filter-group on the Admin Dashboard */
+  .sr-picker { background:rgba(163,176,135,.05); border:1px solid rgba(163,176,135,.2); border-radius:12px; padding:1.5rem; }
+  .sr-picker-head { font-weight:600; color:#313647; margin-bottom:1rem; display:flex; align-items:center; gap:.6rem; }
+  .sr-picker-head i { color:#A3B087; }
   .sr-cycle-row { display:flex; align-items:flex-end; gap:1.5rem; flex-wrap:wrap; }
-  .sr-field { display:flex; flex-direction:column; gap:.4rem; min-width:230px; flex:1; }
-  .sr-field label { font-size:.8rem; font-weight:600; color:#435663; text-transform:uppercase; letter-spacing:.4px; }
-  .sr-select { padding:.6rem .8rem; border:1px solid #cdd4da; border-radius:9px; font-size:.95rem; background:#fff; }
+  .sr-field { display:flex; flex-direction:column; gap:.5rem; min-width:230px; flex:1; }
+  .sr-field label { font-size:.9rem; font-weight:600; color:#2c3e50; }
+  .sr-select { padding:.75rem; border:1px solid rgba(163,176,135,.3); border-radius:8px; font-size:.95rem; background:#fff; transition:all .3s ease; }
   .sr-select:focus { outline:none; border-color:#A3B087; box-shadow:0 0 0 3px rgba(163,176,135,.2); }
   .sr-select:disabled { background:#f1f3f5; color:#adb5bd; }
   .sr-status-box { display:flex; flex-direction:column; gap:.35rem; }
@@ -105,8 +112,8 @@
   .sr-badge.DRAFT { background:rgba(255,193,7,.15); color:#b8860b; border:1px solid rgba(255,193,7,.5); }
   .sr-badge.SALE_UPLOADED { background:rgba(23,162,184,.12); color:#0b7285; border:1px solid rgba(23,162,184,.4); }
   .sr-badge.FINALIZED { background:rgba(40,167,69,.12); color:#1e7e34; border:1px solid rgba(40,167,69,.4); }
-  .sr-empty { text-align:center; color:#adb5bd; padding:3rem 1rem; }
-  .sr-empty i { font-size:2.2rem; margin-bottom:.6rem; display:block; }
+  .sr-empty { text-align:center; color:#7f8c8d; padding:3rem 1rem; }
+  .sr-empty i { font-size:2.2rem; margin-bottom:.6rem; display:block; color:#A3B087; }
   .sr-summary { display:grid; grid-template-columns:repeat(4,1fr); gap:.9rem; margin-bottom:1.1rem; }
   .sr-stat { background:#fff; border:1px solid #e9ecef; border-radius:12px; padding:1rem; text-align:center; box-shadow:0 2px 8px rgba(0,0,0,.04); }
   .sr-stat-num { display:block; font-size:1.7rem; font-weight:700; color:#313647; }
@@ -117,6 +124,7 @@
   .sr-hint { font-size:.82rem; color:#0b7285; }
   .sr-hint-locked { color:#b8860b; font-weight:600; }
   .sr-btn { border:none; border-radius:9px; padding:.55rem 1rem; font-size:.88rem; font-weight:600; cursor:pointer; display:inline-flex; align-items:center; gap:.5rem; transition:all .2s ease; text-decoration:none; }
+  .sr-btn:hover { text-decoration:none; }
   .sr-btn:disabled { opacity:.5; cursor:not-allowed; }
   .sr-btn-primary { background:#313647; color:#fff; }
   .sr-btn-primary:hover:not(:disabled) { background:#435663; transform:translateY(-1px); }
@@ -130,10 +138,13 @@
   .sr-toast.info { background:rgba(23,162,184,.1); color:#0b7285; border:1px solid rgba(23,162,184,.35); }
   .sr-table-scroll { overflow-x:auto; background:#fff; border:1px solid #e9ecef; border-radius:14px; box-shadow:0 2px 8px rgba(0,0,0,.04); }
   .sr-table { width:100%; border-collapse:collapse; font-size:.85rem; }
-  .sr-table th, .sr-table td { border:1px solid #e9ecef; padding:.5rem .65rem; text-align:left; white-space:nowrap; }
+  /* Cells wrap (product/remark can take two lines) so the table fits without a horizontal
+     scrollbar; only numbers stay on one line. The scroll container remains as a safety
+     net for very narrow screens. */
+  .sr-table th, .sr-table td { border:1px solid #e9ecef; padding:.5rem .65rem; text-align:left; }
   .sr-table th { background:#313647; color:#fff; font-weight:600; }
   .sr-table th.edit { background:#5a4b7a; }
-  .sr-table td.num, .sr-table th.num { text-align:right; }
+  .sr-table td.num, .sr-table th.num { text-align:right; white-space:nowrap; }
   .sr-table tr:nth-child(even) td { background:#f8f9fa; }
   .sr-table td.neg { color:#dc3545; font-weight:700; }
   .sr-table .total-row td { background:#D9E1F2 !important; font-weight:700; }

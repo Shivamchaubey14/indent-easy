@@ -123,6 +123,9 @@ MIDDLEWARE = [
     # Prevents duplicate record creation on retried POSTs carrying an
     # X-Idempotency-Key header. No-op for requests without that header.
     'main_app.idempotency_middleware.IdempotencyMiddleware',
+    # Auto-creates this/next month's cycles and keeps today's cycle active
+    # (hourly check piggybacked on requests — no scheduler needed).
+    'main_app.cycle_auto.CycleAutoMiddleware',
 ]
 
 ROOT_URLCONF = 'shwetDhara_project.urls'

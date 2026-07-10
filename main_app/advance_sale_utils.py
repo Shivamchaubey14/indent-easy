@@ -309,11 +309,15 @@ class InventoryManager:
         try:
             lock_key = self.acquire_lock(user.id, product.id)
             with transaction.atomic():
-                from .models import Inventory
-                inventory_item = Inventory.objects.select_for_update().get(
-                    mcc_bmc_user=user,
-                    product=product
-                )
+                # Deduct from the LOCATION's shared inventory row — the stock a
+                # colleague at the same location received is available too.
+                from .location_inventory import location_inventory
+                inventory_item = location_inventory(user, product, create=False, lock=True)
+                if inventory_item is None:
+                    raise ValidationError(
+                        f'Insufficient inventory for {product.name}. '
+                        f'Available: 0, Requested: {quantity_to_deduct}'
+                    )
                 if inventory_item.quantity < quantity_to_deduct:
                     raise ValidationError(
                         f'Insufficient inventory for {product.name}. '

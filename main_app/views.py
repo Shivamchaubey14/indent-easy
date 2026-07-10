@@ -61,6 +61,7 @@ from django.utils.timezone import localtime, now
 from django.views.decorators.csrf import csrf_exempt
 from itertools import groupby
 from main_app import models
+from main_app.location_inventory import location_inventory, location_owner
 from main_app.email_handler import send_purchase_requisition_notification
 from .decorators import restrict_hod_access, restrict_user_access
 from .models import (
@@ -569,16 +570,10 @@ def submit_grn(request):
                         continue
                 print(f"Found product in inventory: {product.name} (ID: {product.id})")
                 
-                # Get or create inventory record for the user and product
-                inventory, created = Inventory.objects.get_or_create(
-                    mcc_bmc_user=request.user,
-                    product=product,
-                    defaults={"quantity": 0},
-                )
-                if created:
-                    print(f"Created new inventory record for user {request.user.employee_code}")
-                else:
-                    print(f"Found existing inventory record: {inventory.id}")
+                # The location's SHARED inventory row — every user at this location
+                # sees and moves the same stock, whoever does the GRN.
+                inventory = location_inventory(request.user, product)
+                print(f"Using location inventory record: {inventory.id} ({request.user.location})")
                 
                 # Update inventory quantity
                 previous_quantity = inventory.quantity
@@ -2602,11 +2597,10 @@ def final_post_stn(request, stn_number):
                     raise ValueError(
                         f"Could not match product '{item.stock_item}' to your catalog."
                     )
-                try:
-                    inventory = Inventory.objects.select_for_update().get(
-                        mcc_bmc_user=request.user, product=product
-                    )
-                except Inventory.DoesNotExist:
+                # Deduct from the location's SHARED stock — includes GRNs done by
+                # any other user at this location.
+                inventory = location_inventory(request.user, product, create=False, lock=True)
+                if inventory is None:
                     raise ValueError(
                         f"You have no inventory of '{item.stock_item}' at "
                         f"{request.user.location} to transfer."
@@ -2999,9 +2993,7 @@ def receive_stn(request, stn_number):
                         raise ValueError(
                             f"Could not match product '{item.stock_item}' to your catalog."
                         )
-                    inventory, _ = Inventory.objects.select_for_update().get_or_create(
-                        mcc_bmc_user=request.user, product=product, defaults={"quantity": 0}
-                    )
+                    inventory = location_inventory(request.user, product, lock=True)
                     inventory.add_quantity(
                         received,
                         action="TRANSFER_IN",
@@ -3022,9 +3014,7 @@ def receive_stn(request, stn_number):
                         raise ValueError(
                             f"Could not match product '{item.stock_item}' to your catalog."
                         )
-                    sender_inv, _ = Inventory.objects.select_for_update().get_or_create(
-                        mcc_bmc_user=stn.created_by, product=product, defaults={"quantity": 0}
-                    )
+                    sender_inv = location_inventory(stn.created_by, product, lock=True)
                     sender_inv.add_quantity(
                         rejected,
                         action="RETURN",
@@ -4473,11 +4463,10 @@ def dispatch_item(request, notification_id):
             with transaction.atomic():
                 
                 # ----------------------------------------------------
-                # Retrieve and Lock Inventory Record
+                # Retrieve and Lock the location's SHARED Inventory Record
                 # ----------------------------------------------------
-                inventory = Inventory.objects.select_for_update().get(
-                    mcc_bmc_user=request.user, 
-                    product=logistic_department.product
+                inventory = location_inventory(
+                    request.user, logistic_department.product, lock=True
                 )
                 
                 # Validate inventory availability
@@ -4665,18 +4654,13 @@ def dispatch_selected_items(request):
                         }
                     )
                 
-                # Use first available user at source location
-                from_location_user = from_location_users.first()
-                
                 # ----------------------------------------------------
-                # Retrieve and Update Source Inventory
+                # Retrieve and Update the source location's SHARED Inventory
                 # ----------------------------------------------------
-                try:
-                    inventory = Inventory.objects.select_for_update().get(
-                        mcc_bmc_user=from_location_user, 
-                        product=product
-                    )
-                except Inventory.DoesNotExist:
+                inventory = location_inventory(
+                    logistic_department.from_location, product, create=False, lock=True
+                )
+                if inventory is None:
                     return JsonResponse(
                         {
                             "success": False,
@@ -4752,7 +4736,7 @@ def dispatch_selected_items(request):
                 # Populate Email Data Structure
                 # ----------------------------------------------------
                 if not email_data["from_user_email"]:
-                    email_data["from_user_email"] = from_location_user.email
+                    email_data["from_user_email"] = from_location_users.first().email
                     email_data["from_location"] = logistic_department.from_location
                 
                 if not email_data["to_user_email"] and to_location_user:
@@ -5742,10 +5726,9 @@ def processTransferRequest(request, transfer_id, action):
             # ----------------------------------------------------
             # Step 1: Update Receiver's Inventory
             # ----------------------------------------------------
-            # Get or create inventory record for receiver
-            receiver_inventory, created = Inventory.objects.get_or_create(
-                mcc_bmc_user=transfer_request.to_user.user,
-                product=product
+            # The receiving location's SHARED inventory record
+            receiver_inventory = location_inventory(
+                transfer_request.to_user.user, product
             )
             
             # Increase receiver's inventory quantity
@@ -5756,10 +5739,9 @@ def processTransferRequest(request, transfer_id, action):
             # ----------------------------------------------------
             # Step 2: Update Sender's Inventory
             # ----------------------------------------------------
-            # Retrieve sender's inventory (must exist for transfer)
-            sender_inventory = Inventory.objects.get(
-                mcc_bmc_user=transfer_request.from_user.user,
-                product=product
+            # The sending location's SHARED inventory record
+            sender_inventory = location_inventory(
+                transfer_request.from_user.user, product
             )
             
             # Decrease sender's inventory quantity
@@ -7425,20 +7407,21 @@ def viewInventory(request):
     avg_trend = 5
     
     # ------------------------------------------------------------
-    # SECTION 7b: CURRENT USER'S OWN STOCK (for condition adjustments)
+    # SECTION 7b: THE LOCATION'S STOCK (for condition adjustments)
     # ------------------------------------------------------------
-    # The table shows location-aggregated stock, but a user may only adjust the
-    # stock held on THEIR own account. Expose their own good/expired/damaged
-    # per product so the Adjust modal can cap quantities correctly.
+    # Inventory is shared per location: every user at the location may adjust
+    # the same stock. Expose the location's good/expired/damaged per product so
+    # the Adjust modal can cap quantities correctly.
     own_inventory = {}
-    for inv in Inventory.objects.filter(mcc_bmc_user=request.user).select_related("product"):
+    for inv in (Inventory.objects
+                .filter(mcc_bmc_user__location__iexact=(request.user.location or "").strip())
+                .select_related("product")):
         if not inv.product:
             continue
-        own_inventory[inv.product_id] = {
-            "good": inv.quantity,
-            "expired": inv.expired_quantity,
-            "damaged": inv.damaged_quantity,
-        }
+        d = own_inventory.setdefault(inv.product_id, {"good": 0, "expired": 0, "damaged": 0})
+        d["good"] += inv.quantity
+        d["expired"] += inv.expired_quantity
+        d["damaged"] += inv.damaged_quantity
 
     # ------------------------------------------------------------
     # SECTION 8: PREPARE TEMPLATE CONTEXT
@@ -7516,11 +7499,11 @@ def adjust_inventory(request):
     if product is None:
         return JsonResponse({"success": False, "error": "Product not found."}, status=404)
 
-    # Only the user's OWN inventory row may be adjusted.
-    inv = Inventory.objects.filter(mcc_bmc_user=request.user, product=product).first()
+    # Inventory is shared per location — any user at the location adjusts the same stock.
+    inv = location_inventory(request.user, product, create=False)
     if inv is None:
         return JsonResponse(
-            {"success": False, "error": f"You hold no stock of '{product.name}' to adjust."},
+            {"success": False, "error": f"Your location holds no stock of '{product.name}' to adjust."},
             status=400,
         )
 
@@ -8361,18 +8344,13 @@ def update_inventory_stock(request, product_id):
         product = Product.objects.get(id=product_id)
         user_location = request.user.location
         users_in_same_location = CustomUser.objects.filter(location=user_location)
-        
+
         # --------------------------------------------------------
-        # SUBSECTION: Initialize or Retrieve User Inventories
+        # SUBSECTION: Retrieve the location's SHARED inventory row
         # --------------------------------------------------------
-        inventories = []
-        for user in users_in_same_location:
-            inventory, created = Inventory.objects.get_or_create(
-                mcc_bmc_user=user,
-                product=product,
-                defaults={'quantity': 0}
-            )
-            inventories.append(inventory)
+        # One row per (location, product) — adjusting per user would multiply
+        # the change by the number of users at the location.
+        inventories = [location_inventory(request.user, product)]
         
         # --------------------------------------------------------
         # SUBSECTION: Execute Adjustment Based on Action Type
@@ -8511,98 +8489,118 @@ def viewOthersInventory(request):
     """
     
     # ------------------------------------------------------------
-    # SECTION 1: APPLY LOCATION FILTER
+    # SECTION 1: THE MAINTAINED LOCATION LIST
     # ------------------------------------------------------------
+    # Every MCC/BMC location (the same cards the stock report admin page shows)
+    # plus the AYODHYA H.O store. User accounts sometimes spell locations
+    # differently (MAHARAJGANJ vs MAHRAJGANJ, NAANPARA vs NANPARA), so match
+    # loosely and via a small alias table.
     location_filter = request.GET.get("location", "")
-    
-    # Filter users based on location parameter
-    if location_filter:
-        users = CustomUser.objects.filter(location__icontains=location_filter)
-    else:
-        users = CustomUser.objects.all()
-    
+    STORE_LOCATION = "AYODHYA H.O"
+
+    def _norm_loc(name):
+        return re.sub(r"[^a-z0-9]", "", str(name or "").lower())
+
+    _LOCATION_ALIASES = {
+        "maharajganj": "MAHRAJGANJ",
+        "naanpara": "NANPARA",
+    }
+
+    bmc_names = list(BMCOrMCC.objects.order_by("name").values_list("name", flat=True))
+    display_of = {_norm_loc(n): n for n in bmc_names}
+
+    def display_location(raw):
+        raw = (raw or "").strip()
+        if raw.upper().startswith(STORE_LOCATION):   # "AYODHYA H.O" / "AYODHYA H.O STORE"
+            return STORE_LOCATION
+        key = _norm_loc(raw)
+        key = _norm_loc(_LOCATION_ALIASES.get(key, key))
+        return display_of.get(key, raw)
+
+    maintained_locations = bmc_names + [STORE_LOCATION]
+
     # ------------------------------------------------------------
     # SECTION 2: INITIALIZE DATA STRUCTURES
     # ------------------------------------------------------------
-    location_inventory = {}
     has_missing_products = False
-    
+    # Seed every maintained location so it shows up even before it holds stock.
+    grouped_by_location = {name: {} for name in maintained_locations}
+
     # ------------------------------------------------------------
-    # SECTION 3: PROCESS INVENTORY BY LOCATION
+    # SECTION 3: AGGREGATE INVENTORY PER LOCATION
     # ------------------------------------------------------------
-    for user in users:
-        user_location = user.location
-        
-        # Skip empty locations and specifically exclude "AYODHYA H.O"
-        if not user_location or user_location.strip().upper() == "AYODHYA H.O":
+    mapping_cache = {}
+    for item in Inventory.objects.select_related('product', 'mcc_bmc_user'):
+        raw_location = (item.mcc_bmc_user.location or "").strip()
+        if not raw_location:
             continue
-            
-        # Process location only once to avoid duplicates
-        if user_location not in location_inventory:
-            # Retrieve inventory with product optimization
-            inventory_items = Inventory.objects.filter(
-                mcc_bmc_user__location=user_location
-            ).select_related('product')
-            
-            # Group and aggregate inventory data
-            grouped_data = {}
-            for item in inventory_items:
-                # Handle missing product references
-                if not item.product:
-                    has_missing_products = True
-                    continue
-                
-                product_name = item.product.name
-                
-                # Initialize product entry if first occurrence
-                if product_name not in grouped_data:
-                    # Retrieve mapping information for cross-system compatibility
-                    sap_mapping_info = get_sap_mapped_product_info(product_name)
-                    nddb_mapping_info = get_product_mapping_info(product_name)
-                    
-                    grouped_data[product_name] = {
-                        'total_quantity': 0,
-                        'sap_mapped_product': sap_mapping_info['mapped_product_name'],
-                        'sap_mapped_system': sap_mapping_info['mapped_system'],
-                        'nddb_mapped_product': nddb_mapping_info['mapped_product_name'],
-                        'nddb_mapped_system': nddb_mapping_info['mapped_system'],
-                        'original_product_name': product_name,
-                        'product__material_type': item.product.material_type or 'General',
-                        'value': 0
-                    }
-                
-                # Aggregate quantities and calculate value
-                grouped_data[product_name]['total_quantity'] += item.quantity
-                if item.product.price:
-                    grouped_data[product_name]['value'] += item.quantity * float(item.product.price)
-            
-            # Transform grouped data to template-friendly format
-            location_inventory[user_location] = [
-                {
-                    'product__name': name,
-                    'total_quantity': data['total_quantity'],
-                    'sap_mapped_product': data['sap_mapped_product'],
-                    'sap_mapped_system': data['sap_mapped_system'],
-                    'nddb_mapped_product': data['nddb_mapped_product'], 
-                    'nddb_mapped_system': data['nddb_mapped_system'],
-                    'original_product_name': data['original_product_name'],
-                    'product__material_type': data['product__material_type'],
-                    'value': data['value'],
-                    'is_sap_mapped': data['sap_mapped_product'] != data['original_product_name'],
-                    'is_nddb_mapped': data['nddb_mapped_product'] != data['original_product_name']
-                } 
-                for name, data in grouped_data.items()
-            ]
-    
+        grouped_data = grouped_by_location.setdefault(display_location(raw_location), {})
+
+        # Handle missing product references
+        if not item.product:
+            has_missing_products = True
+            continue
+
+        product_name = item.product.name
+
+        # Initialize product entry if first occurrence
+        if product_name not in grouped_data:
+            # Retrieve mapping information for cross-system compatibility (memoised)
+            if product_name not in mapping_cache:
+                mapping_cache[product_name] = (
+                    get_sap_mapped_product_info(product_name),
+                    get_product_mapping_info(product_name),
+                )
+            sap_mapping_info, nddb_mapping_info = mapping_cache[product_name]
+
+            grouped_data[product_name] = {
+                'total_quantity': 0,
+                'sap_mapped_product': sap_mapping_info['mapped_product_name'],
+                'sap_mapped_system': sap_mapping_info['mapped_system'],
+                'nddb_mapped_product': nddb_mapping_info['mapped_product_name'],
+                'nddb_mapped_system': nddb_mapping_info['mapped_system'],
+                'original_product_name': product_name,
+                'product__material_type': item.product.material_type or 'General',
+                'value': 0
+            }
+
+        # Aggregate quantities and calculate value
+        grouped_data[product_name]['total_quantity'] += item.quantity
+        if item.product.price:
+            grouped_data[product_name]['value'] += item.quantity * float(item.product.price)
+
+    # Transform grouped data to template-friendly format
+    location_inventory = {
+        location: [
+            {
+                'product__name': name,
+                'total_quantity': data['total_quantity'],
+                'sap_mapped_product': data['sap_mapped_product'],
+                'sap_mapped_system': data['sap_mapped_system'],
+                'nddb_mapped_product': data['nddb_mapped_product'],
+                'nddb_mapped_system': data['nddb_mapped_system'],
+                'original_product_name': data['original_product_name'],
+                'product__material_type': data['product__material_type'],
+                'value': data['value'],
+                'is_sap_mapped': data['sap_mapped_product'] != data['original_product_name'],
+                'is_nddb_mapped': data['nddb_mapped_product'] != data['original_product_name']
+            }
+            for name, data in grouped_data.items()
+        ]
+        for location, grouped_data in grouped_by_location.items()
+    }
+
     # ------------------------------------------------------------
-    # SECTION 4: APPLY FINAL FILTERING AND VALIDATION
+    # SECTION 4: APPLY THE LOCATION FILTER
     # ------------------------------------------------------------
     filtered_location_inventory = {}
-    
+
     for location, inventory in location_inventory.items():
-        # Final validation: exclude empty locations and "AYODHYA H.O"
-        if location and location.strip().upper() != "AYODHYA H.O":
-            filtered_location_inventory[location] = inventory
+        if location_filter:
+            if (_norm_loc(location_filter) != _norm_loc(location)
+                    and location_filter.lower() not in location.lower()):
+                continue
+        filtered_location_inventory[location] = inventory
     
     # ------------------------------------------------------------
     # SECTION 5: CALCULATE DASHBOARD METRICS
@@ -8629,13 +8627,13 @@ def viewOthersInventory(request):
         
         # Filter state
         "location_filter": location_filter,
-        
+
         # Error handling information
-        "error_message": "Some inventory items couldn't be displayed due to missing product information." 
-        if has_missing_products 
+        "error_message": "Some inventory items couldn't be displayed due to missing product information."
+        if has_missing_products
         else None
     }
-    
+
     # ------------------------------------------------------------
     # SECTION 7: RENDER INVENTORY COMPARISON DASHBOARD
     # ------------------------------------------------------------
@@ -20784,8 +20782,10 @@ def adjust_inventory_quantity(request):
             # ------------------------------------------------------------
             # SECTION 2: LOCATION-BASED USER IDENTIFICATION
             # ------------------------------------------------------------
-            # Identify all users in the specified location for inventory management
-            users_in_same_location = CustomUser.objects.filter(location=location)
+            # Identify all users in the specified location for inventory management.
+            # Ordered by id so the first user is the location's canonical inventory
+            # owner (see location_inventory.py) — the total lands on the shared row.
+            users_in_same_location = CustomUser.objects.filter(location=location).order_by('id')
             
             # --------------------------------------------------------
             # SUBSECTION 2.1: LOCATION VALIDATION

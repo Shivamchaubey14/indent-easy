@@ -460,6 +460,47 @@ def parse_cycle_header(text):
     return sd, ed, _MONTH_ABBR.get(mon, m.group(3).capitalize()), int(m.group(4))
 
 
+def parse_cycle_from_filename(filename):
+    """Pull the cycle a sale export claims to cover out of its FILE NAME, e.g.
+    'Sale Report 21-30 June 2026 (1).xlsx' -> (21, 30, 'June', 2026). The year is
+    None when the name carries no year. Returns None when the name has no
+    recognisable day-range + month, in which case no cross-check is possible."""
+    s = str(filename or "")
+    m = re.search(r"(\d{1,2})\s*[-–]\s*(\d{1,2})[\s\-_.]*([A-Za-z]{3,9})[\s\-_.]*(\d{4})?", s)
+    if m:
+        sd, ed, mon_raw, yr = int(m.group(1)), int(m.group(2)), m.group(3), m.group(4)
+    else:
+        m = re.search(r"([A-Za-z]{3,9})[\s\-_.]*(\d{1,2})\s*[-–]\s*(\d{1,2})[\s\-_.]*(\d{4})?", s)
+        if not m:
+            return None
+        mon_raw, sd, ed, yr = m.group(1), int(m.group(2)), int(m.group(3)), m.group(4)
+    mon3 = mon_raw.strip().lower()[:3]
+    if mon3 not in _MONTH_ABBR:
+        return None
+    return sd, ed, _MONTH_ABBR[mon3], (int(yr) if yr else None)
+
+
+def filename_cycle_mismatch(filename, cycle):
+    """If `filename` names a cycle and it isn't `cycle`, return a human message
+    describing the mismatch; otherwise None. Used to stop a sale export uploaded
+    against the wrong cycle before it overwrites that cycle's MPP Sale."""
+    claimed = parse_cycle_from_filename(filename)
+    if not claimed or not (cycle.start_date and cycle.end_date):
+        return None
+    sd, ed, month, yr = claimed
+    mc = cycle.monthly_cycle
+    ok = (cycle.start_date.day == sd and cycle.end_date.day == ed
+          and (not mc or not mc.month or mc.month.strip().lower()[:3] == month.strip().lower()[:3])
+          and (not yr or not mc or not mc.year or int(mc.year) == yr))
+    if ok:
+        return None
+    selected = (f"{cycle.start_date.day:02d}-{cycle.end_date.day:02d} {mc.month} {mc.year}"
+                if mc else (cycle.name or str(cycle)))
+    claimed_str = f"{sd:02d}-{ed:02d} {month}" + (f" {yr}" if yr else "")
+    return (f"Cycle mismatch: the file name says {claimed_str} but you selected "
+            f"cycle {selected}. Select the matching cycle or upload the right file.")
+
+
 def detect_cycle_from_workbook(wb):
     """Identify which Cycle a report workbook belongs to from its 'Sale Report Cycle ...'
     header. Returns (Cycle or None, parsed_tuple or None). parsed is set even when no

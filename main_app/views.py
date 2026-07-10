@@ -30648,6 +30648,12 @@ def stock_report_upload_sale(request):
     if not upload.name.lower().endswith((".xlsx", ".xls")):
         return JsonResponse({"success": False, "error": "Please upload an .xlsx / .xls file."}, status=400)
 
+    # The file name usually carries the cycle it covers ('Sale Report 21-30 June 2026...').
+    # If it names a DIFFERENT cycle than the one selected, refuse before overwriting anything.
+    mismatch = stock_report_engine.filename_cycle_mismatch(upload.name, cycle)
+    if mismatch:
+        return JsonResponse({"success": False, "error": mismatch}, status=400)
+
     statement = StockStatement.objects.filter(cycle=cycle).first()
     if not statement:
         return JsonResponse({"success": False, "error": "Generate the statement first, then upload the sale file."}, status=400)
@@ -30826,6 +30832,11 @@ def stock_report_upload_filled(request):
         return JsonResponse({"success": False, "error": "No file uploaded."}, status=400)
     if not upload.name.lower().endswith((".xlsx", ".xls")):
         return JsonResponse({"success": False, "error": "Please upload an .xlsx / .xls file."}, status=400)
+
+    # Refuse a filled report whose file name says it belongs to a different cycle.
+    mismatch = stock_report_engine.filename_cycle_mismatch(upload.name, cycle)
+    if mismatch:
+        return JsonResponse({"success": False, "error": mismatch}, status=400)
 
     statement = StockStatement.objects.filter(cycle=cycle).first()
     if not statement:

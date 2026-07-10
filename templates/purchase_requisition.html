@@ -733,7 +733,7 @@
                   <input type="text"
                          id="bulk_po_number"
                          name="po_number"
-                         class="form-control"
+                         class="form-control po-number-input"
                          placeholder="Enter 10-digit SAP PO Number"
                          required
                          pattern="[0-9]{10}"
@@ -742,6 +742,24 @@
                     <i class="fas fa-info-circle"></i>
                     Enter the 10-digit SAP PO number (e.g., 4500000001)
                   </div>
+                </div>
+
+                <!-- No PO Required Checkbox -->
+                <div class="form-group po-exception-group">
+                  <label class="checkbox-label">
+                    <input
+                      type="checkbox"
+                      class="no-po-checkbox"
+                      id="bulk_no_po_checkbox"
+                    />
+                    <span>
+                      This/These product(s) do not require a Purchase Order
+                    </span>
+                  </label>
+                  <small class="form-text">
+                    <i class="fas fa-info-circle"></i>
+                    Selecting this will auto-generate a system PO and allow GRN processing.
+                  </small>
                 </div>
               </div>
             </div>
@@ -4194,9 +4212,9 @@ $(document).ready(function () {
     const checkbox = form.find('.no-po-checkbox');
     const errorMessage = form.find('.error-message');
     const SAP_PATTERN = /^[0-9]{10}$/;
-    
+
     console.log('[VALIDATION] PO input changed, value:', poValue, 'length:', poValue.length);
-    
+
     if (!checkbox.is(':checked') && poValue && !SAP_PATTERN.test(poValue)) {
       console.log('[VALIDATION] Invalid PO format, showing error');
       errorMessage.addClass('show');
@@ -4392,6 +4410,8 @@ $(document).ready(function () {
       sel.append($('<option>', { value: v, text: v }));
     });
     $('#bulk_email').val('');
+    // Fresh start each open: uncheck No-PO and restore manual PO entry
+    $('#bulk_no_po_checkbox').prop('checked', false).trigger('change');
   });
 
   // Don't open an empty modal

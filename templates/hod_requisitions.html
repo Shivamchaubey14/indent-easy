@@ -75,23 +75,32 @@
         <div class="selected-info" id="selectedInfo" style="display: none;">
           <i class="fas fa-check-circle"></i>
           <span id="selectedCount">0</span> items selected
-          <button type="button" class="bulk-approve-btn" id="bulkApproveBtn">
-            <i class="fas fa-check-double"></i> Approve Selected
-          </button>
         </div>
-        <div class="table-filters">
-          <button class="filter-btn active" data-filter="all">
-            <i class="fas fa-list"></i> All
-          </button>
-          <button class="filter-btn" data-filter="pending">
-            <i class="fas fa-clock"></i> Pending
-          </button>
-          <button class="filter-btn" data-filter="approved">
-            <i class="fas fa-check"></i> Approved
-          </button>
-          <button class="filter-btn" data-filter="rejected">
-            <i class="fas fa-times"></i> Rejected
-          </button>
+        <div class="header-actions-right">
+          <div class="table-filters">
+            <button class="filter-btn active" data-filter="all">
+              <i class="fas fa-list"></i> All
+            </button>
+            <button class="filter-btn" data-filter="pending">
+              <i class="fas fa-clock"></i> Pending
+            </button>
+            <button class="filter-btn" data-filter="approved">
+              <i class="fas fa-check"></i> Approved
+            </button>
+            <button class="filter-btn" data-filter="rejected">
+              <i class="fas fa-times"></i> Rejected
+            </button>
+          </div>
+          {% if request.user.is_hod %}
+          <div class="bulk-actions" id="bulkActions" style="display: none;">
+            <button type="button" class="bulk-approve-btn" id="bulkApproveBtn">
+              <i class="fas fa-check-double"></i> Approve
+            </button>
+            <button type="button" class="bulk-reject-btn" id="bulkRejectBtn">
+              <i class="fas fa-times"></i> Reject
+            </button>
+          </div>
+          {% endif %}
         </div>
       </div>
 
@@ -339,6 +348,74 @@
       </div>
     </div>
   </main>
+</div>
+
+<!-- Process Modal: confirm -> progress bar -> animated tick (same pattern as the indent success page) -->
+<div class="modal fade" id="processModal" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content process-modal">
+      <div class="modal-body">
+
+        <!-- State 1: Confirmation -->
+        <div class="process-state" id="processConfirmState">
+          <div class="process-icon" id="processConfirmIcon">
+            <i class="fas fa-check-double"></i>
+          </div>
+          <h4 class="process-title" id="processConfirmTitle">Approve Requisitions</h4>
+          <p class="process-text" id="processConfirmText"></p>
+          <div class="process-actions">
+            <button type="button" class="process-btn cancel" data-bs-dismiss="modal">
+              <i class="fas fa-times"></i> Cancel
+            </button>
+            <button type="button" class="process-btn confirm" id="processConfirmBtn">
+              <i class="fas fa-check"></i> Confirm
+            </button>
+          </div>
+        </div>
+
+        <!-- State 2: Progress -->
+        <div class="process-state" id="processProgressState" style="display: none;">
+          <div class="process-icon spinning">
+            <i class="fas fa-sync-alt fa-spin"></i>
+          </div>
+          <h4 class="process-title" id="processProgressTitle">Processing...</h4>
+          <div class="process-progress-bar">
+            <div class="process-progress-fill" id="processProgressFill"></div>
+          </div>
+          <p class="process-text" id="processProgressText">Please wait, do not close this window.</p>
+        </div>
+
+        <!-- State 3: Success (animated tick) -->
+        <div class="process-state" id="processSuccessState" style="display: none;">
+          <svg class="animated-checkmark" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 52 52">
+            <circle class="checkmark-circle" cx="26" cy="26" r="25" fill="none" />
+            <path class="checkmark-check" fill="none" d="M16 26l7 7 13-13" />
+          </svg>
+          <h4 class="process-title" id="processSuccessTitle">Done!</h4>
+          <p class="process-text" id="processSuccessText"></p>
+          <div class="process-progress-bar">
+            <div class="process-progress-fill full" id="processReloadFill"></div>
+          </div>
+          <p class="process-text muted">Refreshing the page...</p>
+        </div>
+
+        <!-- State 4: Error -->
+        <div class="process-state" id="processErrorState" style="display: none;">
+          <div class="process-icon error">
+            <i class="fas fa-exclamation-triangle"></i>
+          </div>
+          <h4 class="process-title">Something went wrong</h4>
+          <p class="process-text" id="processErrorText"></p>
+          <div class="process-actions">
+            <button type="button" class="process-btn cancel" data-bs-dismiss="modal">
+              <i class="fas fa-times"></i> Close
+            </button>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
@@ -962,21 +1039,39 @@
     box-shadow: 0 4px 12px rgba(40, 167, 69, 0.3);
   }
 
-  .bulk-approve-btn {
-    margin-left: 0.75rem;
-    padding: 0.45rem 0.9rem;
+  .header-actions-right {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    margin-left: auto;
+  }
+
+  .bulk-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding-left: 1rem;
+    border-left: 2px solid rgba(49, 54, 71, 0.2);
+  }
+
+  .bulk-approve-btn,
+  .bulk-reject-btn {
+    padding: 0.5rem 1rem;
     border: none;
     border-radius: 8px;
-    font-size: 0.85rem;
+    font-size: 0.9rem;
     font-weight: 600;
     cursor: pointer;
     transition: all 0.3s ease;
     display: inline-flex;
     align-items: center;
     gap: 0.5rem;
-    background: var(--success);
     color: white;
     white-space: nowrap;
+  }
+
+  .bulk-approve-btn {
+    background: var(--success);
   }
 
   .bulk-approve-btn:hover:not(:disabled) {
@@ -985,7 +1080,18 @@
     box-shadow: 0 4px 12px rgba(40, 167, 69, 0.3);
   }
 
-  .bulk-approve-btn:disabled {
+  .bulk-reject-btn {
+    background: var(--danger);
+  }
+
+  .bulk-reject-btn:hover:not(:disabled) {
+    background: #c82333;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(220, 53, 69, 0.3);
+  }
+
+  .bulk-approve-btn:disabled,
+  .bulk-reject-btn:disabled {
     opacity: 0.6;
     cursor: not-allowed;
   }
@@ -1118,6 +1224,208 @@
     background-color: #A3B087;
   }
 
+  /* Process Modal (confirm -> progress -> tick) */
+  .process-modal {
+    border: 2px solid black;
+    border-radius: 16px;
+    overflow: hidden;
+    box-shadow: 0 12px 48px rgba(49, 54, 71, 0.25);
+  }
+
+  .process-modal .modal-body {
+    padding: 2.5rem 2rem;
+  }
+
+  .process-state {
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1rem;
+  }
+
+  .process-icon {
+    width: 72px;
+    height: 72px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.75rem;
+    background: rgba(40, 167, 69, 0.1);
+    color: var(--success);
+  }
+
+  .process-icon.reject {
+    background: rgba(220, 53, 69, 0.1);
+    color: var(--danger);
+  }
+
+  .process-icon.spinning {
+    background: rgba(163, 176, 135, 0.15);
+    color: var(--accent-green);
+  }
+
+  .process-icon.error {
+    background: rgba(220, 53, 69, 0.1);
+    color: var(--danger);
+  }
+
+  .process-title {
+    font-size: 1.35rem;
+    font-weight: 700;
+    color: var(--primary-dark);
+    margin: 0;
+  }
+
+  .process-text {
+    font-size: 0.95rem;
+    color: var(--text-light);
+    margin: 0;
+  }
+
+  .process-text.muted {
+    font-size: 0.85rem;
+  }
+
+  .process-actions {
+    display: flex;
+    gap: 1rem;
+    margin-top: 0.5rem;
+  }
+
+  .process-btn {
+    padding: 0.65rem 1.5rem;
+    border: none;
+    border-radius: 8px;
+    font-weight: 600;
+    font-size: 0.9rem;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  .process-btn.cancel {
+    background: var(--bg-light);
+    color: var(--text-dark);
+    border: 2px solid var(--border-color);
+  }
+
+  .process-btn.cancel:hover {
+    background: var(--border-color);
+  }
+
+  .process-btn.confirm {
+    background: var(--success);
+    color: white;
+  }
+
+  .process-btn.confirm:hover {
+    background: #218838;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(40, 167, 69, 0.3);
+  }
+
+  .process-btn.confirm.reject {
+    background: var(--danger);
+  }
+
+  .process-btn.confirm.reject:hover {
+    background: #c82333;
+    box-shadow: 0 4px 12px rgba(220, 53, 69, 0.3);
+  }
+
+  /* Progress bar (same look as the indent success page) */
+  .process-progress-bar {
+    width: 100%;
+    height: 6px;
+    background: rgba(67, 86, 99, 0.1);
+    border-radius: 100px;
+    overflow: hidden;
+    position: relative;
+  }
+
+  .process-progress-bar::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: linear-gradient(90deg, transparent 0%, rgba(255, 255, 255, 0.4) 50%, transparent 100%);
+    animation: processShimmer 2s infinite;
+  }
+
+  .process-progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--accent-green) 0%, #b5c49b 50%, var(--accent-green) 100%);
+    border-radius: 100px;
+    width: 0%;
+    transition: width 1.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+    position: relative;
+    z-index: 2;
+    box-shadow: 0 2px 8px rgba(163, 176, 135, 0.3);
+  }
+
+  .process-progress-fill.full {
+    width: 0%;
+    animation: processProgressFill 1.8s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+  }
+
+  @keyframes processProgressFill {
+    0% { width: 0%; }
+    100% { width: 100%; }
+  }
+
+  @keyframes processShimmer {
+    0% { transform: translateX(-100%); }
+    100% { transform: translateX(100%); }
+  }
+
+  /* Animated checkmark (same as the indent success page) */
+  .animated-checkmark {
+    width: 90px;
+    height: 90px;
+    display: block;
+    stroke-width: 2.5;
+    stroke: var(--accent-green);
+    stroke-miterlimit: 10;
+    margin: 0 auto;
+    filter: drop-shadow(0 8px 24px rgba(163, 176, 135, 0.25));
+  }
+
+  .checkmark-circle {
+    stroke-dasharray: 166;
+    stroke-dashoffset: 166;
+    stroke-width: 2.5;
+    stroke-miterlimit: 10;
+    fill: rgba(163, 176, 135, 0.05);
+    stroke: var(--accent-green);
+    animation: checkmarkStroke 0.6s cubic-bezier(0.65, 0, 0.45, 1) forwards;
+  }
+
+  .checkmark-check {
+    transform-origin: 50% 50%;
+    stroke-dasharray: 48;
+    stroke-dashoffset: 48;
+    stroke: var(--accent-green);
+    animation:
+      checkmarkStroke 0.3s cubic-bezier(0.65, 0, 0.45, 1) 0.8s forwards,
+      checkmarkScale 0.2s cubic-bezier(0.68, -0.55, 0.265, 1.55) 1.1s both;
+  }
+
+  @keyframes checkmarkStroke {
+    100% { stroke-dashoffset: 0; }
+  }
+
+  @keyframes checkmarkScale {
+    0% { transform: scale(0.9); opacity: 0; }
+    70% { transform: scale(1.1); }
+    100% { transform: scale(1); opacity: 1; }
+  }
+
   /* Form Styles */
   .form-group {
     display: flex;
@@ -1209,8 +1517,15 @@
       font-size: 1.5rem;
     }
 
+    .table-header-actions,
+    .header-actions-right,
     .table-filters {
       flex-wrap: wrap;
+    }
+
+    .bulk-actions {
+      padding-left: 0;
+      border-left: none;
     }
 
     .filter-btn {
@@ -1258,12 +1573,11 @@ $(document).ready(function () {
 
   function updateSelectedCount() {
     const count = $(".requisition-checkbox:checked").length;
-    if (count > 0) {
-      $("#selectedCount").text(count);
-      $("#selectedInfo").show();
-    } else {
-      $("#selectedInfo").hide();
-    }
+    $("#selectedCount").text(count);
+    $("#selectedInfo").toggle(count > 0);
+    $("#bulkActions").toggle(count > 0);
+    // Multiple rows ticked -> hide the row-wise Approve/Reject, use the top buttons
+    $(".actions-cell .action-buttons").toggle(count < 2);
   }
 
   // Filter Buttons
@@ -1292,104 +1606,166 @@ $(document).ready(function () {
   });
 
   function disableAllActionButtons() {
-    $('.approve-btn, .reject-btn, #bulkApproveBtn').prop('disabled', true);
+    $('.approve-btn, .reject-btn, #bulkApproveBtn, #bulkRejectBtn').prop('disabled', true);
   }
 
   function enableAllActionButtons() {
-    $('.approve-btn, .reject-btn, #bulkApproveBtn').prop('disabled', false);
+    $('.approve-btn, .reject-btn, #bulkApproveBtn, #bulkRejectBtn').prop('disabled', false);
   }
 
-  // Bulk approve — approve every checked requisition in one request
-  $('#bulkApproveBtn').on('click', function () {
-    const ids = $('.requisition-checkbox:checked').map(function () { return this.value; }).get();
-    if (!ids.length) return;
-    if (!confirm('Approve ' + ids.length + ' selected requisition(s)?')) return;
+  // ------- Process modal (confirm -> progress bar -> animated tick) -------
+  const processModal = new bootstrap.Modal(document.getElementById('processModal'));
+  let pendingAction = null;
+  let processRunning = false;
+
+  function showProcessState(state) {
+    $('.process-state').hide();
+    $('#process' + state + 'State').show();
+  }
+
+  function openProcessModal(action) {
+    pendingAction = action;
+    processRunning = false;
+    const isReject = action.kind === 'reject';
+    $('#processConfirmTitle').text(action.title);
+    $('#processConfirmText').text(action.confirmText);
+    $('#processConfirmIcon')
+      .toggleClass('reject', isReject)
+      .find('i').attr('class', isReject ? 'fas fa-times-circle' : 'fas fa-check-double');
+    $('#processConfirmBtn').toggleClass('reject', isReject);
+    showProcessState('Confirm');
+    processModal.show();
+  }
+
+  $('#processModal').on('hidden.bs.modal', function () {
+    if (!processRunning) {
+      pendingAction = null;
+      enableAllActionButtons();
+    }
+  });
+
+  $('#processConfirmBtn').on('click', function () {
+    if (!pendingAction) return;
+    processRunning = true;
     disableAllActionButtons();
-    const btn = $(this);
-    const loader = $('<div class="spinner-border spinner-border-sm text-light ms-2" role="status"><span class="visually-hidden">Loading...</span></div>');
-    btn.append(loader);
+
+    $('#processProgressTitle').text(pendingAction.progressTitle);
+    showProcessState('Progress');
+    const fill = $('#processProgressFill');
+    fill.css({ transition: 'none', width: '0%' });
+    setTimeout(function () {
+      fill.css({ transition: 'width 1.5s cubic-bezier(0.34, 1.56, 0.64, 1)', width: '90%' });
+    }, 50);
+
     $.ajax({
-      url: '{% url "approve_requisitions_bulk" %}',
+      url: pendingAction.url,
       method: 'POST',
       traditional: true,
+      data: pendingAction.data,
+      success: function (response) {
+        fill.css({ transition: 'width 0.3s ease', width: '100%' });
+        setTimeout(function () {
+          $('#processSuccessTitle').text(pendingAction.successTitle);
+          $('#processSuccessText').text(
+            (response && response.message) || pendingAction.successText
+          );
+          showProcessState('Success');
+          setTimeout(function () { location.reload(); }, 2200);
+        }, 400);
+      },
+      error: function (xhr) {
+        processRunning = false;
+        const err = (xhr.responseJSON && (xhr.responseJSON.error || xhr.responseJSON.message))
+          || pendingAction.errorText;
+        $('#processErrorText').text(err);
+        showProcessState('Error');
+        enableAllActionButtons();
+      }
+    });
+  });
+
+  // ------- Bulk actions (top-right buttons) -------
+  function selectedIds() {
+    return $('.requisition-checkbox:checked').map(function () { return this.value; }).get();
+  }
+
+  $('#bulkApproveBtn').on('click', function () {
+    const ids = selectedIds();
+    if (!ids.length) return;
+    openProcessModal({
+      kind: 'approve',
+      title: 'Approve Requisitions',
+      confirmText: 'Approve ' + ids.length + ' selected requisition(s)?',
+      progressTitle: 'Approving ' + ids.length + ' requisition(s)...',
+      successTitle: 'Approved!',
+      successText: 'Selected requisitions approved successfully.',
+      errorText: 'Failed to approve the selected requisitions.',
+      url: '{% url "approve_requisitions_bulk" %}',
       data: {
         csrfmiddlewaretoken: '{{ csrf_token }}',
         'requisition_ids[]': ids,
         idempotency_key: window.IdemKeys.get('bulk-approve-' + ids.join('-'))
-      },
-      success: function (response) {
-        alert(response.message || 'Selected requisitions approved.');
-        location.reload();
-      },
-      error: function (xhr) {
-        const err = (xhr.responseJSON && xhr.responseJSON.error) || 'Failed to approve the selected requisitions.';
-        alert(err);
-        enableAllActionButtons();
-        loader.remove();
       }
     });
   });
 
-  // Approve Button
+  $('#bulkRejectBtn').on('click', function () {
+    const ids = selectedIds();
+    if (!ids.length) return;
+    openProcessModal({
+      kind: 'reject',
+      title: 'Reject Requisitions',
+      confirmText: 'Reject ' + ids.length + ' selected requisition(s)?',
+      progressTitle: 'Rejecting ' + ids.length + ' requisition(s)...',
+      successTitle: 'Rejected!',
+      successText: 'Selected requisitions rejected successfully.',
+      errorText: 'Failed to reject the selected requisitions.',
+      url: '{% url "reject_requisitions_bulk" %}',
+      data: {
+        csrfmiddlewaretoken: '{{ csrf_token }}',
+        'requisition_ids[]': ids,
+        idempotency_key: window.IdemKeys.get('bulk-reject-' + ids.join('-'))
+      }
+    });
+  });
+
+  // ------- Row-wise actions (single requisition) -------
   $('.approve-btn').on('click', function (e) {
     e.preventDefault();
-    var clickedButton = $(this);
-    var requisitionId = clickedButton.data('requisition-id');
-    var loader = $('<div class="spinner-border spinner-border-sm text-light ms-2" role="status"><span class="visually-hidden">Loading...</span></div>');
-
-    // Disable all action buttons in the table
-    disableAllActionButtons();
-    clickedButton.append(loader);
-
-    $.ajax({
+    const requisitionId = $(this).data('requisition-id');
+    openProcessModal({
+      kind: 'approve',
+      title: 'Approve Requisition',
+      confirmText: 'Approve this requisition?',
+      progressTitle: 'Approving requisition...',
+      successTitle: 'Approved!',
+      successText: 'Requisition approved and email sent successfully.',
+      errorText: 'Failed to approve the requisition.',
       url: '{% url "approve_requisition" 0 %}'.replace('0', requisitionId),
-      method: 'POST',
       data: {
         csrfmiddlewaretoken: '{{ csrf_token }}',
         requisition_id: requisitionId,
         idempotency_key: window.IdemKeys.get('approve-' + requisitionId)
-      },
-      success: function (response) {
-        console.log('Requisition approved successfully:', response);
-        alert('Requisition approved and email sent successfully.');
-        location.reload();
-      },
-      error: function (xhr, status, error) {
-        console.error('Error approving requisition:', error);
-        alert('Error: ' + error);
-        enableAllActionButtons();
-        loader.remove();
       }
     });
   });
 
-  // Reject Button
-  $('.reject-btn').on('click', function(e) {
+  $('.reject-btn').on('click', function (e) {
     e.preventDefault();
-    var clickedButton = $(this);
-    var requisitionId = clickedButton.data('requisition-id');
-    var loader = $('<div class="spinner-border spinner-border-sm text-light ms-2" role="status"><span class="visually-hidden">Loading...</span></div>');
-    
-    // Disable all action buttons when reject is clicked
-    disableAllActionButtons();
-    clickedButton.append(loader);
-    
-    $.ajax({
+    const requisitionId = $(this).data('requisition-id');
+    openProcessModal({
+      kind: 'reject',
+      title: 'Reject Requisition',
+      confirmText: 'Reject this requisition?',
+      progressTitle: 'Rejecting requisition...',
+      successTitle: 'Rejected!',
+      successText: 'Requisition rejected successfully.',
+      errorText: 'Failed to reject the requisition.',
       url: '{% url "reject_requisition" 0 %}'.replace('0', requisitionId),
-      method: 'POST',
       data: {
         csrfmiddlewaretoken: '{{ csrf_token }}',
         requisition_id: requisitionId,
         idempotency_key: window.IdemKeys.get('reject-' + requisitionId)
-      },
-      success: function(response) {
-        alert('Requisition rejected successfully.');
-        location.reload();
-      },
-      error: function(xhr, status, error) {
-        alert('Error: ' + error);
-        enableAllActionButtons();
-        loader.remove();
       }
     });
   });

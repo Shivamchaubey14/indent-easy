@@ -6376,6 +6376,46 @@ def approve_requisitions_bulk(request):
     })
 
 
+@login_required(login_url='login')
+def reject_requisitions_bulk(request):
+    """HOD rejects several requisitions in one go. Same effect as rejecting each one
+    individually (audit record + REJECTED status)."""
+    if not request.user.is_hod:
+        return HttpResponseForbidden("You are not authorized to reject requisitions.")
+    if request.method != "POST":
+        return JsonResponse({"error": "Invalid request method"}, status=400)
+    ids = request.POST.getlist("requisition_ids[]")
+    if not ids:
+        return JsonResponse({"error": "No requisitions selected."}, status=400)
+
+    rejected = []
+    with transaction.atomic():
+        requisitions = (PurchaseRequisition.objects.filter(id__in=ids)
+                        .exclude(status__in=["APPROVED", "REJECTED", "PO GENERATED",
+                                             "APPROVED FOR TRANSFER"]))
+        for requisition in requisitions:
+            HODApproval.objects.update_or_create(
+                requisition=requisition,
+                defaults={
+                    "status": "REJECTED",
+                    "approved_by": request.user,
+                },
+            )
+            requisition.status = "REJECTED"
+            requisition.save()
+            rejected.append(requisition)
+
+    if not rejected:
+        return JsonResponse(
+            {"error": "Nothing to reject — the selected requisitions are already processed."},
+            status=400)
+
+    return JsonResponse({
+        "message": f"Rejected {len(rejected)} requisition(s).",
+        "rejected": [r.id for r in rejected],
+    })
+
+
 # =========== HOD REQUISITION REJECTION HANDLER ==============
 # Secure rejection system for HODs to decline purchase requisitions
 # Maintains audit trail while updating requisition status

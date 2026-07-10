@@ -719,7 +719,7 @@ def ingest_sale(statement, file_obj, filename=""):
     # aggregation keys
     per_entry = defaultdict(int)                 # (bmc_id, product_id) -> qty
     per_mpp = {}                                 # (mpp_code, material_code) -> dict
-    total = matched = unmatched = 0
+    total = matched = unmatched = services = 0
 
     for r in range(header_row + 1, len(rows)):
         row = rows[r]
@@ -731,8 +731,11 @@ def ingest_sale(statement, file_obj, filename=""):
         material_desc = _cell(row, cols["material_desc"])
         qty_raw = _cell(row, cols["qty"])
         net_raw = _cell(row, cols["net"])
-        if plant is None and mcc_name is None and material_code is None and qty_raw is None:
-            continue   # blank row
+        if not any(str(v or "").strip() for v in (plant, mcc_name, material_code, material_desc)):
+            continue   # blank row, or the trailing grand-total row (qty with no identifiers)
+        if _norm_product(material_desc) in SAP_NON_STOCK:
+            services += 1   # service lines (AI etc.) aren't products — leave them out entirely
+            continue
         total += 1
 
         try:
@@ -813,6 +816,7 @@ def ingest_sale(statement, file_obj, filename=""):
 
     return {
         "total": total, "matched": matched, "unmatched": unmatched,
+        "services_skipped": services,
         "mpp_rows": len(per_mpp), "entries_with_sale": len(per_entry),
     }
 

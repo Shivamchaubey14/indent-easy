@@ -38,6 +38,7 @@ from .models import (
     MPPWithCode,
     Product,
     ProductMapping,
+    ProductMappingRelation,
     StockReportProduct,
     StockStatement,
     StockStatementEntry,
@@ -71,45 +72,87 @@ def _strip_leading_zeros(value):
 
 
 def resolve_product(material_code, material_desc, cache):
-    """SAP material (code + description) -> internal Product, memoised in `cache`."""
+    """SAP material (code + description) -> internal Product, memoised in `cache`.
+
+    Precedence: service-line exclusion -> curated SAP_SALE_ALIASES -> the
+    admin-maintained SAP ProductMapping (by material code, then exact SAP name)
+    -> direct product code / exact name / loose-normalised name.
+
+    Deliberately NO first-word fuzzy matching (the old shared resolver filed
+    'AI Services' under ghee that way).
+    """
     key = (str(material_code or "").strip(), str(material_desc or "").strip().upper())
     if key in cache:
         return cache[key]
+    code = key[0]
+    desc = str(material_desc or "").strip()
+    desc_norm = _norm_product(desc)
+
+    # 0) service lines (AI etc.) are not stock — never fill a product row
+    if desc_norm in SAP_NON_STOCK:
+        cache[key] = None
+        return None
 
     product = None
-    # 1) Reuse the existing SAP -> ProductMappingGroup resolver, then group -> Product.
-    try:
-        from .views import find_product_group_for_sap_material
-        group = find_product_group_for_sap_material(key[0], material_desc or "")
-    except Exception:
-        group = None
-    if group is not None:
-        indent = group.mappings.filter(
-            product_mapping__system="INDENT_EASY"
-        ).select_related("product_mapping").first()
-        candidate_names = []
-        if indent and indent.product_mapping:
-            candidate_names.append(indent.product_mapping.product_name)
-        candidate_names.append(group.name)
-        for name in candidate_names:
-            if not name:
-                continue
-            product = Product.objects.filter(name__iexact=name).first()
-            if product:
-                break
 
-    # 2) Direct fallbacks against Product itself.
-    if product is None and key[0]:
-        product = Product.objects.filter(product_code=key[0]).first()
-    if product is None and material_desc:
-        product = Product.objects.filter(name__iexact=material_desc.strip()).first()
+    # 1) curated sale-export aliases -> the report's product
+    alias_target = _SAP_SALE_ALIASES_NORM.get(desc_norm)
+    if alias_target:
+        product = Product.objects.filter(name__iexact=alias_target).first()
+
+    # 2) the admin-maintained SAP mapping, by material code then exact SAP name
+    if product is None:
+        mapping = None
+        if code:
+            mapping = ProductMapping.objects.filter(
+                system="SAP", is_active=True, product_code=code).first()
+        if mapping is None and desc:
+            mapping = ProductMapping.objects.filter(
+                system="SAP", is_active=True, product_name__iexact=desc).first()
+        if mapping is not None:
+            relation = (ProductMappingRelation.objects
+                        .filter(product_mapping=mapping)
+                        .select_related("group").first())
+            group = relation.group if relation else None
+            if group is not None:
+                indent = group.mappings.filter(
+                    product_mapping__system="INDENT_EASY"
+                ).select_related("product_mapping").first()
+                candidate_names = []
+                if indent and indent.product_mapping:
+                    candidate_names.append(indent.product_mapping.product_name)
+                candidate_names.append(group.name)
+                for name in candidate_names:
+                    if not name:
+                        continue
+                    product = Product.objects.filter(name__iexact=name).first()
+                    if product:
+                        break
+
+    # 3) Direct fallbacks against Product itself: code, exact name, loose name.
+    if product is None and code:
+        product = Product.objects.filter(product_code=code).first()
+    if product is None and desc:
+        product = Product.objects.filter(name__iexact=desc).first()
+    if product is None and desc_norm:
+        norm_cache = cache.get("_norm")
+        if norm_cache is None:
+            norm_cache = cache["_norm"] = build_product_norm_cache()
+        product = norm_cache.get(desc_norm)
 
     cache[key] = product
     return product
 
 
-def resolve_bmc(plant, mcc_name, cache):
-    """SAP (Plant code, Mcc Name) -> BMCOrMCC, memoised in `cache`."""
+def resolve_bmc(plant, mcc_name, cache, create=True):
+    """SAP (Plant code, Mcc Name) -> BMCOrMCC, memoised in `cache`.
+
+    Matches by plant code, then by name (exact / collapsed, so 'RAMSNEHIGHAT'
+    finds 'RAM SANEHI GHAT'). A name match with no stored plant code gets the
+    plant backfilled. A location in the sale export that's missing from the
+    master entirely is CREATED (name + plant) so its sales fill instead of
+    silently dropping — that's how RAIBARELI/MAHARAJGANJ rows were vanishing.
+    """
     key = (str(plant or "").strip(), str(mcc_name or "").strip().upper())
     if key in cache:
         return cache[key]
@@ -119,6 +162,16 @@ def resolve_bmc(plant, mcc_name, cache):
     if bmc is None and key[1]:
         bmc = (BMCOrMCC.objects.filter(name__iexact=key[1]).first()
                or BMCOrMCC.objects.filter(name__icontains=key[1]).first())
+        if bmc is None:
+            norm = _norm_bmc(key[1])
+            if norm:
+                bmc = next((b for b in BMCOrMCC.objects.all()
+                            if _norm_bmc(b.name) == norm), None)
+        if bmc is not None and key[0] and not bmc.plant:
+            bmc.plant = key[0]          # remember the plant code for next time
+            bmc.save(update_fields=["plant"])
+    if bmc is None and create and key[1]:
+        bmc = BMCOrMCC.objects.create(name=key[1], plant=key[0] or None)
     cache[key] = bmc
     return bmc
 
@@ -145,6 +198,29 @@ def _norm_product(name):
     s = re.sub(r"\b0+(\d)", r"\1", s)        # 01 -> 1, 05 -> 5
     s = re.sub(r"\s+", " ", s).strip()
     return s
+
+
+# Curated aliases for the SAP SALE EXPORT: material description -> the REPORT's product.
+# The sale export must land on the same products the report rows resolve to; SAP names
+# several materials differently (and some name-collide with off-report duplicate products
+# like 'Dewormr- IIL' / 'Silage'), which left their MPP Sale invisible on the report.
+# Keys are matched loosely (case / punctuation / leading zeros ignored).
+SAP_SALE_ALIASES = {
+    "Ghee - 1 Kg": "MOTHER DAIRY GHEE 1 LTR",          # report row 'Ghee (01_Ltr)'
+    "Ghee - 500 GM": "MOTHER DAIRY GHEE 1/2 L",        # report row 'Ghee (500_ML)'
+    "IODOPHORE SOLU 200ML": "Iodophor solution",       # report row 'Iodophor Solution 200_ML'
+    "CMT DIP CUP": "Teat dip cup..",                   # report row 'Teat dip cup..'
+    "Silage": "Silage Kg",                             # report row 'Silage Kg'
+    "Dewormr- IIL": "Dwormer IIL_2200 Mg Tab",         # report row 'Dwormer IIL_2200 Mg Tab'
+    "Dewormr- Nilzn Sup": "Dewormer- 100ML",           # report row 'Dewormer Nilzan Suspension ML Nos'
+    "Dewormr- 150 mg": "Dwormer IIL Calf 150_Mg Tab",  # report row 'Dwormer IIL Calf 150_Mg Tab'
+}
+
+# Sale-export lines that are SERVICES, not stock — they must never fill a product row.
+# ('AI Services' used to fuzzy-match 'MOTHER D*AI*RY GHEE 1 LTR' and inflate ghee sales.)
+SAP_NON_STOCK = {"ai services"}
+
+_SAP_SALE_ALIASES_NORM = {_norm_product(k): v for k, v in SAP_SALE_ALIASES.items()}
 
 
 # Curated aliases: Sale/Stock-report (Excel) product name  ->  the real product in the
@@ -731,6 +807,9 @@ def ingest_sale(statement, file_obj, filename=""):
     if statement.status == StockStatement.STATUS_DRAFT:
         statement.status = StockStatement.STATUS_SALE_UPLOADED
     statement.save()
+    # Locations first seen in this sale file (auto-created above) get their full
+    # zero-filled product grid so their sheet shows every report product.
+    ensure_all_locations(statement)
 
     return {
         "total": total, "matched": matched, "unmatched": unmatched,

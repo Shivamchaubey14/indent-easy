@@ -44,40 +44,13 @@
       <h4 class="sidebar-section-title">Quick Actions</h4>
       <div class="quick-actions">
         <a href="{% url 'advance-sale' %}" class="action-btn">
-          <i class="fas fa-exclamation-triangle"></i>
-          <span class="btn-text">Advance Sale</span>
-        </a>
-
-        <a href="{% url 'advance-sale' %}" class="action-btn">
-          <i class="fas fa-history"></i>
-          <span class="btn-text">Transaction History</span>
-        </a>
-
-        <a href="{% url 'dispatch_notifications' %}" class="action-btn">
-          <i class="fas fa-bell"></i>
-          <span class="btn-text">Dispatch Notifications</span>
+          <i class="fas fa-paper-plane"></i>
+          <span class="btn-text">Send to MPP</span>
         </a>
 
         <a href="{% url 'export_excel_view' %}" class="action-btn">
           <i class="fas fa-download"></i>
           <span class="btn-text">Download Excel</span>
-        </a>
-
-        <!-- Updated: Download Opening & Closing Excel with inline loader -->
-        <div class="action-btn-wrapper" id="downloadOpeningClosingWrapper">
-          <a href="#" class="action-btn" id="downloadOpeningClosingBtn">
-            <i class="fas fa-file-excel"></i>
-            <span class="btn-text">Download Opening & Closing Excel Sheet</span>
-          </a>
-          <div class="inline-loader" id="inlineLoader" style="display: none;">
-            <div class="small-spinner"></div>
-            <span class="loader-text">Generating...</span>
-          </div>
-        </div>
-
-        <a href="{% url 'location_balance_view' %}" class="action-btn">
-          <i class="fa fa-cash-register"></i>
-          <span class="btn-text">Opening Closing Balance</span>
         </a>
 
         <a href="{% url 'location_stock_report' %}" class="action-btn">
@@ -2834,77 +2807,6 @@
     // Enhanced: Prevent readonly fields from being focused
     $('.readonly-field').on('focus', function(e) {
       $(this).blur();
-    });
-
-    // Download Opening & Closing Excel Handler
-    $("#downloadOpeningClosingBtn").on("click", function(e) {
-      e.preventDefault();
-      
-      // Show inline loader
-      $("#inlineLoader").show();
-      
-      // Disable the button temporarily
-      $(this).css('pointer-events', 'none');
-      
-      // Make AJAX request to download
-      $.ajax({
-        url: "{% url 'download_opening_closing_excel' %}",
-        method: "GET",
-        xhrFields: {
-          responseType: 'blob'
-        },
-        success: function(data, status, xhr) {
-          // Hide loader
-          $("#inlineLoader").hide();
-          
-          // Get filename from response headers
-          const filename = xhr.getResponseHeader('Content-Disposition')
-            ? xhr.getResponseHeader('Content-Disposition').split('filename=')[1].replace(/"/g, '')
-            : 'Opening_Closing_Report.xlsx';
-          
-          // Create download link
-          const blob = new Blob([data], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
-          const downloadUrl = window.URL.createObjectURL(blob);
-          const a = document.createElement('a');
-          a.href = downloadUrl;
-          a.download = filename;
-          document.body.appendChild(a);
-          a.click();
-          document.body.removeChild(a);
-          window.URL.revokeObjectURL(downloadUrl);
-          
-          // Show success notification
-          showNotification('Success', 'Opening & Closing Excel sheet downloaded successfully!', 'success');
-          
-          // Re-enable button
-          setTimeout(() => {
-            $('#downloadOpeningClosingBtn').css('pointer-events', 'auto');
-          }, 1000);
-        },
-        error: function(xhr, status, error) {
-          // Hide loader
-          $("#inlineLoader").hide();
-          
-          // Show error notification
-          let errorMessage = 'Failed to generate Excel sheet. Please try again.';
-          if (xhr.status === 404) {
-            errorMessage = 'Excel generation service not available.';
-          } else if (xhr.status === 500) {
-            errorMessage = 'Server error occurred while generating Excel.';
-          }
-          
-          showNotification('Error', errorMessage, 'error');
-          
-          // Re-enable button
-          $('#downloadOpeningClosingBtn').css('pointer-events', 'auto');
-        },
-        complete: function() {
-          // Ensure button is re-enabled even on complete
-          setTimeout(() => {
-            $('#downloadOpeningClosingBtn').css('pointer-events', 'auto');
-          }, 1000);
-        }
-      });
     });
 
     // NEW: View Your GRN's Button Handler

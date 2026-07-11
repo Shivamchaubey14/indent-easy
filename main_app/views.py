@@ -2880,6 +2880,43 @@ def download_incoming_stn_excel(request, stn_number):
     return response
 
 
+def _archive_stn_attachment_pdf(filefield, archive_dir, archive_base):
+    """
+    Copy an uploaded receipt / shortfall proof into the grn_against_stn archive
+    as "<archive_base>.pdf". Reads the saved copy back from storage — the upload's
+    own file handle is unusable here, because Django MOVES large uploads' temp
+    files into media on save. PDF uploads are copied as-is; photos are converted
+    to a single-page PDF. If Pillow can't convert (e.g. an exotic format), the
+    original bytes are archived under their own extension so the document still
+    shows up. Never raises — the receipt itself must not fail over an archive copy.
+    """
+    if not filefield or not filefield.name:
+        return
+    try:
+        with filefield.storage.open(filefield.name, "rb") as fh:
+            content = fh.read()
+    except (FileNotFoundError, OSError, ValueError) as exc:
+        print(f"WARNING: could not read {filefield.name} for archiving: {exc}")
+        return
+    try:
+        if content[:5] == b"%PDF-" or str(filefield.name).lower().endswith(".pdf"):
+            with open(os.path.join(archive_dir, archive_base + ".pdf"), "wb") as out:
+                out.write(content)
+            return
+        try:
+            img = Image.open(io.BytesIO(content))
+            if img.mode not in ("RGB", "L"):
+                img = img.convert("RGB")
+            img.save(os.path.join(archive_dir, archive_base + ".pdf"), "PDF", resolution=150)
+        except Exception as exc:
+            print(f"WARNING: could not convert {filefield.name} to PDF ({exc}); archiving the original")
+            ext = os.path.splitext(str(filefield.name))[1] or ".bin"
+            with open(os.path.join(archive_dir, archive_base + ext), "wb") as out:
+                out.write(content)
+    except OSError as exc:
+        print(f"WARNING: could not archive {filefield.name}: {exc}")
+
+
 @login_required(login_url="login")
 def receive_stn(request, stn_number):
     """
@@ -3051,9 +3088,35 @@ def receive_stn(request, stn_number):
     except (ValueError, ValidationError) as exc:
         return _fail(f"Could not receive {stn.stn_number}: {exc}")
 
-    # GRN done — stream the GRN-against-STN PDF straight back as a download.
-    pdf_buffer = _render_stn_grn_pdf(stn, request)
-    response = HttpResponse(pdf_buffer.read(), content_type="application/pdf")
+    # GRN done — archive a copy under media/grn_against_stn/<employee_code>/ so it
+    # shows up in the "GRN Against STN Files" document searches (fetch_finance_data
+    # lists that folder), then stream the PDF straight back as a download.
+    pdf_bytes = _render_stn_grn_pdf(stn, request).read()
+    try:
+        emp_code = str(getattr(request.user, "employee_code", "") or "").strip() or "unknown"
+        archive_dir = os.path.join(settings.MEDIA_ROOT, "grn_against_stn", emp_code)
+        os.makedirs(archive_dir, exist_ok=True)
+        stamp = timezone.now().strftime("%Y%m%d%H%M%S")  # the date filter parses this
+        archive_name = f"{stn.grn_number}_{stn.stn_number}_{stamp}.pdf"
+        with open(os.path.join(archive_dir, archive_name), "wb") as fh:
+            fh.write(pdf_bytes)
+        # The uploaded receipt / shortfall proof go into the archive as PDFs too
+        # (photos are converted). The names differ from the GRN copy only by the
+        # Receipt/Shortfall marker so the document searches can group them under
+        # the GRN entry instead of listing them as separate rows.
+        _archive_stn_attachment_pdf(
+            stn.receipt, archive_dir,
+            f"{stn.grn_number}_{stn.stn_number}_Receipt_{stamp}",
+        )
+        _archive_stn_attachment_pdf(
+            stn.proof, archive_dir,
+            f"{stn.grn_number}_{stn.stn_number}_Shortfall_{stamp}",
+        )
+    except OSError as exc:
+        # The receipt itself succeeded — a failed archive copy must not undo it.
+        print(f"WARNING: could not archive GRN {stn.grn_number} to grn_against_stn: {exc}")
+
+    response = HttpResponse(pdf_bytes, content_type="application/pdf")
     filename = f"{stn.grn_number or stn.stn_number}-GRN.pdf"
     response["Content-Disposition"] = f'attachment; filename="{filename}"'
     return response
@@ -5111,24 +5174,55 @@ def fetch_finance_data(request):
                 f for f in os.listdir(grn_against_stn_folder_path)
                 if os.path.isfile(os.path.join(grn_against_stn_folder_path, f))
             ]
-            
-            for stn_file in stn_files:
-                
+
+            # Receipt / shortfall-proof copies (saved by receive_stn as
+            # "<GRN>_<STN>_Receipt_<stamp>.pdf" etc.) are attachments of the GRN
+            # copy "<GRN>_<STN>_<stamp>.pdf" — group them under that entry rather
+            # than listing them as separate rows. An attachment whose GRN copy is
+            # missing falls back to being listed on its own.
+            main_stn_files = []
+            main_by_base = {}   # GRN copy filename without extension -> filename
+            stn_attachments = {}  # GRN copy filename -> {"receipt": ..., "proof": ...}
+            for f in stn_files:
+                if "_Receipt_" not in f and "_Shortfall_" not in f:
+                    main_stn_files.append(f)
+                    main_by_base[os.path.splitext(f)[0]] = f
+            for f in stn_files:
+                if "_Receipt_" in f:
+                    kind, parent_base = "receipt", f.replace("_Receipt_", "_", 1)
+                elif "_Shortfall_" in f:
+                    kind, parent_base = "proof", f.replace("_Shortfall_", "_", 1)
+                else:
+                    continue
+                # Match on the base name so an attachment kept in its original
+                # format (conversion fallback) still groups with the .pdf GRN copy.
+                parent = main_by_base.get(os.path.splitext(parent_base)[0])
+                if parent:
+                    stn_attachments.setdefault(parent, {})[kind] = f
+                else:
+                    main_stn_files.append(f)
+
+            for stn_file in main_stn_files:
+
+                attachments = stn_attachments.get(stn_file, {})
+
                 # Extract timestamp from STN filename
                 stn_timestamp = extract_timestamp_from_filename(stn_file)
-                
+
                 # Apply date filter if provided
                 if from_date and to_date:
                     if not stn_timestamp:
                         continue
-                    
+
                     stn_date_str = stn_timestamp.strftime("%Y-%m-%d")
                     if not (from_date <= stn_date_str <= to_date):
                         continue
 
-                # Apply file name search
-                if file_name_query and file_name_query not in stn_file.lower():
-                    continue
+                # Apply file name search (matches the GRN copy or its attachments)
+                if file_name_query:
+                    searchable = " ".join([stn_file] + list(attachments.values())).lower()
+                    if file_name_query not in searchable:
+                        continue
 
                 # Add file system STN record
                 grn_against_stn_files.append({
@@ -5136,6 +5230,8 @@ def fetch_finance_data(request):
                     'stn_file': stn_file,
                     'file_type': 'stn',
                     'timestamp': stn_timestamp.strftime("%Y%m%d%H%M%S") if stn_timestamp else None,
+                    'receipt_file': attachments.get("receipt"),
+                    'proof_file': attachments.get("proof"),
                     'source': 'file_system'
                 })
         

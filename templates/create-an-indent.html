@@ -3001,6 +3001,23 @@
                     .attr('target', '_blank')
                     .html(`<i class="fas fa-file-contract"></i> <strong>STN</strong> - ${formattedDate} - ${fileName}`)
                 );
+                // Receipt / shortfall proof archived with the GRN show up nested below it
+                if (file.receipt_file) {
+                  li.append($('<div></div>').css('margin-left', '1.5rem').append(
+                    $('<a></a>')
+                      .attr('href', response.media_url + 'grn_against_stn/' + file.employee_code + '/' + file.receipt_file)
+                      .attr('target', '_blank')
+                      .html(`<i class="fas fa-receipt"></i> <strong>Receipt</strong> (PDF) - ${file.receipt_file}`)
+                  ));
+                }
+                if (file.proof_file) {
+                  li.append($('<div></div>').css('margin-left', '1.5rem').append(
+                    $('<a></a>')
+                      .attr('href', response.media_url + 'grn_against_stn/' + file.employee_code + '/' + file.proof_file)
+                      .attr('target', '_blank')
+                      .html(`<i class="fas fa-file-image"></i> <strong>Shortfall Proof</strong> (PDF) - ${file.proof_file}`)
+                  ));
+                }
                 grnAgainstStnFilesList.append(li);
               });
             }

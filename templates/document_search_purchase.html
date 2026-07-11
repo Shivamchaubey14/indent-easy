@@ -96,6 +96,14 @@
       <div class="card-body" id="documentCardBody">
         <div class="search-form-container">
           <form id="purchaseFilterForm" class="modern-form">
+            <div class="form-group" style="margin-bottom: 1rem;">
+              <label for="purchaseFileNameFilter">
+                <i class="fas fa-search"></i>
+                Search by File Name
+              </label>
+              <input type="text" class="form-control" id="purchaseFileNameFilter" name="fileName" placeholder="Type any part of the GRN or Chalan file name (capital or small letters)" autocomplete="off">
+              <small style="color: #6c757d;">Searches ALL records for the location and ignores the date range below. Leave empty to search by date.</small>
+            </div>
             <div class="form-grid">
               <div class="form-group">
                 <label for="purchaseLocation">
@@ -111,21 +119,21 @@
                   {% endfor %}
                 </select>
               </div>
-              
+
               <div class="form-group">
                 <label for="purchaseFromDate">
                   <i class="fas fa-calendar-alt"></i>
                   From Date
                 </label>
-                <input type="date" class="form-control" id="purchaseFromDate" name="fromDate" required>
+                <input type="date" class="form-control" id="purchaseFromDate" name="fromDate">
               </div>
-              
+
               <div class="form-group">
                 <label for="purchaseToDate">
                   <i class="fas fa-calendar-alt"></i>
                   To Date
                 </label>
-                <input type="date" class="form-control" id="purchaseToDate" name="toDate" required>
+                <input type="date" class="form-control" id="purchaseToDate" name="toDate">
               </div>
               
               <div class="form-group">
@@ -789,8 +797,18 @@
 }
 
 .chalan-with-grn {
+    padding: 1rem;
+    border-bottom: 1px solid #e9ecef;
+    background: #f8f9fa;
+    margin-bottom: 0.5rem;
+    border-radius: 8px;
+    border-left: 4px solid #2c5f2d;
+}
+
+.chalan-with-grn:hover {
     background: #e8f5e8;
-    border-left: 4px solid #28a745;
+    transform: translateY(-1px);
+    transition: all 0.3s ease;
 }
 
 .chalan-standalone {
@@ -802,6 +820,7 @@
     font-size: 0.8rem;
     color: #28a745;
     margin-top: 0.25rem;
+    padding-left: 1.5rem;
     font-style: italic;
 }
 
@@ -926,7 +945,10 @@ $(document).ready(function() {
     
     // Document search form submission
     initializePurchaseDocumentSearch();
-    
+
+    // NEW: Global file name search — sent to the server with the form,
+    // where it searches ALL records for the location ignoring the date range
+
     console.log("✅ Purchase dashboard components initialized");
 });
 
@@ -967,7 +989,7 @@ function initializePurchaseDocumentSearch() {
                 grnFilesList.empty();
                 grnAgainstStnFilesList.empty();
                 chalanFilesList.empty();
-                
+
                 const grnCount = response.grn_files ? response.grn_files.length : 0;
                 const linkedChalanCount = response.grn_files ? response.grn_files.filter(grnFile => grnFile.chalan_file).length : 0;
                 const stnCount = response.grn_against_stn_files ? response.grn_against_stn_files.length : 0;
@@ -1058,12 +1080,14 @@ function initializePurchaseDocumentSearch() {
                         console.log(`   Chalan ${index + 1}: ${chalanFileName}, Linked to GRN: ${grnFile.grn_file}`);
                         
                         var li = $('<li></li>').addClass('chalan-with-grn');
-                        
-                        var chalanLink = $('<a></a>')
-                            .attr('href', chalanFileUrl)
-                            .attr('target', '_blank')
-                            .html(`<i class="fas fa-receipt text-success"></i> <strong>Chalan</strong> - ${chalanFormattedDate} - ${chalanFileName}`);
-                        
+
+                        var chalanLink = $('<div></div>').addClass('file-link').append(
+                            $('<a></a>')
+                                .attr('href', chalanFileUrl)
+                                .attr('target', '_blank')
+                                .html(`<i class="fas fa-receipt"></i> <strong>Chalan</strong> - ${chalanFormattedDate} - ${chalanFileName}`)
+                        );
+
                         li.append(chalanLink);
                         li.append($('<div></div>').addClass('grn-association').html(`<i class="fas fa-link"></i> Linked to GRN: ${grnFile.grn_file}`));
                         

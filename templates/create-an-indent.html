@@ -407,21 +407,29 @@
         <div class="card-body" id="grnViewerCardBody" style="display: none;">
           <div class="search-form-container">
             <form id="grnFilterForm" class="modern-form">
+              <div class="form-group" style="margin-bottom: 1rem;">
+                <label for="userFileNameFilter">
+                  <i class="fas fa-search"></i>
+                  Search by File Name
+                </label>
+                <input type="text" class="form-control" id="userFileNameFilter" name="fileName" placeholder="Type any part of the GRN or Chalan file name (capital or small letters)" autocomplete="off">
+                <small style="color: #6c757d;">Searches ALL your records and ignores the date range below. Leave empty to search by date.</small>
+              </div>
               <div class="form-grid">
                 <div class="form-group">
                   <label for="grnFromDate">
                     <i class="fas fa-calendar-alt"></i>
                     From Date
                   </label>
-                  <input type="date" class="form-control" id="grnFromDate" name="fromDate" required>
+                  <input type="date" class="form-control" id="grnFromDate" name="fromDate">
                 </div>
-                
+
                 <div class="form-group">
                   <label for="grnToDate">
                     <i class="fas fa-calendar-alt"></i>
                     To Date
                   </label>
-                  <input type="date" class="form-control" id="grnToDate" name="toDate" required>
+                  <input type="date" class="form-control" id="grnToDate" name="toDate">
                 </div>
                 
                 <div class="form-group">
@@ -1622,8 +1630,18 @@
   }
 
   .chalan-with-grn {
+    padding: 1rem;
+    border-bottom: 1px solid #e9ecef;
+    background: #f8f9fa;
+    margin-bottom: 0.5rem;
+    border-radius: 8px;
+    border-left: 4px solid #2c5f2d;
+  }
+
+  .chalan-with-grn:hover {
     background: #e8f5e8;
-    border-left: 4px solid var(--success);
+    transform: translateY(-1px);
+    transition: all 0.3s ease;
   }
 
   .chalan-standalone {
@@ -1635,6 +1653,7 @@
     font-size: 0.8rem;
     color: var(--success);
     margin-top: 0.25rem;
+    padding-left: 1.5rem;
     font-style: italic;
     word-break: break-word;
   }
@@ -2854,18 +2873,21 @@
       event.preventDefault();
       console.log("🔍 GRN filter form submitted");
       
-      // Validate date range
+      // Validate date range (skipped for a file name search, which is global)
+      const nameQuery = $('#userFileNameFilter').val().trim();
       const fromDate = $('#grnFromDate').val();
       const toDate = $('#grnToDate').val();
-      
-      if (!fromDate || !toDate) {
-        showNotification('Error', 'Please select both from and to dates.', 'error');
-        return;
-      }
-      
-      if (new Date(toDate) < new Date(fromDate)) {
-        showNotification('Error', 'To date cannot be earlier than From date.', 'error');
-        return;
+
+      if (!nameQuery) {
+        if (!fromDate || !toDate) {
+          showNotification('Error', 'Please select both from and to dates.', 'error');
+          return;
+        }
+
+        if (new Date(toDate) < new Date(fromDate)) {
+          showNotification('Error', 'To date cannot be earlier than From date.', 'error');
+          return;
+        }
       }
       
       const formData = $(this).serialize();
@@ -3008,12 +3030,14 @@
                 console.log(`   User Chalan ${index + 1}: ${chalanFileName}, Linked to GRN: ${grnFile.grn_file}`);
                 
                 var li = $('<li></li>').addClass('chalan-with-grn');
-                
-                var chalanLink = $('<a></a>')
-                  .attr('href', chalanFileUrl)
-                  .attr('target', '_blank')
-                  .html(`<i class="fas fa-receipt text-success"></i> <strong>Chalan</strong> - ${chalanFormattedDate} - ${chalanFileName}`);
-                
+
+                var chalanLink = $('<div></div>').addClass('file-link').append(
+                  $('<a></a>')
+                    .attr('href', chalanFileUrl)
+                    .attr('target', '_blank')
+                    .html(`<i class="fas fa-receipt"></i> <strong>Chalan</strong> - ${chalanFormattedDate} - ${chalanFileName}`)
+                );
+
                 li.append(chalanLink);
                 li.append($('<div></div>').addClass('grn-association').html(`<i class="fas fa-link"></i> Linked to GRN: ${grnFile.grn_file}`));
                 
@@ -3040,6 +3064,12 @@
     // NEW: Date change handler for GRN search
     $('#grnFromDate, #grnToDate').on('change', function() {
       console.log(`📅 GRN search filter changed: ${$(this).attr('id')} = ${$(this).val()}`);
+      $('#grnResults').hide();
+    });
+
+    // NEW: Global file name search — sent to the server with the form,
+    // where it searches ALL records ignoring the date range
+    $('#userFileNameFilter').on('input', function() {
       $('#grnResults').hide();
     });
 

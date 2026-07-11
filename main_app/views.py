@@ -5004,6 +5004,13 @@ def fetch_finance_data(request):
     selected_location = request.GET.get("location", "")
     from_date = request.GET.get("fromDate", "")
     to_date = request.GET.get("toDate", "")
+    file_name_query = request.GET.get("fileName", "").strip().lower()
+
+    # A file name search is global: it looks through every record for the
+    # location and ignores the date range entirely.
+    if file_name_query:
+        from_date = ""
+        to_date = ""
     
     # ------------------------------------------------------------
     # SECTION 2: INITIALIZE DATA STRUCTURES
@@ -5078,7 +5085,13 @@ def fetch_finance_data(request):
                 corresponding_chalan = find_chalan_by_timestamp(
                     chalan_folder_path, grn_timestamp
                 )
-                
+
+                # Apply file name search (matches the GRN or its linked chalan)
+                if file_name_query:
+                    if (file_name_query not in grn_file.lower()
+                            and file_name_query not in (corresponding_chalan or "").lower()):
+                        continue
+
                 # Add to GRN files list
                 grn_files_with_chalan.append({
                     'employee_code': employee_code,
@@ -5112,7 +5125,11 @@ def fetch_finance_data(request):
                     stn_date_str = stn_timestamp.strftime("%Y-%m-%d")
                     if not (from_date <= stn_date_str <= to_date):
                         continue
-                
+
+                # Apply file name search
+                if file_name_query and file_name_query not in stn_file.lower():
+                    continue
+
                 # Add file system STN record
                 grn_against_stn_files.append({
                     'employee_code': employee_code,
@@ -5153,7 +5170,17 @@ def fetch_finance_data(request):
                 stn_date_str = stn_date.strftime("%Y-%m-%d")
                 if not (from_date <= stn_date_str <= to_date):
                     continue
-            
+
+            # Apply file name search (matches file name, STN or GRN number)
+            if file_name_query:
+                searchable = " ".join(filter(None, [
+                    stn_filename,
+                    stn_record.stn_number,
+                    stn_record.grn_number,
+                ])).lower()
+                if file_name_query not in searchable:
+                    continue
+
             # Check for duplicate entries (file system vs database)
             already_added = any(
                 item.get('stn_file') == stn_filename 
@@ -5191,18 +5218,22 @@ def fetch_finance_data(request):
                 )
                 
                 if not is_linked:
-                    
+
                     # Extract timestamp for filtering
                     chalan_timestamp = extract_timestamp_from_filename(chalan_file)
-                    
+
                     # Apply date filter if provided
                     if from_date and to_date:
                         if not chalan_timestamp:
                             continue
-                        
+
                         chalan_date_str = chalan_timestamp.strftime("%Y-%m-%d")
                         if not (from_date <= chalan_date_str <= to_date):
                             continue
+
+                    # Apply file name search
+                    if file_name_query and file_name_query not in chalan_file.lower():
+                        continue
                     
                     # Add as standalone chalan
                     standalone_chalan_files.append({

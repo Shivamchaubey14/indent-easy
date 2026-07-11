@@ -62,16 +62,31 @@ Write-Host "Checking Redis service..." -ForegroundColor Magenta
 redis-cli ping 2>$null | Out-Null
 
 if ($LASTEXITCODE -ne 0) {
-    if (-not (Test-Path $RedisExePath)) {
-        Write-Host "ERROR: Redis executable not found." -ForegroundColor Red
-        exit 1
-    }
+    # Start Redis via its Windows service. Launching redis-server.exe directly
+    # runs it as the current user, which cannot write dump.rdb into
+    # C:\Program Files\Redis and triggers MISCONF errors on every write.
+    $redisService = Get-Service -Name Redis -ErrorAction SilentlyContinue
 
-    Write-Host "Starting Redis server..." -ForegroundColor Yellow
-    Get-Process redis-server -ErrorAction SilentlyContinue | Stop-Process -Force
-    Start-Sleep -Seconds 2
-    Start-Process $RedisExePath -WindowStyle Hidden
-    Start-Sleep -Seconds 5
+    if ($redisService) {
+        Write-Host "Starting Redis service..." -ForegroundColor Yellow
+        try {
+            Start-Service -Name Redis -ErrorAction Stop
+        } catch {
+            Write-Host "ERROR: Could not start the Redis service. Run this script as Administrator, or start it with: Start-Service Redis" -ForegroundColor Red
+            exit 1
+        }
+        Start-Sleep -Seconds 3
+    } else {
+        if (-not (Test-Path $RedisExePath)) {
+            Write-Host "ERROR: Redis executable not found." -ForegroundColor Red
+            exit 1
+        }
+        Write-Host "Starting Redis server..." -ForegroundColor Yellow
+        Get-Process redis-server -ErrorAction SilentlyContinue | Stop-Process -Force
+        Start-Sleep -Seconds 2
+        Start-Process $RedisExePath -WindowStyle Hidden
+        Start-Sleep -Seconds 5
+    }
 
     redis-cli ping 2>$null | Out-Null
     if ($LASTEXITCODE -ne 0) {

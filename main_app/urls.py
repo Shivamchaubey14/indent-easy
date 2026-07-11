@@ -314,6 +314,7 @@ urlpatterns = [
     path('location/stock-report/data/', views.location_stock_report_data, name='location_stock_report_data'),
     path('location/stock-report/submit/', views.location_stock_report_submit, name='location_stock_report_submit'),
     path('location/stock-report/download/', views.location_stock_report_download, name='location_stock_report_download'),
+    path('location/stock-report/download-sale/', views.location_stock_report_download_sale, name='location_stock_report_download_sale'),
     path('location/reconciliation/', views.view_location_reconciliation, name='view_location_reconciliation'),
     path('location/acknowledge/<int:record_id>/', views.acknowledge_reconciliation, name='acknowledge_reconciliation'),
     path('finance/reconciliation-sheet/<int:sheet_id>/excel/', views.generate_reconciliation_excel, name='generate_reconciliation_excel'),

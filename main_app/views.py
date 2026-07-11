@@ -402,7 +402,7 @@ def submit_grn(request):
             # reports like the Sale & Stock Report count the GRN in the right range.
             from django.utils.dateparse import parse_date
             grn_date = parse_date(str(chalan_date)) if chalan_date else None
-            today = timezone.localdate()
+            today = timezone.now().date()   # USE_TZ is off; localdate() raises on naive now()
             if grn_date and grn_date > today:
                 print(f"WARNING: Chalan date {grn_date} is in the future; clamping to today")
                 grn_date = today
@@ -31219,4 +31219,31 @@ def location_stock_report_download(request):
         content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
     )
     response["Content-Disposition"] = f'attachment; filename="Stock_Report_{safe_loc}_{safe_period}.xlsx"'
+    return response
+
+
+@login_required(login_url='login')
+@require_GET
+def location_stock_report_download_sale(request):
+    """Download the raw SAP sale export uploaded for a cycle, exactly as uploaded —
+    the same file the admin's SAP Sale Report serves, available to location users."""
+    bmc = _resolve_user_bmc(request.user)
+    if bmc is None:
+        return HttpResponseForbidden("Your account is not linked to any MCC/BMC location.")
+    cycle = get_object_or_404(Cycle, id=request.GET.get("cycle"))
+    statement = StockStatement.objects.filter(cycle=cycle).first()
+    if not statement or not statement.sale_file:
+        return HttpResponseNotFound("No SAP sale file has been uploaded for this cycle yet.")
+    try:
+        with statement.sale_file.open("rb") as f:
+            content = f.read()
+    except (FileNotFoundError, OSError):
+        return HttpResponseNotFound("The SAP sale file for this cycle is missing on the server. Please contact the admin.")
+    filename = statement.sale_file_name or os.path.basename(statement.sale_file.name)
+    if filename.lower().endswith(".xls"):
+        content_type = "application/vnd.ms-excel"
+    else:
+        content_type = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    response = HttpResponse(content, content_type=content_type)
+    response["Content-Disposition"] = f'attachment; filename="{filename.replace(chr(34), "")}"'
     return response

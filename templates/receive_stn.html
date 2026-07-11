@@ -121,11 +121,13 @@
             <label><i class="fas fa-receipt"></i> Upload Receipt</label>
             <input type="file" name="receipt" id="receiptInput" accept="image/*,.pdf" />
             <small>Signed receipt / acknowledgement document for the received goods.</small>
+            <div class="file-preview" id="receiptPreview" style="display: none;"></div>
           </div>
           <div class="rcv-field" id="proofField" style="display: none;">
             <label><i class="fas fa-paperclip"></i> Proof of shortfall <span class="req-tag">required</span></label>
             <input type="file" name="proof" id="proofInput" accept="image/*,.pdf" />
             <small class="proof-note">A shortfall was detected — please attach a photo / scan / document proving the shortage.</small>
+            <div class="file-preview" id="proofPreview" style="display: none;"></div>
           </div>
         </div>
 
@@ -138,6 +140,17 @@
       </form>
     </div>
   </main>
+</div>
+
+<!-- File preview modal (Receipt / Proof of shortfall) -->
+<div class="file-preview-modal" id="filePreviewModal" aria-hidden="true">
+  <div class="file-preview-dialog">
+    <div class="file-preview-head">
+      <span class="file-preview-title" id="filePreviewTitle"><i class="fas fa-eye"></i> Preview</span>
+      <button type="button" class="file-preview-close" id="filePreviewClose" aria-label="Close preview">&times;</button>
+    </div>
+    <div class="file-preview-body" id="filePreviewBody"></div>
+  </div>
 </div>
 
 <!-- GRN progress overlay -->
@@ -225,6 +238,50 @@
   .rcv-field .proof-note { color: #8a2330; font-weight: 500; }
   .req-tag { display: inline-block; background: rgba(234,91,111,.15); color: #8a2330; font-size: .7rem; font-weight: 700; padding: .1rem .45rem; border-radius: 10px; text-transform: uppercase; letter-spacing: .5px; }
   #proofField { border: 2px dashed var(--accent-red); border-radius: 10px; padding: 1rem; background: rgba(234,91,111,.04); }
+
+  /* Inline preview under the Receipt / Proof file inputs */
+  .file-preview { display: flex; align-items: center; gap: .8rem; margin-top: .35rem; padding: .6rem .75rem;
+    background: rgba(163,176,135,.08); border: 1px solid rgba(163,176,135,.45); border-radius: 10px; }
+  .file-thumb { width: 64px; height: 64px; flex-shrink: 0; border-radius: 8px; overflow: hidden;
+    border: 2px solid var(--accent-green); background: #fff; display: flex; align-items: center;
+    justify-content: center; cursor: pointer; }
+  .file-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .file-thumb i { font-size: 1.6rem; color: var(--accent-red); }
+  .file-meta { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: .15rem; }
+  .file-name { font-size: .82rem; font-weight: 600; color: var(--text-dark);
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .file-size { font-size: .72rem; color: var(--text-light); }
+  .file-actions { display: flex; gap: .4rem; flex-shrink: 0; }
+  .file-view-btn, .file-remove-btn { border: none; border-radius: 6px; padding: .4rem .65rem;
+    font-size: .75rem; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center;
+    gap: .35rem; font-family: 'Lexend', sans-serif; }
+  .file-view-btn { background: var(--primary-dark); color: #fff; }
+  .file-view-btn:hover { background: var(--primary-light); }
+  .file-remove-btn { background: rgba(234,91,111,.15); color: #8a2330; }
+  .file-remove-btn:hover { background: rgba(234,91,111,.3); }
+
+  /* Full-size preview modal */
+  .file-preview-modal { position: fixed; inset: 0; background: rgba(49,54,71,.55); backdrop-filter: blur(3px);
+    display: none; align-items: center; justify-content: center; z-index: 12000; padding: 1rem; }
+  .file-preview-modal.active { display: flex; }
+  .file-preview-dialog { background: #fff; border: 2px solid #000; border-radius: 16px; width: 100%;
+    max-width: 720px; max-height: 90vh; display: flex; flex-direction: column; overflow: hidden;
+    box-shadow: 0 20px 60px rgba(0,0,0,.3); }
+  .file-preview-head { display: flex; justify-content: space-between; align-items: center; gap: 1rem;
+    padding: .85rem 1.25rem; background: var(--primary-dark); color: #fff; }
+  .file-preview-title { font-weight: 600; font-size: .95rem; display: flex; align-items: center; gap: .5rem;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .file-preview-title i { color: var(--accent-green); }
+  .file-preview-close { background: none; border: none; color: #fff; font-size: 1.6rem; line-height: 1;
+    cursor: pointer; padding: 0 .25rem; }
+  .file-preview-close:hover { color: var(--accent-red); }
+  .file-preview-body { padding: 1rem; overflow: auto; display: flex; align-items: center;
+    justify-content: center; background: #f5f6f7; min-height: 200px; }
+  .file-preview-body img { max-width: 100%; max-height: 70vh; border-radius: 8px;
+    box-shadow: 0 4px 16px rgba(0,0,0,.15); }
+  .file-preview-body iframe { width: 100%; height: 70vh; border: none; border-radius: 8px; background: #fff; }
+  .file-preview-fallback { color: var(--text-light); font-size: .9rem; display: flex;
+    align-items: center; gap: .5rem; }
 
   .rcv-submit { text-align: center; margin-top: 1.75rem; }
   .btn-confirm { background: linear-gradient(135deg, #435663, var(--primary-dark)); color: #fff; border: none; border-radius: 12px; padding: 1rem 2.25rem; font-size: 1.05rem; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: .6rem; }
@@ -325,6 +382,145 @@
     if (excelInput) excelInput.addEventListener("change", updateProofVisibility);
 
     updateProofVisibility();
+
+    // ---- Upload preview for Receipt & Proof of shortfall (same idea as the GRN page) ----
+    var previewModal = document.getElementById("filePreviewModal");
+    var previewBody = document.getElementById("filePreviewBody");
+    var previewTitle = document.getElementById("filePreviewTitle");
+    var previewClose = document.getElementById("filePreviewClose");
+    var previewObjectUrl = null; // object URL for the PDF currently shown in the modal
+
+    function isPdf(file) {
+      return file.type === "application/pdf" || /\.pdf$/i.test(file.name);
+    }
+
+    function closePreviewModal() {
+      previewModal.classList.remove("active");
+      previewBody.innerHTML = "";
+      if (previewObjectUrl) { URL.revokeObjectURL(previewObjectUrl); previewObjectUrl = null; }
+    }
+
+    previewClose.addEventListener("click", closePreviewModal);
+    previewModal.addEventListener("click", function (e) {
+      if (e.target === previewModal) closePreviewModal();
+    });
+    document.addEventListener("keydown", function (e) {
+      if (e.key === "Escape" && previewModal.classList.contains("active")) closePreviewModal();
+    });
+
+    function openPreviewModal(file, labelText) {
+      previewTitle.textContent = "";
+      var titleIcon = document.createElement("i");
+      titleIcon.className = "fas fa-eye";
+      previewTitle.appendChild(titleIcon);
+      previewTitle.appendChild(document.createTextNode(" " + labelText + " — " + file.name));
+
+      previewBody.innerHTML = "";
+      if (previewObjectUrl) { URL.revokeObjectURL(previewObjectUrl); previewObjectUrl = null; }
+
+      if (file.type.indexOf("image/") === 0) {
+        var reader = new FileReader();
+        reader.onload = function (e) {
+          var img = document.createElement("img");
+          img.src = e.target.result;
+          img.alt = file.name;
+          previewBody.appendChild(img);
+        };
+        reader.readAsDataURL(file);
+      } else if (isPdf(file)) {
+        previewObjectUrl = URL.createObjectURL(file);
+        var frame = document.createElement("iframe");
+        frame.src = previewObjectUrl;
+        frame.title = "PDF preview";
+        previewBody.appendChild(frame);
+      } else {
+        var fallback = document.createElement("p");
+        fallback.className = "file-preview-fallback";
+        var fbIcon = document.createElement("i");
+        fbIcon.className = "fas fa-file";
+        fallback.appendChild(fbIcon);
+        fallback.appendChild(document.createTextNode(" " + file.name + " — no preview available for this file type."));
+        previewBody.appendChild(fallback);
+      }
+      previewModal.classList.add("active");
+    }
+
+    function formatSize(bytes) {
+      if (bytes >= 1024 * 1024) return (bytes / (1024 * 1024)).toFixed(1) + " MB";
+      return Math.max(1, Math.round(bytes / 1024)) + " KB";
+    }
+
+    function setupFilePreview(inputId, boxId, labelText) {
+      var input = document.getElementById(inputId);
+      var box = document.getElementById(boxId);
+      if (!input || !box) return;
+
+      input.addEventListener("change", function () {
+        box.innerHTML = "";
+        var file = input.files && input.files[0];
+        if (!file) { box.style.display = "none"; return; }
+
+        // Inline thumbnail + name/size + view/remove actions.
+        var thumb = document.createElement("div");
+        thumb.className = "file-thumb";
+        thumb.title = "Click to preview";
+        if (file.type.indexOf("image/") === 0) {
+          var img = document.createElement("img");
+          var reader = new FileReader();
+          reader.onload = function (e) { img.src = e.target.result; };
+          reader.readAsDataURL(file);
+          img.alt = file.name;
+          thumb.appendChild(img);
+        } else {
+          var icon = document.createElement("i");
+          icon.className = "fas " + (isPdf(file) ? "fa-file-pdf" : "fa-file");
+          thumb.appendChild(icon);
+        }
+        thumb.addEventListener("click", function () { openPreviewModal(file, labelText); });
+
+        var meta = document.createElement("div");
+        meta.className = "file-meta";
+        var nameEl = document.createElement("span");
+        nameEl.className = "file-name";
+        nameEl.textContent = file.name;
+        nameEl.title = file.name;
+        var sizeEl = document.createElement("span");
+        sizeEl.className = "file-size";
+        sizeEl.textContent = formatSize(file.size);
+        meta.appendChild(nameEl);
+        meta.appendChild(sizeEl);
+
+        var actions = document.createElement("div");
+        actions.className = "file-actions";
+        var viewBtn = document.createElement("button");
+        viewBtn.type = "button";
+        viewBtn.className = "file-view-btn";
+        viewBtn.innerHTML = '<i class="fas fa-eye"></i> View';
+        viewBtn.addEventListener("click", function () { openPreviewModal(file, labelText); });
+        var removeBtn = document.createElement("button");
+        removeBtn.type = "button";
+        removeBtn.className = "file-remove-btn";
+        removeBtn.innerHTML = '<i class="fas fa-times"></i> Remove';
+        removeBtn.addEventListener("click", function () {
+          input.value = "";
+          box.innerHTML = "";
+          box.style.display = "none";
+        });
+        actions.appendChild(viewBtn);
+        actions.appendChild(removeBtn);
+
+        box.appendChild(thumb);
+        box.appendChild(meta);
+        box.appendChild(actions);
+        box.style.display = "";
+
+        // Pop the full preview right away, like the GRN upload does.
+        openPreviewModal(file, labelText);
+      });
+    }
+
+    setupFilePreview("receiptInput", "receiptPreview", "Receipt");
+    setupFilePreview("proofInput", "proofPreview", "Proof of shortfall");
 
     // ---- Submit: progress bar -> download GRN sheet -> go to Incoming STNs ----
     var form = document.getElementById("grnForm");

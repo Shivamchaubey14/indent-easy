@@ -5003,6 +5003,42 @@ def dispatch_log_book(request):
     
 # =========== Financial Document Data Retrieval API ==============
 
+def _split_stn_archive_attachments(stn_files):
+    """
+    Split a grn_against_stn folder listing into main GRN files and their
+    receipt / shortfall-proof attachments.
+
+    receive_stn archives attachments as "<GRN>_<STN>_Receipt_<stamp>.<ext>" /
+    "..._Shortfall_...", i.e. the GRN copy's name plus a marker. Matching is on
+    the base name (extension ignored) so an attachment kept in its original
+    format still groups with the .pdf GRN copy. An attachment whose GRN copy is
+    missing is returned as a main file so it never becomes invisible.
+
+    Returns (main_files, attachments) where attachments maps a main filename to
+    {"receipt": filename, "proof": filename} (keys present only when found).
+    """
+    main_files = []
+    main_by_base = {}   # GRN copy filename without extension -> filename
+    attachments = {}
+    for f in stn_files:
+        if "_Receipt_" not in f and "_Shortfall_" not in f:
+            main_files.append(f)
+            main_by_base[os.path.splitext(f)[0]] = f
+    for f in stn_files:
+        if "_Receipt_" in f:
+            kind, parent_base = "receipt", f.replace("_Receipt_", "_", 1)
+        elif "_Shortfall_" in f:
+            kind, parent_base = "proof", f.replace("_Shortfall_", "_", 1)
+        else:
+            continue
+        parent = main_by_base.get(os.path.splitext(parent_base)[0])
+        if parent:
+            attachments.setdefault(parent, {})[kind] = f
+        else:
+            main_files.append(f)
+    return main_files, attachments
+
+
 @login_required(login_url='login')
 def fetch_finance_data(request):
     """
@@ -5175,32 +5211,10 @@ def fetch_finance_data(request):
                 if os.path.isfile(os.path.join(grn_against_stn_folder_path, f))
             ]
 
-            # Receipt / shortfall-proof copies (saved by receive_stn as
-            # "<GRN>_<STN>_Receipt_<stamp>.pdf" etc.) are attachments of the GRN
-            # copy "<GRN>_<STN>_<stamp>.pdf" — group them under that entry rather
-            # than listing them as separate rows. An attachment whose GRN copy is
-            # missing falls back to being listed on its own.
-            main_stn_files = []
-            main_by_base = {}   # GRN copy filename without extension -> filename
-            stn_attachments = {}  # GRN copy filename -> {"receipt": ..., "proof": ...}
-            for f in stn_files:
-                if "_Receipt_" not in f and "_Shortfall_" not in f:
-                    main_stn_files.append(f)
-                    main_by_base[os.path.splitext(f)[0]] = f
-            for f in stn_files:
-                if "_Receipt_" in f:
-                    kind, parent_base = "receipt", f.replace("_Receipt_", "_", 1)
-                elif "_Shortfall_" in f:
-                    kind, parent_base = "proof", f.replace("_Shortfall_", "_", 1)
-                else:
-                    continue
-                # Match on the base name so an attachment kept in its original
-                # format (conversion fallback) still groups with the .pdf GRN copy.
-                parent = main_by_base.get(os.path.splitext(parent_base)[0])
-                if parent:
-                    stn_attachments.setdefault(parent, {})[kind] = f
-                else:
-                    main_stn_files.append(f)
+            # Receipt / shortfall-proof copies saved by receive_stn are
+            # attachments of their GRN copy — group them under that entry
+            # rather than listing them as separate rows.
+            main_stn_files, stn_attachments = _split_stn_archive_attachments(stn_files)
 
             for stn_file in main_stn_files:
 
